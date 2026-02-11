@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         :root {
             --bg: #05050f;
@@ -40,6 +41,21 @@
         /* Scrollbar */
         ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,240,255,.2);border-radius:3px}
 
+        /* Auth screen */
+        .auth-screen{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;background:rgba(5,5,15,.95);backdrop-filter:blur(20px)}
+        .auth-screen.on{display:flex}
+        .auth-box{width:100%;max-width:400px;padding:48px 36px;background:var(--glass);backdrop-filter:blur(24px);border:1px solid var(--border);border-radius:20px;text-align:center;position:relative;overflow:hidden}
+        .auth-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--cyan),var(--purple),var(--pink));opacity:.8}
+        .auth-box h2{font-size:22px;font-weight:700;margin-bottom:6px;background:linear-gradient(135deg,#fff,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .auth-box p{font-size:13px;color:var(--text2);margin-bottom:28px}
+        .auth-input{width:100%;padding:12px 16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;margin-bottom:14px;outline:none;transition:border-color .3s}
+        .auth-input:focus{border-color:rgba(0,240,255,.4)}
+        .auth-input::placeholder{color:var(--text3)}
+        .auth-btn{width:100%;padding:13px;background:linear-gradient(135deg,rgba(0,240,255,.2),rgba(168,85,247,.15));border:1px solid rgba(0,240,255,.3);border-radius:10px;color:var(--cyan);font-size:14px;font-weight:600;cursor:pointer;transition:all .3s;font-family:inherit;margin-top:6px}
+        .auth-btn:hover{background:linear-gradient(135deg,rgba(0,240,255,.3),rgba(168,85,247,.25));box-shadow:0 0 25px rgba(0,240,255,.2);transform:translateY(-1px)}
+        .auth-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+        .auth-error{color:var(--rose);font-size:12px;margin-top:12px;min-height:18px}
+
         /* Header */
         .header{position:sticky;top:0;z-index:100;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;background:rgba(5,5,15,.75);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
         .header-left{display:flex;align-items:center;gap:14px}
@@ -50,6 +66,16 @@
         .date-info{font-size:11px;color:var(--text2)}
         .status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;box-shadow:0 0 8px var(--green);animation:pulse-dot 2s ease-in-out infinite}
         @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.5}}
+
+        /* User info */
+        .user-info{display:none;align-items:center;gap:10px;font-size:12px}
+        .user-info .user-name{color:var(--text2)}
+        .role-badge{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+        .role-badge.admin{color:var(--cyan);background:rgba(0,240,255,.1);border:1px solid rgba(0,240,255,.2)}
+        .role-badge.editor{color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2)}
+        .role-badge.viewer{color:var(--text2);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+        .btn-logout{padding:6px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;color:var(--text2);font-size:11px;cursor:pointer;transition:all .3s;font-family:inherit}
+        .btn-logout:hover{border-color:rgba(251,113,133,.3);color:var(--rose);background:rgba(251,113,133,.08)}
 
         /* Buttons */
         .btn{display:flex;align-items:center;gap:8px;padding:9px 18px;background:linear-gradient(135deg,rgba(0,240,255,.12),rgba(168,85,247,.08));border:1px solid rgba(0,240,255,.25);border-radius:10px;color:var(--cyan);font-size:12px;font-weight:500;cursor:pointer;transition:all .3s;position:relative;overflow:hidden;font-family:inherit}
@@ -153,6 +179,7 @@
         @keyframes spin{to{transform:rotate(360deg)}}
         .toast{position:fixed;top:80px;right:32px;padding:12px 20px;background:var(--glass);backdrop-filter:blur(20px);border:1px solid rgba(34,197,94,.3);border-radius:12px;font-size:13px;color:var(--green);transform:translateX(150%);transition:transform .4s cubic-bezier(.16,1,.3,1);z-index:150}
         .toast.on{transform:translateX(0)}
+        .toast.error{color:var(--rose);border-color:rgba(251,113,133,.3)}
 
         @media(max-width:1200px){.chart-row.cols-2{grid-template-columns:1fr}}
         @media(max-width:768px){.header{padding:12px 16px;flex-wrap:wrap;gap:12px}.main{padding:16px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.kpi-value{font-size:20px}}
@@ -163,6 +190,18 @@
 <div class="bg-mesh"><div class="bg-orb bg-orb--1"></div><div class="bg-orb bg-orb--2"></div><div class="bg-orb bg-orb--3"></div></div>
 <div class="bg-grid"></div>
 
+<!-- Auth screen -->
+<div class="auth-screen" id="authScreen">
+    <div class="auth-box">
+        <h2>KPI Dashboard</h2>
+        <p>Увійдіть для доступу до панелі</p>
+        <input class="auth-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
+        <input class="auth-input" id="authPass" type="password" placeholder="Пароль" autocomplete="current-password">
+        <button class="auth-btn" id="btnLogin" onclick="handleLogin()">Увійти</button>
+        <div class="auth-error" id="authError"></div>
+    </div>
+</div>
+
 <header class="header">
     <div class="header-left">
         <div class="logo">KPI</div>
@@ -172,6 +211,11 @@
         </div>
     </div>
     <div class="header-right">
+        <div class="user-info" id="userInfo">
+            <span class="user-name" id="userName"></span>
+            <span class="role-badge" id="roleBadge"></span>
+            <button class="btn-logout" onclick="handleLogout()">Вийти</button>
+        </div>
         <div class="period-filter" id="periodBar" style="display:none">
             <button class="period-btn" data-p="30">30д</button>
             <button class="period-btn" data-p="90">90д</button>
@@ -179,7 +223,7 @@
             <button class="period-btn active" data-p="all">Все</button>
         </div>
         <div id="dateInfo" style="display:none"><span class="status-dot"></span><span id="updLbl"></span></div>
-        <label class="btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Оновити дані<input type="file" id="fileHdr" accept=".xlsx,.xls"></label>
+        <label class="btn" id="btnUpload" style="display:none"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Оновити дані<input type="file" id="fileHdr" accept=".xlsx,.xls"></label>
         <button class="btn btn-danger" id="btnClear" style="display:none" title="Очистити базу"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
     </div>
 </header>
@@ -245,67 +289,149 @@
 
 <script>
 // ============================
-// IndexedDB
+// Supabase client
 // ============================
-const DB_NAME = 'kpi_dashboard';
-const DB_VER = 1;
-const STORE = 'records';
+const SUPABASE_URL = 'https://qfggalnkosrpfaosrqhj.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_0NmTVR4yOdPWXHjaO4MTjg_Xo-QrYTc';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function openDB() {
-    return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VER);
-        req.onupgradeneeded = e => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains(STORE)) {
-                const store = db.createObjectStore(STORE, { keyPath: 'id' });
-                store.createIndex('type', 'type', { unique: false });
-                store.createIndex('date', 'date', { unique: false });
-            }
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-}
-
+// ============================
+// Supabase data layer
+// ============================
 async function saveRecords(records) {
-    const db = await openDB();
-    const tx = db.transaction(STORE, 'readwrite');
-    const store = tx.objectStore(STORE);
-    for (const r of records) {
-        r.id = r.date + '|' + r.indicator;
-        store.put(r);
+    const { data: { user } } = await sb.auth.getUser();
+    const rows = records.map(r => ({
+        id: r.date + '|' + r.indicator,
+        date: r.date,
+        indicator: r.indicator,
+        type: r.type,
+        value: r.value,
+        unit: r.unit || '',
+        uploaded_by: user ? user.id : null,
+        updated_at: new Date().toISOString()
+    }));
+    // Upsert in chunks of 500
+    for (let i = 0; i < rows.length; i += 500) {
+        const chunk = rows.slice(i, i + 500);
+        const { error } = await sb.from('kpi_records').upsert(chunk, { onConflict: 'id' });
+        if (error) throw new Error(error.message);
     }
-    return new Promise((resolve, reject) => {
-        tx.oncomplete = resolve;
-        tx.onerror = () => reject(tx.error);
-    });
 }
 
 async function loadAllRecords() {
-    const db = await openDB();
-    const tx = db.transaction(STORE, 'readonly');
-    const store = tx.objectStore(STORE);
-    return new Promise((resolve, reject) => {
-        const req = store.getAll();
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
+    const all = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+        const { data, error } = await sb.from('kpi_records').select('*').range(from, from + pageSize - 1);
+        if (error) throw new Error(error.message);
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+    }
+    return all;
 }
 
 async function clearDB() {
-    const db = await openDB();
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).clear();
-    return new Promise(r => { tx.oncomplete = r; });
+    const { error } = await sb.from('kpi_records').delete().neq('id', '');
+    if (error) throw new Error(error.message);
 }
 
 async function getRecordCount() {
-    const db = await openDB();
-    const tx = db.transaction(STORE, 'readonly');
-    return new Promise(r => {
-        const req = tx.objectStore(STORE).count();
-        req.onsuccess = () => r(req.result);
-    });
+    const { count, error } = await sb.from('kpi_records').select('*', { count: 'exact', head: true });
+    if (error) throw new Error(error.message);
+    return count || 0;
+}
+
+// ============================
+// Auth
+// ============================
+let currentProfile = null;
+
+async function getCurrentProfile() {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+    if (error) { console.error('Profile fetch error:', error); return null; }
+    return data;
+}
+
+function showAuthScreen() {
+    $('authScreen').classList.add('on');
+    $('authError').textContent = '';
+    $('authEmail').value = '';
+    $('authPass').value = '';
+}
+
+function hideAuthScreen() {
+    $('authScreen').classList.remove('on');
+}
+
+async function handleLogin() {
+    const email = $('authEmail').value.trim();
+    const pass = $('authPass').value;
+    if (!email || !pass) { $('authError').textContent = 'Введіть email та пароль'; return; }
+    $('btnLogin').disabled = true;
+    $('authError').textContent = '';
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    $('btnLogin').disabled = false;
+    if (error) {
+        $('authError').textContent = error.message === 'Invalid login credentials'
+            ? 'Невірний email або пароль'
+            : error.message;
+        return;
+    }
+    // Auth state change listener will handle the rest
+}
+
+async function handleLogout() {
+    await sb.auth.signOut();
+    currentProfile = null;
+    allData = []; filtered = [];
+    Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+    charts = {};
+    hide('dash');
+    show('empty');
+    hide('periodBar');
+    hide('dateInfo');
+    hide('btnClear');
+    hide('btnUpload');
+    $('userInfo').style.display = 'none';
+    $('hdrSub').textContent = 'Завантажте файл для початку';
+    showAuthScreen();
+}
+
+async function showAppForUser(user) {
+    hideAuthScreen();
+    currentProfile = await getCurrentProfile();
+    const role = currentProfile ? currentProfile.role : 'viewer';
+    const displayName = currentProfile && currentProfile.full_name ? currentProfile.full_name : user.email;
+
+    // Show user info
+    $('userInfo').style.display = 'flex';
+    $('userName').textContent = displayName;
+    const badge = $('roleBadge');
+    badge.textContent = role;
+    badge.className = 'role-badge ' + role;
+
+    // Role-based visibility
+    if (role === 'admin' || role === 'editor') {
+        $('btnUpload').style.display = '';
+    } else {
+        $('btnUpload').style.display = 'none';
+    }
+    // Clear button only for admins
+    // (will be shown/hidden in loadAndRender based on data)
+
+    // Setup Chart.js defaults
+    setupChartDefaults();
+
+    // Load data
+    const count = await getRecordCount();
+    if (count > 0) {
+        await loadAndRender();
+    }
 }
 
 // ============================
@@ -391,7 +517,13 @@ function $(id) { return document.getElementById(id); }
 function show(id) { $(id).style.display = ''; }
 function hide(id) { $(id).style.display = 'none'; }
 function showLoader(v) { $('loader').classList.toggle('on', v); }
-function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 3000); }
+function toast(t, isError) {
+    const el = $('toast');
+    el.textContent = t;
+    el.classList.toggle('error', !!isError);
+    el.classList.add('on');
+    setTimeout(() => el.classList.remove('on'), 3000);
+}
 function fmt(n, d = 0) { return n == null || isNaN(n) ? '—' : n.toLocaleString('uk-UA', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 function fmtDate(s) { const d = new Date(s); return d.toLocaleDateString('uk-UA'); }
 
@@ -399,16 +531,21 @@ function fmtDate(s) { const d = new Date(s); return d.toLocaleDateString('uk-UA'
 // Main flow
 // ============================
 async function handleFile(file) {
+    // Check permissions
+    const role = currentProfile ? currentProfile.role : 'viewer';
+    if (role === 'viewer') {
+        toast('У вас немає прав для завантаження даних', true);
+        return;
+    }
     showLoader(true);
     try {
         const records = await parseFile(file);
         if (!records.length) { alert('Не знайдено даних'); showLoader(false); return; }
         await saveRecords(records);
-        localStorage.setItem('kpi_updated', new Date().toISOString());
         await loadAndRender();
         toast(`Додано/оновлено ${records.length} записів`);
     } catch (err) {
-        alert('Помилка: ' + err.message);
+        toast('Помилка: ' + err.message, true);
         console.error(err);
     }
     showLoader(false);
@@ -417,20 +554,26 @@ async function handleFile(file) {
 async function loadAndRender() {
     const raw = await loadAllRecords();
     allData = raw.map(r => ({ ...r, _date: new Date(r.date) })).sort((a, b) => a._date - b._date);
-    if (!allData.length) { hide('dash'); show('empty'); hide('periodBar'); hide('dateInfo'); hide('btnClear'); $('hdrSub').textContent = 'Завантажте файл для початку'; return; }
+    const role = currentProfile ? currentProfile.role : 'viewer';
+
+    if (!allData.length) {
+        hide('dash'); show('empty'); hide('periodBar'); hide('dateInfo'); hide('btnClear');
+        $('hdrSub').textContent = 'Завантажте файл для початку';
+        return;
+    }
     hide('empty');
     const dash = $('dash');
     dash.style.display = 'block';
     show('periodBar');
     show('dateInfo');
-    show('btnClear');
+    // Only show clear button for admins
+    if (role === 'admin') { show('btnClear'); } else { hide('btnClear'); }
 
     const dates = allData.map(r => r._date);
     const minD = new Date(Math.min(...dates));
     const maxD = new Date(Math.max(...dates));
     $('hdrSub').textContent = `${fmtDate(minD)} — ${fmtDate(maxD)} | ${allData.length} записів`;
-    const upd = localStorage.getItem('kpi_updated');
-    $('updLbl').textContent = upd ? 'Оновлено: ' + fmtDate(upd) : '';
+    $('updLbl').textContent = 'Online';
 
     // Show cash card if data exists
     const hasCash = allData.some(r => r.type === 'cash_daily' || r.type === 'cash_monthly');
@@ -833,21 +976,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Clear DB
     $('btnClear').addEventListener('click', async () => {
         if (!confirm('Очистити всю базу даних?')) return;
-        await clearDB();
-        localStorage.removeItem('kpi_updated');
-        allData = []; filtered = [];
-        Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
-        charts = {};
-        await loadAndRender();
-        toast('Базу очищено');
+        showLoader(true);
+        try {
+            await clearDB();
+            allData = []; filtered = [];
+            Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+            charts = {};
+            await loadAndRender();
+            toast('Базу очищено');
+        } catch (err) {
+            toast('Помилка: ' + err.message, true);
+        }
+        showLoader(false);
     });
 
-    // Setup Chart.js defaults (loaded statically in head)
-    setupChartDefaults();
+    // Login on Enter key
+    $('authPass').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
+    $('authEmail').addEventListener('keydown', e => { if (e.key === 'Enter') $('authPass').focus(); });
 
-    const count = await getRecordCount();
-    if (count > 0) {
-        await loadAndRender();
+    // Auth state listener
+    sb.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+            await showAppForUser(session.user);
+        } else if (event === 'SIGNED_OUT') {
+            // handleLogout already handles UI
+        }
+    });
+
+    // Check existing session
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+        await showAppForUser(session.user);
+    } else {
+        showAuthScreen();
     }
 });
 </script>
