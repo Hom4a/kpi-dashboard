@@ -441,10 +441,19 @@
 </div>
 
 <script>
+// ===== Error handler =====
+window.onerror = function(msg, url, line) {
+    console.error('Global error:', msg, url, line);
+    const t = document.getElementById('toast');
+    if (t) { t.textContent = 'JS Error: ' + msg; t.className = 'toast error on'; }
+};
+
 // ===== Supabase =====
 const SUPABASE_URL = 'https://qfggalnkosrpfaosrqhj.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_0NmTVR4yOdPWXHjaO4MTjg_Xo-QrYTc';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let sb;
+try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }
+catch(e) { console.error('Supabase init failed:', e); }
 
 async function saveRecords(records) {
     const { data: { user } } = await sb.auth.getUser();
@@ -503,19 +512,21 @@ async function handleLogout() {
 }
 function hideButtons() { ['btnUpload','btnClear','btnExport','btnPrint','btnTargets','liveInfo'].forEach(id => { try { $(id).style.display = 'none'; } catch(e){} }); }
 async function showAppForUser(user) {
-    hideAuthScreen();
-    currentProfile = await getCurrentProfile();
-    const role = currentProfile ? currentProfile.role : 'viewer';
-    const displayName = currentProfile && currentProfile.full_name ? currentProfile.full_name : user.email;
-    $('userInfo').style.display = 'flex';
-    $('userName').textContent = displayName;
-    const badge = $('roleBadge'); badge.textContent = role; badge.className = 'role-badge ' + role;
-    if (role === 'admin' || role === 'editor') $('btnUpload').style.display = '';
-    else $('btnUpload').style.display = 'none';
-    setupChartDefaults();
-    const count = await getRecordCount();
-    if (count > 0) await loadAndRender();
-    startAutoRefresh();
+    try {
+        hideAuthScreen();
+        currentProfile = await getCurrentProfile();
+        const role = currentProfile ? currentProfile.role : 'viewer';
+        const displayName = currentProfile && currentProfile.full_name ? currentProfile.full_name : user.email;
+        $('userInfo').style.display = 'flex';
+        $('userName').textContent = displayName;
+        const badge = $('roleBadge'); badge.textContent = role; badge.className = 'role-badge ' + role;
+        if (role === 'admin' || role === 'editor') $('btnUpload').style.display = '';
+        else $('btnUpload').style.display = 'none';
+        setupChartDefaults();
+        const count = await getRecordCount();
+        if (count > 0) await loadAndRender();
+        startAutoRefresh();
+    } catch(e) { console.error('showAppForUser error:', e); toast('Помилка завантаження: ' + e.message, true); }
 }
 
 // ===== Theme =====
@@ -633,28 +644,29 @@ async function handleFile(file) {
 
 // ===== Load & Render =====
 async function loadAndRender() {
-    const raw = await loadAllRecords();
-    allData = raw.map(r => ({ ...r, _date: new Date(r.date) })).sort((a, b) => a._date - b._date);
-    const role = currentProfile ? currentProfile.role : 'viewer';
-    if (!allData.length) {
-        hide('dash'); show('empty'); hideButtons();
-        $('hdrSub').textContent = 'Завантажте файл для початку'; return;
-    }
-    hide('empty'); $('dash').style.display = 'block';
-    $('btnExport').style.display = ''; $('btnPrint').style.display = ''; $('liveInfo').style.display = '';
-    if (role === 'admin') { show('btnClear'); $('btnTargets').style.display = ''; }
-    else { hide('btnClear'); $('btnTargets').style.display = 'none'; }
-    const dates = allData.map(r => r._date);
-    const minD = new Date(Math.min(...dates)), maxD = new Date(Math.max(...dates));
-    $('hdrSub').textContent = `${fmtDate(minD)} — ${fmtDate(maxD)} | ${allData.length} записів`;
-    // Finance empty state
-    const hasCash = allData.some(r => r.type === 'cash_daily' || r.type === 'cash_monthly');
-    $('finEmptyState').style.display = hasCash ? 'none' : '';
-    $('cashChartCard').style.display = hasCash ? '' : 'none';
-    // Populate year filter
-    populateFilters();
-    applyFilter();
-    checkThresholds();
+    try {
+        const raw = await loadAllRecords();
+        console.log('Loaded records:', raw.length);
+        allData = raw.map(r => ({ ...r, _date: new Date(r.date) })).sort((a, b) => a._date - b._date);
+        const role = currentProfile ? currentProfile.role : 'viewer';
+        if (!allData.length) {
+            hide('dash'); show('empty'); hideButtons();
+            $('hdrSub').textContent = 'Завантажте файл для початку'; return;
+        }
+        hide('empty'); $('dash').style.display = 'block';
+        $('btnExport').style.display = ''; $('btnPrint').style.display = ''; $('liveInfo').style.display = '';
+        if (role === 'admin') { show('btnClear'); $('btnTargets').style.display = ''; }
+        else { hide('btnClear'); $('btnTargets').style.display = 'none'; }
+        const dates = allData.map(r => r._date);
+        const minD = new Date(Math.min(...dates)), maxD = new Date(Math.max(...dates));
+        $('hdrSub').textContent = `${fmtDate(minD)} — ${fmtDate(maxD)} | ${allData.length} записів`;
+        const hasCash = allData.some(r => r.type === 'cash_daily' || r.type === 'cash_monthly');
+        $('finEmptyState').style.display = hasCash ? 'none' : '';
+        $('cashChartCard').style.display = hasCash ? '' : 'none';
+        populateFilters();
+        applyFilter();
+        checkThresholds();
+    } catch(e) { console.error('loadAndRender error:', e); toast('Помилка: ' + e.message, true); }
 }
 
 // ===== Filters =====
@@ -728,7 +740,7 @@ function makeGrad(ctx, r, g, b) {
 }
 function getTargetAnnotation(key, label) {
     const val = targets[key];
-    if (!val) return {};
+    if (!val) return { annotations: {} };
     return { annotations: { target: { type: 'line', yMin: val, yMax: val, borderColor: 'rgba(231,76,60,0.5)', borderDash: [6, 3], borderWidth: 1.5, label: { content: label || 'План: ' + fmt(val), display: true, position: 'start', backgroundColor: 'rgba(231,76,60,0.15)', color: 'rgba(231,76,60,0.8)', font: { size: 10 } } } } };
 }
 
@@ -1194,11 +1206,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     // Auth state
+    if (!sb) { toast('Supabase не ініціалізовано', true); showAuthScreen(); return; }
     sb.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) await showAppForUser(session.user);
     });
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) await showAppForUser(session.user); else showAuthScreen();
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) await showAppForUser(session.user); else showAuthScreen();
+    } catch(e) { console.error('Session check error:', e); showAuthScreen(); }
 });
 </script>
 </body>
