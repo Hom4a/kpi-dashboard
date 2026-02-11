@@ -10,6 +10,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script>
+    // CDN library check
+    window._libCheck = { xlsx: typeof XLSX !== 'undefined', chart: typeof Chart !== 'undefined', supabase: typeof supabase !== 'undefined' };
+    console.log('Libraries:', window._libCheck);
+    </script>
     <style>
         /* ===== THEME VARIABLES ===== */
         :root,[data-theme="dark"]{
@@ -251,8 +256,8 @@
 <div class="bg-mesh"><div class="bg-orb bg-orb--1"></div><div class="bg-orb bg-orb--2"></div><div class="bg-orb bg-orb--3"></div></div>
 <div class="bg-grid"></div>
 
-<!-- Auth -->
-<div class="auth-screen" id="authScreen">
+<!-- Auth (on by default - JS hides when session exists) -->
+<div class="auth-screen on" id="authScreen">
     <div class="auth-box">
         <h2>ДП Ліси України</h2>
         <div class="auth-subtitle">Панель KPI</div>
@@ -446,7 +451,17 @@ window.onerror = function(msg, url, line) {
     console.error('Global error:', msg, url, line);
     const t = document.getElementById('toast');
     if (t) { t.textContent = 'JS Error: ' + msg; t.className = 'toast error on'; }
+    // Also show in auth error area as fallback
+    const ae = document.getElementById('authError');
+    if (ae) ae.textContent = 'JS: ' + msg;
 };
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('Unhandled rejection:', e.reason);
+    const t = document.getElementById('toast');
+    if (t) { t.textContent = 'Error: ' + (e.reason?.message || e.reason); t.className = 'toast error on'; }
+    const ae = document.getElementById('authError');
+    if (ae && ae.textContent === '') ae.textContent = 'Error: ' + (e.reason?.message || e.reason);
+});
 
 // ===== Supabase =====
 const SUPABASE_URL = 'https://qfggalnkosrpfaosrqhj.supabase.co';
