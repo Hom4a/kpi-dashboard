@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KPI Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg: #05050f;
+            --glass: rgba(20,20,50,0.45);
+            --glass-hover: rgba(30,30,60,0.55);
+            --border: rgba(255,255,255,0.06);
+            --text: #e8eaed;
+            --text2: rgba(255,255,255,0.5);
+            --text3: rgba(255,255,255,0.25);
+            --cyan: #00f0ff;
+            --purple: #a855f7;
+            --pink: #ec4899;
+            --green: #22c55e;
+            --amber: #fbbf24;
+            --rose: #fb7185;
+            --r: 16px;
+        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+        /* BG */
+        .bg-mesh{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+        .bg-orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.3;animation:float 20s ease-in-out infinite}
+        .bg-orb--1{width:600px;height:600px;background:radial-gradient(circle,rgba(0,240,255,.3),transparent 70%);top:-200px;left:-100px;animation-duration:25s}
+        .bg-orb--2{width:500px;height:500px;background:radial-gradient(circle,rgba(168,85,247,.25),transparent 70%);top:40%;right:-150px;animation-duration:30s;animation-delay:-5s}
+        .bg-orb--3{width:400px;height:400px;background:radial-gradient(circle,rgba(236,72,153,.2),transparent 70%);bottom:-100px;left:30%;animation-duration:22s;animation-delay:-10s}
+        .bg-grid{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:60px 60px;pointer-events:none}
+        @keyframes float{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(30px,-40px) scale(1.05)}50%{transform:translate(-20px,20px) scale(.95)}75%{transform:translate(40px,30px) scale(1.02)}}
+
+        /* Scrollbar */
+        ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,240,255,.2);border-radius:3px}
+
+        /* Header */
+        .header{position:sticky;top:0;z-index:100;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;background:rgba(5,5,15,.75);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+        .header-left{display:flex;align-items:center;gap:14px}
+        .logo{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--cyan);background:rgba(0,240,255,.08);border:1px solid rgba(0,240,255,.2)}
+        .header-title h1{font-size:16px;font-weight:700;background:linear-gradient(135deg,var(--text),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .header-title p{font-size:11px;color:var(--text2);margin-top:1px}
+        .header-right{display:flex;align-items:center;gap:12px}
+        .date-info{font-size:11px;color:var(--text2)}
+        .status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;box-shadow:0 0 8px var(--green);animation:pulse-dot 2s ease-in-out infinite}
+        @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.5}}
+
+        /* Buttons */
+        .btn{display:flex;align-items:center;gap:8px;padding:9px 18px;background:linear-gradient(135deg,rgba(0,240,255,.12),rgba(168,85,247,.08));border:1px solid rgba(0,240,255,.25);border-radius:10px;color:var(--cyan);font-size:12px;font-weight:500;cursor:pointer;transition:all .3s;position:relative;overflow:hidden;font-family:inherit}
+        .btn:hover{background:linear-gradient(135deg,rgba(0,240,255,.2),rgba(168,85,247,.15));box-shadow:0 0 20px rgba(0,240,255,.15);transform:translateY(-1px)}
+        .btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+        .btn svg{width:14px;height:14px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+        .btn-danger{border-color:rgba(251,113,133,.3);color:var(--rose);background:rgba(251,113,133,.08)}
+        .btn-danger:hover{background:rgba(251,113,133,.15);box-shadow:0 0 20px rgba(251,113,133,.15)}
+
+        /* Period filter */
+        .period-filter{display:flex;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px}
+        .period-btn{padding:6px 14px;border:none;background:transparent;color:var(--text2);font-size:11px;font-weight:500;cursor:pointer;border-radius:8px;transition:all .3s;font-family:inherit}
+        .period-btn:hover{color:var(--text)}
+        .period-btn.active{background:linear-gradient(135deg,rgba(0,240,255,.15),rgba(168,85,247,.1));color:var(--cyan)}
+
+        /* Main */
+        .main{position:relative;z-index:1;padding:24px 32px;max-width:1600px;margin:0 auto}
+
+        /* Glass */
+        .glass{background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:var(--r);transition:border-color .3s}
+        .glass:hover{border-color:rgba(0,240,255,.12)}
+
+        /* Empty state */
+        .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:65vh}
+        .drop-zone{width:100%;max-width:520px;padding:60px 40px;cursor:pointer;position:relative;text-align:center;background:var(--glass);backdrop-filter:blur(20px);border-radius:20px;border:2px dashed rgba(0,240,255,.25);transition:all .3s}
+        .drop-zone.drag-over{border-color:var(--cyan);background:rgba(0,240,255,.05)}
+        .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:2}
+        .drop-icon{width:72px;height:72px;margin:0 auto 24px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:rgba(0,240,255,.08);border:1px solid rgba(0,240,255,.15)}
+        .drop-icon svg{width:32px;height:32px;stroke:var(--cyan);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+        .drop-zone h2{font-size:22px;font-weight:700;margin-bottom:8px;background:linear-gradient(135deg,#fff,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .drop-zone p{color:var(--text2);font-size:13px}
+        .drop-zone .ft{margin-top:20px;font-size:11px;color:var(--text3);padding:6px 14px;background:rgba(255,255,255,.03);border-radius:20px;display:inline-block}
+
+        /* Dashboard */
+        .dashboard{display:none}
+
+        /* Stats bar */
+        .stats-bar{display:flex;align-items:center;gap:16px;margin-bottom:20px;font-size:12px;color:var(--text2);flex-wrap:wrap}
+        .stats-bar .stat{display:flex;align-items:center;gap:6px}
+        .stats-bar .stat b{color:var(--cyan);font-weight:600}
+
+        /* KPI Grid */
+        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+        .kpi-card{padding:20px;position:relative;overflow:hidden}
+        .kpi-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:.8}
+        .kpi-card:nth-child(1)::after{background:linear-gradient(90deg,var(--cyan),transparent)}
+        .kpi-card:nth-child(2)::after{background:linear-gradient(90deg,var(--green),transparent)}
+        .kpi-card:nth-child(3)::after{background:linear-gradient(90deg,var(--purple),transparent)}
+        .kpi-card:nth-child(4)::after{background:linear-gradient(90deg,var(--amber),transparent)}
+        .kpi-card:nth-child(5)::after{background:linear-gradient(90deg,var(--pink),transparent)}
+        .kpi-card:nth-child(6)::after{background:linear-gradient(90deg,var(--rose),transparent)}
+        .kpi-card:nth-child(7)::after{background:linear-gradient(90deg,var(--cyan),var(--purple),transparent)}
+        .kpi-card:nth-child(8)::after{background:linear-gradient(90deg,var(--green),var(--amber),transparent)}
+        .kpi-label{font-size:10px;color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+        .kpi-value{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+        .kpi-unit{font-size:12px;color:var(--text2);font-weight:400;margin-left:4px}
+        .kpi-change{display:inline-flex;align-items:center;gap:3px;margin-top:8px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+        .kpi-change.up{color:var(--green);background:rgba(34,197,94,.1)}
+        .kpi-change.down{color:var(--rose);background:rgba(251,113,133,.1)}
+        .kpi-sub{font-size:10px;color:var(--text3);margin-top:3px}
+
+        .neon-cyan .kpi-value{color:var(--cyan);text-shadow:0 0 25px rgba(0,240,255,.3)}
+        .neon-green .kpi-value{color:var(--green);text-shadow:0 0 25px rgba(34,197,94,.3)}
+        .neon-purple .kpi-value{color:var(--purple);text-shadow:0 0 25px rgba(168,85,247,.3)}
+        .neon-amber .kpi-value{color:var(--amber);text-shadow:0 0 25px rgba(251,191,36,.3)}
+        .neon-pink .kpi-value{color:var(--pink);text-shadow:0 0 25px rgba(236,72,153,.3)}
+        .neon-rose .kpi-value{color:var(--rose);text-shadow:0 0 25px rgba(251,113,133,.3)}
+
+        /* Chart card */
+        .chart-row{display:grid;gap:14px;margin-bottom:20px}
+        .chart-row.cols-2{grid-template-columns:1fr 1fr}
+        .chart-card{padding:22px}
+        .chart-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+        .chart-hdr h3{font-size:14px;font-weight:600}
+        .chart-hdr small{font-size:11px;color:var(--text3);display:block;margin-top:2px}
+        .chart-wrap{position:relative;width:100%;height:350px}
+        .chart-wrap.medium{height:300px}
+        .chart-wrap canvas{display:block}
+
+        /* Toggle */
+        .toggle{display:flex;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3px}
+        .toggle button{padding:5px 12px;border:none;background:transparent;color:var(--text2);font-size:11px;font-weight:500;cursor:pointer;border-radius:6px;transition:all .3s;white-space:nowrap;font-family:inherit}
+        .toggle button.active{background:linear-gradient(135deg,rgba(0,240,255,.15),rgba(168,85,247,.1));color:var(--cyan)}
+
+        /* Table */
+        .tbl-wrap{overflow-x:auto;max-height:400px;overflow-y:auto;margin-top:8px}
+        table.tbl{width:100%;border-collapse:collapse;font-size:12px}
+        .tbl th,.tbl td{padding:10px 14px;text-align:right}
+        .tbl th{font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-size:10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--glass)}
+        .tbl th:first-child,.tbl td:first-child{text-align:left}
+        .tbl td{font-variant-numeric:tabular-nums;border-bottom:1px solid rgba(255,255,255,.03)}
+        .tbl tr:hover td{background:rgba(0,240,255,.03)}
+        .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+        .badge.up{color:var(--green);background:rgba(34,197,94,.08)}
+        .badge.down{color:var(--rose);background:rgba(251,113,133,.08)}
+
+        /* Loader / Notification */
+        .loader{display:none;position:fixed;inset:0;background:rgba(5,5,15,.85);backdrop-filter:blur(8px);z-index:200;align-items:center;justify-content:center}
+        .loader.on{display:flex}
+        .spinner{width:48px;height:48px;border:2px solid rgba(255,255,255,.05);border-top-color:var(--cyan);border-right-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;box-shadow:0 0 20px rgba(0,240,255,.2)}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .toast{position:fixed;top:80px;right:32px;padding:12px 20px;background:var(--glass);backdrop-filter:blur(20px);border:1px solid rgba(34,197,94,.3);border-radius:12px;font-size:13px;color:var(--green);transform:translateX(150%);transition:transform .4s cubic-bezier(.16,1,.3,1);z-index:150}
+        .toast.on{transform:translateX(0)}
+
+        @media(max-width:1200px){.chart-row.cols-2{grid-template-columns:1fr}}
+        @media(max-width:768px){.header{padding:12px 16px;flex-wrap:wrap;gap:12px}.main{padding:16px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.kpi-value{font-size:20px}}
+    </style>
+</head>
+<body>
+
+<div class="bg-mesh"><div class="bg-orb bg-orb--1"></div><div class="bg-orb bg-orb--2"></div><div class="bg-orb bg-orb--3"></div></div>
+<div class="bg-grid"></div>
+
+<header class="header">
+    <div class="header-left">
+        <div class="logo">KPI</div>
+        <div class="header-title">
+            <h1>Ключові показники діяльності</h1>
+            <p id="hdrSub">Завантажте файл для початку</p>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="period-filter" id="periodBar" style="display:none">
+            <button class="period-btn" data-p="30">30д</button>
+            <button class="period-btn" data-p="90">90д</button>
+            <button class="period-btn" data-p="365">1 рік</button>
+            <button class="period-btn active" data-p="all">Все</button>
+        </div>
+        <div id="dateInfo" style="display:none"><span class="status-dot"></span><span id="updLbl"></span></div>
+        <label class="btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Оновити дані<input type="file" id="fileHdr" accept=".xlsx,.xls"></label>
+        <button class="btn btn-danger" id="btnClear" style="display:none" title="Очистити базу"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+    </div>
+</header>
+
+<div class="loader" id="loader"><div><div class="spinner"></div><p style="color:var(--text2);font-size:13px">Обробка даних...</p></div></div>
+<div class="toast" id="toast"></div>
+
+<main class="main">
+    <div class="empty-state" id="empty">
+        <div class="drop-zone" id="dropZone">
+            <input type="file" id="fileDrop" accept=".xlsx,.xls">
+            <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg></div>
+            <h2>Завантажте файл з даними</h2>
+            <p>Перетягніть Excel або натисніть для вибору.<br>Нові дані додаються до існуючих.</p>
+            <span class="ft">.xlsx .xls</span>
+        </div>
+    </div>
+
+    <div class="dashboard" id="dash">
+        <div class="stats-bar" id="statsBar"></div>
+        <div class="kpi-grid" id="kpiGrid"></div>
+
+        <div class="glass chart-card" style="margin-bottom:20px">
+            <div class="chart-hdr"><div><h3>Динаміка обсягів</h3><small>Реалізація та заготівля, м³</small></div>
+                <div class="toggle" id="tglMain"><button class="active" data-m="both">Обидва</button><button data-m="realized">Реалізація</button><button data-m="harvested">Заготівля</button></div></div>
+            <div class="chart-wrap" id="wrapMain"><canvas id="cMain"></canvas></div>
+        </div>
+
+        <div class="glass chart-card" id="cashCard" style="margin-bottom:20px;display:none">
+            <div class="chart-hdr"><div><h3>Надходження грошових коштів</h3><small>Денна динаміка та помісячна агрегація, грн</small></div></div>
+            <div class="chart-wrap" id="wrapCash"><canvas id="cCash"></canvas></div>
+        </div>
+
+        <div class="chart-row cols-2">
+            <div class="glass chart-card">
+                <div class="chart-hdr"><div><h3>Місячні обсяги</h3><small>Сума за місяць</small></div></div>
+                <div class="chart-wrap medium" id="wrapMonthly"><canvas id="cMonthly"></canvas></div>
+            </div>
+            <div class="glass chart-card">
+                <div class="chart-hdr"><div><h3>Накопичувальний підсумок</h3><small>Кумулятивно з початку року</small></div></div>
+                <div class="chart-wrap medium" id="wrapCum"><canvas id="cCum"></canvas></div>
+            </div>
+        </div>
+
+        <div class="chart-row cols-2">
+            <div class="glass chart-card">
+                <div class="chart-hdr"><div><h3>Порівняння по роках</h3><small>Місячні обсяги реалізації</small></div></div>
+                <div class="chart-wrap medium" id="wrapYoy"><canvas id="cYoy"></canvas></div>
+            </div>
+            <div class="glass chart-card">
+                <div class="chart-hdr"><div><h3>Розподіл по днях тижня</h3><small>Середні обсяги реалізації</small></div></div>
+                <div class="chart-wrap medium" id="wrapWd"><canvas id="cWd"></canvas></div>
+            </div>
+        </div>
+
+        <div class="glass chart-card" style="margin-bottom:20px">
+            <div class="chart-hdr"><div><h3>Детальна таблиця по місяцях</h3><small>Обсяги та динаміка</small></div>
+                <div class="toggle" id="tglTbl"><button class="active" data-t="realized">Реалізація</button><button data-t="harvested">Заготівля</button><button data-t="cash_daily">Гроші (дні)</button></div></div>
+            <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Місяць</th><th>Обсяг</th><th>Середнє/день</th><th>Макс</th><th>Днів</th><th>MoM</th></tr></thead><tbody id="tblBody"></tbody></table></div>
+        </div>
+    </div>
+</main>
+
+<script>
+// ============================
+// IndexedDB
+// ============================
+const DB_NAME = 'kpi_dashboard';
+const DB_VER = 1;
+const STORE = 'records';
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VER);
+        req.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE)) {
+                const store = db.createObjectStore(STORE, { keyPath: 'id' });
+                store.createIndex('type', 'type', { unique: false });
+                store.createIndex('date', 'date', { unique: false });
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function saveRecords(records) {
+    const db = await openDB();
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    for (const r of records) {
+        r.id = r.date + '|' + r.indicator;
+        store.put(r);
+    }
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+async function loadAllRecords() {
+    const db = await openDB();
+    const tx = db.transaction(STORE, 'readonly');
+    const store = tx.objectStore(STORE);
+    return new Promise((resolve, reject) => {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function clearDB() {
+    const db = await openDB();
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
+    return new Promise(r => { tx.oncomplete = r; });
+}
+
+async function getRecordCount() {
+    const db = await openDB();
+    const tx = db.transaction(STORE, 'readonly');
+    return new Promise(r => {
+        const req = tx.objectStore(STORE).count();
+        req.onsuccess = () => r(req.result);
+    });
+}
+
+// ============================
+// State
+// ============================
+let allData = [];
+let filtered = [];
+let period = 'all';
+let charts = {};
+let tblTab = 'realized';
+
+const MO = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+const WD = ['Неділя','Понеділок','Вівторок','Середа','Четвер',"П'ятниця",'Субота'];
+
+// ============================
+// Parsing
+// ============================
+const XL_EPOCH = new Date(1899, 11, 30);
+
+function xlDateToNum(v) {
+    if (v instanceof Date) return Math.round((v.getTime() - XL_EPOCH.getTime()) / 864e5);
+    return typeof v === 'number' ? v : parseFloat(v) || 0;
+}
+
+function classifyIndicator(name) {
+    const s = name.toLowerCase();
+    if (s.includes('реалізован') || s.includes('реалізов')) return 'realized';
+    if (s.includes('заготівл') || s.includes('заготовл')) return 'harvested';
+    if (s.includes('надходжен') && s.includes('грошов')) {
+        if (s.includes('помісяч') || s.includes('місяч') || s.includes('агрегац')) return 'cash_monthly';
+        return 'cash_daily';
+    }
+    return 'unknown';
+}
+
+function parseFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+                const sh = wb.Sheets[wb.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sh, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+                const out = [];
+                for (let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if (!r || !r[0]) continue;
+                    let date = typeof r[0] === 'string' ? new Date(r[0]) : r[0] instanceof Date ? r[0] : null;
+                    if (!date || isNaN(date.getTime())) continue;
+                    const dateStr = date.toISOString().slice(0, 10);
+                    const indicator = (r[1] || '').toString().trim();
+                    const rawVal = r[2];
+                    const unit = (r[3] || '').toString().trim();
+                    let value;
+                    if (typeof rawVal === 'string') {
+                        const td = new Date(rawVal);
+                        if (!isNaN(td.getTime()) && rawVal.includes('-') && td.getFullYear() < 1950) {
+                            value = xlDateToNum(td);
+                        } else {
+                            value = parseFloat(rawVal.replace(/[^\d.\-]/g, '')) || 0;
+                        }
+                    } else if (rawVal instanceof Date) {
+                        value = xlDateToNum(rawVal);
+                    } else {
+                        value = typeof rawVal === 'number' ? rawVal : 0;
+                    }
+                    const type = classifyIndicator(indicator);
+                    if (type !== 'unknown') {
+                        out.push({ date: dateStr, indicator, type, value, unit });
+                    }
+                }
+                resolve(out);
+            } catch (err) { reject(err); }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+// ============================
+// UI helpers
+// ============================
+function $(id) { return document.getElementById(id); }
+function show(id) { $(id).style.display = ''; }
+function hide(id) { $(id).style.display = 'none'; }
+function showLoader(v) { $('loader').classList.toggle('on', v); }
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 3000); }
+function fmt(n, d = 0) { return n == null || isNaN(n) ? '—' : n.toLocaleString('uk-UA', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function fmtDate(s) { const d = new Date(s); return d.toLocaleDateString('uk-UA'); }
+
+// ============================
+// Main flow
+// ============================
+async function handleFile(file) {
+    showLoader(true);
+    try {
+        const records = await parseFile(file);
+        if (!records.length) { alert('Не знайдено даних'); showLoader(false); return; }
+        await saveRecords(records);
+        localStorage.setItem('kpi_updated', new Date().toISOString());
+        await loadAndRender();
+        toast(`Додано/оновлено ${records.length} записів`);
+    } catch (err) {
+        alert('Помилка: ' + err.message);
+        console.error(err);
+    }
+    showLoader(false);
+}
+
+async function loadAndRender() {
+    const raw = await loadAllRecords();
+    allData = raw.map(r => ({ ...r, _date: new Date(r.date) })).sort((a, b) => a._date - b._date);
+    if (!allData.length) { hide('dash'); show('empty'); hide('periodBar'); hide('dateInfo'); hide('btnClear'); $('hdrSub').textContent = 'Завантажте файл для початку'; return; }
+    hide('empty');
+    const dash = $('dash');
+    dash.style.display = 'block';
+    show('periodBar');
+    show('dateInfo');
+    show('btnClear');
+
+    const dates = allData.map(r => r._date);
+    const minD = new Date(Math.min(...dates));
+    const maxD = new Date(Math.max(...dates));
+    $('hdrSub').textContent = `${fmtDate(minD)} — ${fmtDate(maxD)} | ${allData.length} записів`;
+    const upd = localStorage.getItem('kpi_updated');
+    $('updLbl').textContent = upd ? 'Оновлено: ' + fmtDate(upd) : '';
+
+    // Show cash card if data exists
+    const hasCash = allData.some(r => r.type === 'cash_daily' || r.type === 'cash_monthly');
+    $('cashCard').style.display = hasCash ? '' : 'none';
+
+    applyFilter();
+}
+
+function applyFilter() {
+    if (period === 'all') { filtered = [...allData]; }
+    else {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - parseInt(period));
+        filtered = allData.filter(r => r._date >= cutoff);
+    }
+    // Defer rendering to next frame so DOM layout is settled
+    requestAnimationFrame(() => { setTimeout(renderAll, 300); });
+}
+
+// ============================
+// Chart.js defaults (loaded statically in head)
+// ============================
+function setupChartDefaults() {
+    Chart.defaults.responsive = true;
+    Chart.defaults.maintainAspectRatio = false;
+    Chart.defaults.color = 'rgba(255,255,255,0.35)';
+    Chart.defaults.font.family = "'Inter',system-ui,sans-serif";
+    Chart.defaults.font.size = 11;
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+    Chart.defaults.plugins.legend.labels.pointStyleWidth = 8;
+    Chart.defaults.plugins.legend.labels.color = 'rgba(255,255,255,0.5)';
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,15,35,0.92)';
+    Chart.defaults.plugins.tooltip.borderColor = 'rgba(0,240,255,0.2)';
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+    Chart.defaults.plugins.tooltip.cornerRadius = 10;
+    Chart.defaults.plugins.tooltip.padding = 12;
+    Chart.defaults.plugins.tooltip.titleColor = '#00f0ff';
+    Chart.defaults.plugins.tooltip.bodyColor = 'rgba(255,255,255,0.8)';
+    // IMPORTANT: only set color, don't replace the entire grid object
+    Chart.defaults.scale.grid.color = 'rgba(255,255,255,0.04)';
+}
+
+function kill(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+// Create a fresh canvas inside a wrapper (eliminates stale canvas issues)
+function freshCanvas(wrapId, canvasId) {
+    const wrap = $(wrapId);
+    const old = $(canvasId);
+    if (old) old.remove();
+    const c = document.createElement('canvas');
+    c.id = canvasId;
+    wrap.appendChild(c);
+    return c;
+}
+
+// ============================
+// Render all
+// ============================
+function renderAll() {
+    const fns = [renderKPIs, renderMainChart, renderCashChart, renderMonthlyChart, renderCumChart, renderYoyChart, renderWdChart, renderTable];
+    for (const fn of fns) { try { fn(); } catch (e) { console.error(fn.name, e); } }
+    // Force Chart.js to recalculate sizes
+    window.dispatchEvent(new Event('resize'));
+    requestAnimationFrame(() => {
+        Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} });
+    });
+}
+
+// ============================
+// KPIs
+// ============================
+function renderKPIs() {
+    const real = filtered.filter(r => r.type === 'realized');
+    const harv = filtered.filter(r => r.type === 'harvested');
+    const cashD = filtered.filter(r => r.type === 'cash_daily');
+    const cashM = filtered.filter(r => r.type === 'cash_monthly');
+
+    const sumR = real.reduce((s, r) => s + r.value, 0);
+    const sumH = harv.reduce((s, r) => s + r.value, 0);
+    const avgR = real.length ? sumR / real.length : 0;
+    const maxR = real.length ? Math.max(...real.map(r => r.value)) : 0;
+    const maxRDate = real.length ? real.reduce((a, b) => b.value > a.value ? b : a, real[0]).date : '';
+
+    const now = filtered.length ? filtered[filtered.length - 1]._date : new Date();
+    const cm = now.getMonth(), cy = now.getFullYear();
+    const pm = cm === 0 ? 11 : cm - 1, py = cm === 0 ? cy - 1 : cy;
+    const curM = real.filter(r => r._date.getMonth() === cm && r._date.getFullYear() === cy).reduce((s, r) => s + r.value, 0);
+    const prevM = real.filter(r => r._date.getMonth() === pm && r._date.getFullYear() === py).reduce((s, r) => s + r.value, 0);
+    const mom = prevM > 0 ? ((curM - prevM) / prevM * 100) : 0;
+
+    const work = real.filter(r => r.value > 1000).length;
+
+    const sumCashD = cashD.reduce((s, r) => s + r.value, 0);
+    const sumCashM = cashM.reduce((s, r) => s + r.value, 0);
+
+    const kpis = [
+        { label: 'Реалізація', val: fmt(sumR / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-cyan', sub: 'За обраний період' },
+        { label: 'Заготівля', val: fmt(sumH / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-green', sub: 'За обраний період' },
+        { label: 'Середнє/день', val: fmt(avgR, 0), unit: 'м\u00B3', cls: 'neon-purple', sub: 'Реалізація' },
+        { label: 'Макс за день', val: fmt(maxR, 0), unit: 'м\u00B3', cls: 'neon-amber', sub: maxRDate ? fmtDate(maxRDate) : '' },
+        { label: MO[cm] + ' ' + cy, val: fmt(curM / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-pink', change: mom, sub: `vs ${MO[pm]}: ${fmt(prevM / 1000, 1)} тис.м\u00B3` },
+        { label: 'Робочі дні', val: fmt(work), unit: 'днів', cls: 'neon-rose', sub: `${fmt(real.length - work)} вихідних` },
+    ];
+
+    if (sumCashD > 0 || sumCashM > 0) {
+        kpis.push({ label: 'Гроші (дні)', val: fmt(sumCashD / 1e6, 2), unit: 'млн грн', cls: 'neon-cyan', sub: 'Денна динаміка' });
+        kpis.push({ label: 'Гроші (міс)', val: fmt(sumCashM / 1e6, 2), unit: 'млн грн', cls: 'neon-green', sub: 'Помісячна агрегація' });
+    }
+
+    $('kpiGrid').innerHTML = kpis.map(k => `
+        <div class="glass kpi-card ${k.cls}">
+            <div class="kpi-label">${k.label}</div>
+            <div class="kpi-value">${k.val}<span class="kpi-unit">${k.unit}</span></div>
+            ${k.change != null ? `<div class="kpi-change ${k.change >= 0 ? 'up' : 'down'}">${k.change >= 0 ? '\u25B2' : '\u25BC'} ${Math.abs(k.change).toFixed(1)}%</div>` : ''}
+            ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}
+        </div>`).join('');
+
+    // Stats bar
+    const types = [...new Set(allData.map(r => r.type))];
+    const typeNames = { realized: 'Реалізація', harvested: 'Заготівля', cash_daily: 'Гроші(дні)', cash_monthly: 'Гроші(міс)' };
+    $('statsBar').innerHTML = `<div class="stat">Всього: <b>${allData.length}</b> записів</div>` +
+        types.map(t => `<div class="stat">${typeNames[t] || t}: <b>${allData.filter(r => r.type === t).length}</b></div>`).join('');
+}
+
+// ============================
+// Gradient helper
+// ============================
+function makeGrad(ctx, r, g, b, h) {
+    const gr = ctx.createLinearGradient(0, 0, 0, h || ctx.canvas.height);
+    gr.addColorStop(0, `rgba(${r},${g},${b},0.2)`);
+    gr.addColorStop(0.5, `rgba(${r},${g},${b},0.04)`);
+    gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    return gr;
+}
+
+// ============================
+// Main volume chart
+// ============================
+function renderMainChart() {
+    kill('main');
+    const canvas = freshCanvas('wrapMain', 'cMain');
+    const ctx = canvas.getContext('2d');
+    const real = filtered.filter(r => r.type === 'realized');
+    const harv = filtered.filter(r => r.type === 'harvested');
+
+    charts['main'] = new Chart(ctx, {
+        type: 'line',
+        data: { datasets: [
+            { label: "Реалізований об'єм", data: real.map(r => ({ x: r._date, y: r.value })), borderColor: '#00f0ff', backgroundColor: makeGrad(ctx, 0, 240, 255), borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 5, fill: true, tension: 0.35 },
+            { label: "Обсяг заготівлі", data: harv.map(r => ({ x: r._date, y: r.value })), borderColor: '#a855f7', backgroundColor: makeGrad(ctx, 168, 85, 247), borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 5, fill: true, tension: 0.35 }
+        ]},
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+            scales: { x: { type: 'time', time: { unit: filtered.length > 365 ? 'month' : 'week', displayFormats: { week: 'dd.MM', month: 'MMM yyyy' }}, ticks: { maxTicksLimit: 15 }},
+                y: { beginAtZero: true, ticks: { callback: v => v >= 1000 ? (v/1000|0) + 'k' : v }}},
+            plugins: { tooltip: { callbacks: { label: i => ` ${i.dataset.label}: ${fmt(i.parsed.y, 1)} м\u00B3` }}}
+        }
+    });
+}
+
+// ============================
+// Cash chart
+// ============================
+function renderCashChart() {
+    const cashD = filtered.filter(r => r.type === 'cash_daily');
+    const cashM = filtered.filter(r => r.type === 'cash_monthly');
+    if (!cashD.length && !cashM.length) return;
+    kill('cash');
+    const canvas = freshCanvas('wrapCash', 'cCash');
+    const ctx = canvas.getContext('2d');
+
+    const datasets = [];
+    if (cashD.length) datasets.push({ label: 'Денна динаміка', data: cashD.map(r => ({ x: r._date, y: r.value })), borderColor: '#fbbf24', backgroundColor: makeGrad(ctx, 251, 191, 36), borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 5, fill: true, tension: 0.3 });
+    if (cashM.length) datasets.push({ label: 'Помісячна агрегація', data: cashM.map(r => ({ x: r._date, y: r.value })), borderColor: '#22c55e', backgroundColor: makeGrad(ctx, 34, 197, 94), borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, fill: true, tension: 0.2, pointBackgroundColor: '#22c55e' });
+
+    charts['cash'] = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+            scales: { x: { type: 'time', time: { unit: 'month', displayFormats: { month: 'MMM yyyy' }}, ticks: { maxTicksLimit: 15 }},
+                y: { beginAtZero: true, ticks: { callback: v => v >= 1e6 ? (v/1e6).toFixed(1) + 'M' : v >= 1e3 ? (v/1e3|0) + 'k' : v }}},
+            plugins: { tooltip: { callbacks: { label: i => ` ${i.dataset.label}: ${fmt(i.parsed.y, 0)} грн` }}}
+        }
+    });
+}
+
+// ============================
+// Monthly bar chart
+// ============================
+function renderMonthlyChart() {
+    kill('monthly');
+    const canvas = freshCanvas('wrapMonthly', 'cMonthly');
+    const ctx = canvas.getContext('2d');
+
+    const mon = {};
+    filtered.forEach(r => {
+        if (r.type !== 'realized' && r.type !== 'harvested') return;
+        const k = r.date.slice(0, 7);
+        if (!mon[k]) mon[k] = { realized: 0, harvested: 0 };
+        mon[k][r.type] += r.value;
+    });
+    const keys = Object.keys(mon).sort();
+    const labels = keys.map(k => { const [y, m] = k.split('-'); return MO[+m - 1].slice(0, 3) + ' ' + y.slice(2); });
+    const realData = keys.map(k => mon[k].realized);
+    const harvData = keys.map(k => mon[k].harvested);
+    if (!keys.length) return;
+
+    charts['monthly'] = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: [
+            { label: 'Реалізація', data: realData, backgroundColor: 'rgba(0,240,255,0.5)', hoverBackgroundColor: 'rgba(0,240,255,0.7)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 },
+            { label: 'Заготівля', data: harvData, backgroundColor: 'rgba(168,85,247,0.5)', hoverBackgroundColor: 'rgba(168,85,247,0.7)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 }
+        ]},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { type: 'category', ticks: { maxRotation: 45 } },
+                y: { type: 'linear', beginAtZero: true, ticks: { callback: v => v >= 1000 ? (v/1000|0) + 'k' : v } }
+            },
+            plugins: { legend: { display: true }, tooltip: { callbacks: { label: i => ` ${i.dataset.label}: ${fmt(i.parsed.y, 0)} м\u00B3` } } }
+        }
+    });
+}
+
+// ============================
+// Cumulative chart
+// ============================
+function renderCumChart() {
+    kill('cum');
+    const canvas = freshCanvas('wrapCum', 'cCum');
+    const ctx = canvas.getContext('2d');
+
+    const yrs = [...new Set(filtered.map(r => r._date.getFullYear()))].sort();
+    const yc = ['#00f0ff', '#a855f7', '#fbbf24', '#fb7185'];
+    const ds = yrs.map((yr, i) => {
+        const d = filtered.filter(r => r._date.getFullYear() === yr && r.type === 'realized').sort((a, b) => a._date - b._date);
+        let cum = 0;
+        return { label: '' + yr, data: d.map(r => { cum += r.value; const soy = new Date(yr, 0, 1); return { x: Math.floor((r._date - soy) / 864e5), y: cum }; }),
+            borderColor: yc[i % 4], backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.2 };
+    });
+
+    charts['cum'] = new Chart(ctx, {
+        type: 'line', data: { datasets: ds },
+        options: { responsive: true, maintainAspectRatio: false,
+            scales: { x: { type: 'linear', title: { display: true, text: 'День року', color: 'rgba(255,255,255,.25)' },
+                ticks: { callback: v => { const d = new Date(2024, 0, 1); d.setDate(d.getDate() + v); return d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0'); }, maxTicksLimit: 12 }},
+                y: { beginAtZero: true, ticks: { callback: v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3 | 0) + 'k' : v }}},
+            plugins: { tooltip: { callbacks: { label: i => ` ${i.dataset.label}: ${fmt(i.parsed.y, 0)} м\u00B3` }}}
+        }
+    });
+}
+
+// ============================
+// YoY chart
+// ============================
+function renderYoyChart() {
+    kill('yoy');
+    const canvas = freshCanvas('wrapYoy', 'cYoy');
+    const ctx = canvas.getContext('2d');
+
+    const yrs = [...new Set(allData.map(r => r._date.getFullYear()))].sort();
+    const yc = [
+        { bg: 'rgba(0,240,255,0.4)', border: '#00f0ff' },
+        { bg: 'rgba(168,85,247,0.4)', border: '#a855f7' },
+        { bg: 'rgba(251,191,36,0.4)', border: '#fbbf24' },
+        { bg: 'rgba(251,113,133,0.4)', border: '#fb7185' }
+    ];
+    const labels = MO.map(m => m.slice(0, 3));
+    const ds = yrs.map((yr, i) => {
+        const mt = new Array(12).fill(0);
+        allData.filter(r => r._date.getFullYear() === yr && r.type === 'realized').forEach(r => mt[r._date.getMonth()] += r.value);
+        const c = yc[i % 4];
+        return { label: '' + yr, data: mt, backgroundColor: c.bg, borderColor: c.border, borderWidth: 1, borderRadius: 3, barPercentage: 0.8, categoryPercentage: 0.9 };
+    });
+
+    charts['yoy'] = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: ds },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { type: 'category' },
+                y: { type: 'linear', beginAtZero: true, ticks: { callback: v => v >= 1000 ? (v/1000|0) + 'k' : v } }
+            },
+            plugins: { legend: { display: true }, tooltip: { callbacks: { label: i => ` ${i.dataset.label}: ${fmt(i.parsed.y, 0)} м\u00B3` } } }
+        }
+    });
+}
+
+// ============================
+// Weekday chart
+// ============================
+function renderWdChart() {
+    kill('wd');
+    const canvas = freshCanvas('wrapWd', 'cWd');
+    const ctx = canvas.getContext('2d');
+
+    const sums = Array(7).fill(0), cnt = Array(7).fill(0);
+    filtered.filter(r => r.type === 'realized').forEach(r => { const d = r._date.getDay(); sums[d] += r.value; cnt[d]++; });
+    const avg = sums.map((s, i) => cnt[i] ? s / cnt[i] : 0);
+    const ord = [1, 2, 3, 4, 5, 6, 0];
+    const vals = ord.map(i => avg[i]);
+    const labels = ord.map(i => WD[i]);
+    const mx = Math.max(...vals);
+    const colors = vals.map(v => v === mx ? 'rgba(0,240,255,0.7)' : v < mx * 0.15 ? 'rgba(251,113,133,0.4)' : 'rgba(0,240,255,0.25)');
+
+    charts['wd'] = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: [{ label: 'Середнє', data: vals, backgroundColor: colors, borderRadius: 6, barPercentage: 0.6 }]},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { type: 'category' },
+                y: { type: 'linear', beginAtZero: true, ticks: { callback: v => v >= 1000 ? (v/1000|0) + 'k' : v } }
+            },
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => ` Середнє: ${fmt(i.parsed.y, 0)} м\u00B3` } } }
+        }
+    });
+}
+
+// ============================
+// Table
+// ============================
+function renderTable() {
+    const data = allData.filter(r => r.type === tblTab).sort((a, b) => a._date - b._date);
+    const mon = {};
+    data.forEach(r => {
+        const k = r.date.slice(0, 7);
+        if (!mon[k]) mon[k] = { vals: [], total: 0, max: 0, work: 0 };
+        mon[k].vals.push(r.value);
+        mon[k].total += r.value;
+        if (r.value > mon[k].max) mon[k].max = r.value;
+        if (r.value > (tblTab.startsWith('cash') ? 0 : 1000)) mon[k].work++;
+    });
+    const keys = Object.keys(mon).sort();
+    const isGrn = tblTab.startsWith('cash');
+    $('tblBody').innerHTML = keys.map((k, i) => {
+        const m = mon[k];
+        const avg = m.vals.length ? m.total / m.vals.length : 0;
+        const prev = i > 0 ? mon[keys[i - 1]].total : 0;
+        const ch = prev > 0 ? ((m.total - prev) / prev * 100) : 0;
+        const [y, mo] = k.split('-');
+        return `<tr><td>${MO[+mo - 1]} ${y}</td><td style="text-align:right;font-weight:500">${isGrn ? fmt(m.total / 1e3, 1) + ' тис' : fmt(m.total, 0)}</td><td style="text-align:right">${fmt(avg, 0)}</td><td style="text-align:right">${fmt(m.max, 0)}</td><td style="text-align:right">${m.work}/${m.vals.length}</td><td style="text-align:right">${i > 0 ? `<span class="badge ${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '\u25B2' : '\u25BC'} ${Math.abs(ch).toFixed(1)}%</span>` : '—'}</td></tr>`;
+    }).join('');
+}
+
+// ============================
+// Toggle main chart datasets
+// ============================
+function setMainMode(mode) {
+    if (!charts['main']) return;
+    charts['main'].data.datasets[0].hidden = mode === 'harvested';
+    if (charts['main'].data.datasets[1]) charts['main'].data.datasets[1].hidden = mode === 'realized';
+    charts['main'].update();
+}
+
+// ============================
+// Events
+// ============================
+document.addEventListener('DOMContentLoaded', async () => {
+    // File inputs
+    $('fileHdr').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
+    $('fileDrop').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
+
+    // Drop zone
+    const dz = $('dropZone');
+    ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag-over'); }));
+    ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag-over'); }));
+    dz.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+    // Period filter
+    document.querySelectorAll('.period-btn').forEach(b => b.addEventListener('click', () => {
+        document.querySelectorAll('.period-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        period = b.dataset.p;
+        applyFilter();
+    }));
+
+    // Main chart toggle
+    $('tglMain').addEventListener('click', e => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        $('tglMain').querySelectorAll('button').forEach(x => x.classList.remove('active'));
+        btn.classList.add('active');
+        setMainMode(btn.dataset.m);
+    });
+
+    // Table toggle
+    $('tglTbl').addEventListener('click', e => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        $('tglTbl').querySelectorAll('button').forEach(x => x.classList.remove('active'));
+        btn.classList.add('active');
+        tblTab = btn.dataset.t;
+        renderTable();
+    });
+
+    // Clear DB
+    $('btnClear').addEventListener('click', async () => {
+        if (!confirm('Очистити всю базу даних?')) return;
+        await clearDB();
+        localStorage.removeItem('kpi_updated');
+        allData = []; filtered = [];
+        Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+        charts = {};
+        await loadAndRender();
+        toast('Базу очищено');
+    });
+
+    // Setup Chart.js defaults (loaded statically in head)
+    setupChartDefaults();
+
+    const count = await getRecordCount();
+    if (count > 0) {
+        await loadAndRender();
+    }
+});
+</script>
+</body>
+</html>
