@@ -545,10 +545,12 @@ async function showAppForUser(user) {
         hideAuthScreen();
     } catch(e) {
         console.error('showAppForUser error:', e);
-        toast('Помилка завантаження: ' + e.message, true);
-        // Keep auth screen visible so user can see the error
+        // Clear corrupt session and show fresh login
+        try { await sb.auth.signOut(); } catch(x) {}
+        currentProfile = null; allData = []; filtered = [];
+        $('userInfo').style.display = 'none';
         showAuthScreen();
-        $('authError').textContent = 'Помилка: ' + e.message + ' — спробуйте увійти знову';
+        $('authError').textContent = 'Сесія застаріла — увійдіть знову';
     }
 }
 
@@ -1235,10 +1237,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     try {
         const { data: { session }, error: sessErr } = await sb.auth.getSession();
-        if (sessErr) { console.error('Session error:', sessErr); $('authError').textContent = sessErr.message; }
-        else if (session) await showAppForUser(session.user);
-        // Auth screen stays visible by default (class="on" in HTML) — no need to call showAuthScreen()
-    } catch(e) { console.error('Session check error:', e); $('authError').textContent = 'Помилка сесії: ' + e.message; }
+        if (sessErr) {
+            console.error('Session error:', sessErr);
+            try { await sb.auth.signOut(); } catch(x) {}
+            $('authError').textContent = 'Сесія застаріла — увійдіть знову';
+        } else if (session) {
+            await showAppForUser(session.user);
+        }
+        // Auth screen stays visible by default (class="on" in HTML) if no session
+    } catch(e) {
+        console.error('Session check error:', e);
+        try { await sb.auth.signOut(); } catch(x) {}
+        $('authError').textContent = 'Сесія застаріла — увійдіть знову';
+    }
 });
 </script>
 </body>
