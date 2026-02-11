@@ -528,7 +528,7 @@ async function handleLogout() {
 function hideButtons() { ['btnUpload','btnClear','btnExport','btnPrint','btnTargets','liveInfo'].forEach(id => { try { $(id).style.display = 'none'; } catch(e){} }); }
 async function showAppForUser(user) {
     try {
-        hideAuthScreen();
+        $('authError').textContent = 'Завантаження...';
         currentProfile = await getCurrentProfile();
         const role = currentProfile ? currentProfile.role : 'viewer';
         const displayName = currentProfile && currentProfile.full_name ? currentProfile.full_name : user.email;
@@ -541,7 +541,15 @@ async function showAppForUser(user) {
         const count = await getRecordCount();
         if (count > 0) await loadAndRender();
         startAutoRefresh();
-    } catch(e) { console.error('showAppForUser error:', e); toast('Помилка завантаження: ' + e.message, true); }
+        // Only hide auth screen AFTER everything loaded successfully
+        hideAuthScreen();
+    } catch(e) {
+        console.error('showAppForUser error:', e);
+        toast('Помилка завантаження: ' + e.message, true);
+        // Keep auth screen visible so user can see the error
+        showAuthScreen();
+        $('authError').textContent = 'Помилка: ' + e.message + ' — спробуйте увійти знову';
+    }
 }
 
 // ===== Theme =====
@@ -1226,9 +1234,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (event === 'SIGNED_IN' && session) await showAppForUser(session.user);
     });
     try {
-        const { data: { session } } = await sb.auth.getSession();
-        if (session) await showAppForUser(session.user); else showAuthScreen();
-    } catch(e) { console.error('Session check error:', e); showAuthScreen(); }
+        const { data: { session }, error: sessErr } = await sb.auth.getSession();
+        if (sessErr) { console.error('Session error:', sessErr); $('authError').textContent = sessErr.message; }
+        else if (session) await showAppForUser(session.user);
+        // Auth screen stays visible by default (class="on" in HTML) — no need to call showAuthScreen()
+    } catch(e) { console.error('Session check error:', e); $('authError').textContent = 'Помилка сесії: ' + e.message; }
 });
 </script>
 </body>
