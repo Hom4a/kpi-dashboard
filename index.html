@@ -66,6 +66,40 @@
         .auth-btn:hover{background:linear-gradient(135deg,rgba(74,157,111,.35),rgba(156,175,136,.25));box-shadow:0 0 25px rgba(74,157,111,.2);transform:translateY(-1px)}
         .auth-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
         .auth-error{color:var(--rose);font-size:12px;margin-top:12px;min-height:18px}
+        .auth-loading-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(26,31,46,0.85);backdrop-filter:blur(8px);border-radius:20px;z-index:10;flex-direction:column;gap:12px}
+        .auth-loading-overlay.on{display:flex}
+        .auth-loading-overlay .spinner{width:36px;height:36px;margin:0}
+        .auth-loading-overlay p{font-size:13px;color:var(--text2)}
+        .auth-screen::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 600px 400px at 20% 80%,rgba(74,157,111,0.08),transparent),radial-gradient(ellipse 500px 350px at 80% 20%,rgba(156,175,136,0.06),transparent),radial-gradient(ellipse 300px 300px at 50% 50%,rgba(212,165,116,0.04),transparent);pointer-events:none}
+        .auth-box{animation:authFadeIn 0.5s ease-out}
+        @keyframes authFadeIn{from{opacity:0;transform:translateY(20px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+        /* KPI animations */
+        @keyframes kpiSlideIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .kpi-card{animation:kpiSlideIn 0.4s ease-out both;-webkit-tap-highlight-color:transparent}
+        .kpi-card:nth-child(1){animation-delay:0s}.kpi-card:nth-child(2){animation-delay:0.05s}
+        .kpi-card:nth-child(3){animation-delay:0.1s}.kpi-card:nth-child(4){animation-delay:0.15s}
+        .kpi-card:nth-child(5){animation-delay:0.2s}.kpi-card:nth-child(6){animation-delay:0.25s}
+        .kpi-card:active{transform:scale(0.97)}
+
+        /* Skeleton loading */
+        @keyframes shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+        .skeleton{background:linear-gradient(90deg,rgba(255,255,255,0.03) 25%,rgba(255,255,255,0.06) 50%,rgba(255,255,255,0.03) 75%);background-size:400px 100%;animation:shimmer 1.5s infinite;border-radius:6px}
+        [data-theme="light"] .skeleton{background:linear-gradient(90deg,rgba(0,0,0,0.03) 25%,rgba(0,0,0,0.06) 50%,rgba(0,0,0,0.03) 75%);background-size:400px 100%}
+
+        /* Header compact on scroll */
+        .header{transition:padding 0.3s ease,margin-left 0.3s}
+        .header.compact{padding-top:8px;padding-bottom:8px}
+        .header.compact .header-title h1{font-size:13px}
+        .header.compact .header-title p{display:none}
+
+        /* Mobile bottom nav */
+        .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:150;background:var(--glass);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:6px 0;padding-bottom:env(safe-area-inset-bottom,6px)}
+        .mobile-nav-inner{display:flex;justify-content:space-around;align-items:center}
+        .mobile-nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;color:var(--text2);cursor:pointer;transition:color 0.2s;border:none;background:none;font-family:inherit;-webkit-tap-highlight-color:transparent;font-size:0}
+        .mobile-nav-item.active{color:var(--primary)}
+        .mobile-nav-item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+        .mobile-nav-item span{font-size:9px;font-weight:500}
 
         /* ===== SIDEBAR ===== */
         .sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);z-index:150;background:var(--glass);backdrop-filter:blur(20px);border-right:1px solid var(--border);transition:width .3s ease;overflow:hidden;display:flex;flex-direction:column}
@@ -234,7 +268,7 @@
 
         /* ===== PRINT ===== */
         @media print{
-            .sidebar,.header-right,.auth-screen,.bg-mesh,.bg-grid,.filter-bar,.insights-bar{display:none!important}
+            .sidebar,.header-right,.auth-screen,.bg-mesh,.bg-grid,.filter-bar,.insights-bar,.mobile-nav,.auth-loading-overlay{display:none!important}
             .header{position:static;margin-left:0}.main{margin-left:0;padding:10px}
             .glass{background:#fff!important;border:1px solid #ddd!important;box-shadow:none!important;backdrop-filter:none!important}
             body{background:#fff!important;color:#000!important}
@@ -244,10 +278,48 @@
         /* ===== RESPONSIVE ===== */
         @media(max-width:1200px){.chart-row.cols-2{grid-template-columns:1fr}}
         @media(max-width:768px){
-            .sidebar{display:none}.header,.main{margin-left:0}
-            .header{padding:12px 16px;flex-wrap:wrap;gap:12px}.main{padding:16px}
-            .kpi-grid{grid-template-columns:repeat(2,1fr)}.kpi-value{font-size:20px}
-            .filter-bar{flex-direction:column;align-items:stretch}
+            .sidebar{display:none}
+            .header,.main{margin-left:0}
+            .header{padding:10px 16px;gap:8px}
+            .header-title h1{font-size:13px}
+            .header-title p{font-size:10px}
+            .main{padding:12px 12px 80px 12px}
+            #btnExport,#btnPrint{display:none!important}
+            .btn-logout{padding:4px 8px;font-size:10px}
+            .kpi-grid{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+            .kpi-card{padding:12px}
+            .kpi-value{font-size:18px}
+            .kpi-label{font-size:9px}
+            .kpi-unit{font-size:10px}
+            .kpi-sub{font-size:9px}
+            .sparkline-wrap{width:60px;height:22px}
+            .sparkline-wrap canvas{width:60px;height:22px}
+            .chart-wrap{height:220px!important}
+            .chart-wrap.medium{height:200px!important}
+            .chart-card{padding:14px}
+            .chart-hdr h3{font-size:12px}
+            .chart-hdr small{font-size:10px}
+            .filter-bar{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:8px 12px;gap:8px;margin-bottom:14px;scrollbar-width:none}
+            .filter-bar::-webkit-scrollbar{display:none}
+            .filter-sep{display:none}
+            .filter-date{min-width:110px}
+            .insights-bar{gap:8px;margin-bottom:14px}
+            .insight-chip{font-size:11px;padding:6px 10px}
+            .stats-bar{font-size:11px;gap:8px;margin-bottom:10px}
+            .tbl-wrap{max-height:300px}
+            .tbl th,.tbl td{padding:6px 8px;font-size:11px}
+            .toast{top:12px;right:12px;left:12px;text-align:center;font-size:12px;padding:10px 16px}
+            .modal{width:95%;max-height:90vh;padding:20px}
+            .user-info{gap:6px;font-size:11px}
+            .role-badge{font-size:9px;padding:1px 6px}
+            .mobile-nav{display:block}
+        }
+        @media(max-width:380px){
+            .kpi-grid{grid-template-columns:1fr}
+            .kpi-value{font-size:22px}
+            .chart-wrap{height:180px!important}
+            .chart-wrap.medium{height:160px!important}
+            .header-title h1{font-size:12px}
         }
     </style>
 </head>
@@ -262,10 +334,14 @@
         <h2>ДП Ліси України</h2>
         <div class="auth-subtitle">Панель KPI</div>
         <p>Увійдіть для доступу до панелі</p>
-        <input class="auth-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
+        <input class="auth-input" id="authEmail" type="email" placeholder="Email" autocomplete="email" autofocus>
         <input class="auth-input" id="authPass" type="password" placeholder="Пароль" autocomplete="current-password">
         <button class="auth-btn" id="btnLogin" onclick="handleLogin()">Увійти</button>
         <div class="auth-error" id="authError"></div>
+        <div class="auth-loading-overlay" id="authLoadingOverlay">
+            <div class="spinner"></div>
+            <p>Завантаження профілю...</p>
+        </div>
     </div>
 </div>
 
@@ -499,6 +575,7 @@ async function getRecordCount() { const { count, error } = await sb.from('kpi_re
 
 // ===== Auth =====
 let currentProfile = null;
+let _authInProgress = false;
 async function getCurrentProfile() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
@@ -506,15 +583,18 @@ async function getCurrentProfile() {
     if (error) return null;
     return data;
 }
-function showAuthScreen() { $('authScreen').classList.add('on'); $('authError').textContent = ''; $('authEmail').value = ''; $('authPass').value = ''; }
+function showAuthScreen() { $('authScreen').classList.add('on'); $('authError').textContent = ''; $('authEmail').value = ''; $('authPass').value = ''; setTimeout(() => $('authEmail').focus(), 100); }
 function hideAuthScreen() { $('authScreen').classList.remove('on'); }
+function showAuthLoading(v) { const el = $('authLoadingOverlay'); if (el) el.classList.toggle('on', v); }
 async function handleLogin() {
     const email = $('authEmail').value.trim(), pass = $('authPass').value;
     if (!email || !pass) { $('authError').textContent = 'Введіть email та пароль'; return; }
-    $('btnLogin').disabled = true; $('authError').textContent = '';
-    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-    $('btnLogin').disabled = false;
-    if (error) { $('authError').textContent = error.message === 'Invalid login credentials' ? 'Невірний email або пароль' : error.message; }
+    $('btnLogin').disabled = true; $('btnLogin').textContent = 'Вхід...'; $('authError').textContent = '';
+    try {
+        const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+        if (error) { $('authError').textContent = error.message === 'Invalid login credentials' ? 'Невірний email або пароль' : error.message; }
+    } catch(e) { $('authError').textContent = "Помилка з'єднання"; }
+    $('btnLogin').disabled = false; $('btnLogin').textContent = 'Увійти';
 }
 async function handleLogout() {
     stopAutoRefresh();
@@ -527,9 +607,12 @@ async function handleLogout() {
 }
 function hideButtons() { ['btnUpload','btnClear','btnExport','btnPrint','btnTargets','liveInfo'].forEach(id => { try { $(id).style.display = 'none'; } catch(e){} }); }
 async function showAppForUser(user) {
+    if (_authInProgress) return;
+    _authInProgress = true;
+    showAuthLoading(true);
     try {
-        $('authError').textContent = 'Завантаження...';
-        currentProfile = await getCurrentProfile();
+        showKpiSkeletons('kpiGrid', 6);
+        currentProfile = await withTimeout(getCurrentProfile(), 8000, null);
         const role = currentProfile ? currentProfile.role : 'viewer';
         const displayName = currentProfile && currentProfile.full_name ? currentProfile.full_name : user.email;
         $('userInfo').style.display = 'flex';
@@ -538,19 +621,20 @@ async function showAppForUser(user) {
         if (role === 'admin' || role === 'editor') $('btnUpload').style.display = '';
         else $('btnUpload').style.display = 'none';
         setupChartDefaults();
-        const count = await getRecordCount();
-        if (count > 0) await loadAndRender();
+        const count = await withTimeout(getRecordCount(), 8000, 0);
+        if (count > 0) await withTimeout(loadAndRender(), 15000, null);
         startAutoRefresh();
-        // Only hide auth screen AFTER everything loaded successfully
         hideAuthScreen();
     } catch(e) {
         console.error('showAppForUser error:', e);
-        // Clear corrupt session and show fresh login
         try { await sb.auth.signOut(); } catch(x) {}
         currentProfile = null; allData = []; filtered = [];
         $('userInfo').style.display = 'none';
         showAuthScreen();
         $('authError').textContent = 'Сесія застаріла — увійдіть знову';
+    } finally {
+        _authInProgress = false;
+        showAuthLoading(false);
     }
 }
 
@@ -636,6 +720,21 @@ function toast(t, isError) {
     const el = $('toast'); el.textContent = t; el.classList.toggle('error', !!isError);
     el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 3500);
 }
+function withTimeout(promise, ms, fallback) {
+    return Promise.race([
+        promise,
+        new Promise((resolve, reject) => setTimeout(() => {
+            if (fallback !== undefined) resolve(fallback);
+            else reject(new Error('Timeout'));
+        }, ms))
+    ]);
+}
+function showKpiSkeletons(gridId, count) {
+    const grid = $(gridId); if (!grid) return;
+    grid.innerHTML = Array.from({length: count}, () =>
+        '<div class="glass kpi-card" style="min-height:80px"><div class="skeleton" style="width:60%;height:10px;margin-bottom:8px">&nbsp;</div><div class="skeleton" style="width:80%;height:24px;margin-bottom:8px">&nbsp;</div><div class="skeleton" style="width:50%;height:10px">&nbsp;</div></div>'
+    ).join('');
+}
 function fmt(n, d = 0) { return n == null || isNaN(n) ? '—' : n.toLocaleString('uk-UA', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 function fmtDate(s) { return new Date(s).toLocaleDateString('uk-UA'); }
 function themeColor(varName) { return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); }
@@ -645,7 +744,16 @@ function switchPage(page) {
     if (page === 'volumes') { $('pageVolumes').classList.add('active'); $('pageFinance').classList.remove('active'); }
     else { $('pageFinance').classList.add('active'); $('pageVolumes').classList.remove('active'); }
     document.querySelectorAll('.nav-item[data-page]').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+    updateMobileNav(page);
     requestAnimationFrame(() => { Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} }); });
+}
+function updateMobileNav(page) {
+    document.querySelectorAll('.mobile-nav-item[data-page]').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+}
+function openMobileUpload() {
+    const role = currentProfile ? currentProfile.role : 'viewer';
+    if (role === 'admin' || role === 'editor') { $('fileDrop').click(); }
+    else { toast('Немає прав для завантаження', true); }
 }
 
 // ===== File handling =====
@@ -1230,27 +1338,81 @@ document.addEventListener('DOMContentLoaded', async () => {
             closeDrillDown(); closeTargetModal();
         }
     });
-    // Auth state
+    // Header compact on scroll
+    window.addEventListener('scroll', () => {
+        const header = document.querySelector('.header');
+        if (window.scrollY > 60) header.classList.add('compact');
+        else header.classList.remove('compact');
+    }, { passive: true });
+
+    // Swipe gesture for page switching (mobile)
+    (function initSwipe() {
+        let startX = 0, startY = 0, swiping = false;
+        document.addEventListener('touchstart', e => {
+            if (window.innerWidth > 768) return;
+            startX = e.touches[0].clientX; startY = e.touches[0].clientY; swiping = true;
+        }, { passive: true });
+        document.addEventListener('touchend', e => {
+            if (!swiping || window.innerWidth > 768) return;
+            swiping = false;
+            const dx = e.changedTouches[0].clientX - startX;
+            const dy = e.changedTouches[0].clientY - startY;
+            if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                const cur = $('pageVolumes').classList.contains('active') ? 'volumes' : 'finance';
+                if (dx < 0 && cur === 'volumes') switchPage('finance');
+                else if (dx > 0 && cur === 'finance') switchPage('volumes');
+            }
+        }, { passive: true });
+    })();
+
+    // Auth state - single handler with guard
     if (!sb) { toast('Supabase не ініціалізовано', true); showAuthScreen(); return; }
     sb.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session) await showAppForUser(session.user);
+        console.log('Auth event:', event);
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+            await showAppForUser(session.user);
+        } else if (event === 'SIGNED_OUT') {
+            currentProfile = null; allData = []; filtered = [];
+            $('userInfo').style.display = 'none';
+            hideButtons(); showAuthScreen();
+        }
     });
-    try {
-        const { data: { session }, error: sessErr } = await sb.auth.getSession();
-        if (sessErr) {
-            console.error('Session error:', sessErr);
+    // Fallback: if onAuthStateChange doesn't fire within 3s, check manually
+    setTimeout(async () => {
+        if (_authInProgress) return;
+        try {
+            const { data: { session } } = await sb.auth.getSession();
+            if (session && !_authInProgress) await showAppForUser(session.user);
+        } catch(e) {
+            console.error('Fallback session check error:', e);
             try { await sb.auth.signOut(); } catch(x) {}
             $('authError').textContent = 'Сесія застаріла — увійдіть знову';
-        } else if (session) {
-            await showAppForUser(session.user);
         }
-        // Auth screen stays visible by default (class="on" in HTML) if no session
-    } catch(e) {
-        console.error('Session check error:', e);
-        try { await sb.auth.signOut(); } catch(x) {}
-        $('authError').textContent = 'Сесія застаріла — увійдіть знову';
-    }
+    }, 3000);
 });
 </script>
+
+<!-- Mobile Bottom Nav -->
+<nav class="mobile-nav" id="mobileNav">
+    <div class="mobile-nav-inner">
+        <button class="mobile-nav-item active" data-page="volumes" onclick="switchPage('volumes')">
+            <svg viewBox="0 0 24 24"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            <span>Обсяги</span>
+        </button>
+        <button class="mobile-nav-item" data-page="finance" onclick="switchPage('finance')">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <span>Фінанси</span>
+        </button>
+        <button class="mobile-nav-item" onclick="openMobileUpload()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Дані</span>
+        </button>
+        <button class="mobile-nav-item" onclick="toggleTheme()">
+            <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <span>Тема</span>
+        </button>
+    </div>
+</nav>
+
 </body>
 </html>
