@@ -25,26 +25,35 @@ import { loadPlanFactData, loadZsuData } from './harvesting/db-harvesting.js';
 import { populateHarvestingFilters, applyHarvestingFilter, initHarvestingFilterEvents, setRenderHarvestingCallback } from './harvesting/filters-harvesting.js';
 import { renderHarvestingDashboard } from './harvesting/render-harvesting.js';
 
+// ===== Show buttons based on role (called after ALL data loads) =====
+function showRoleButtons() {
+    const role = currentProfile ? currentProfile.role : 'viewer';
+    if (role === 'admin' || role === 'editor') {
+        $('btnUpload').style.display = '';
+        const helpBtn = $('btnFormatHelp');
+        if (helpBtn) helpBtn.style.display = '';
+    }
+    if (role === 'admin') {
+        $('btnTargets').style.display = '';
+        show('btnClear');
+        const vaBtn = $('btnViewerAccess');
+        if (vaBtn) vaBtn.style.display = '';
+    }
+}
+
 // ===== Load & Render KPI =====
 async function loadAndRender() {
     try {
         const raw = await loadAllRecords();
         console.log('Loaded records:', raw.length);
         setAllData(raw.map(r => ({ ...r, _date: new Date(r.date) })).sort((a, b) => a._date - b._date));
-        const role = currentProfile ? currentProfile.role : 'viewer';
         if (!allData.length) {
-            hide('dash'); show('empty'); hideButtons();
             $('hdrSub').textContent = 'Завантажте файл для початку'; return;
         }
         hide('empty'); $('dash').style.display = 'block';
         $('btnExport').style.display = ''; $('btnPrint').style.display = ''; $('liveInfo').style.display = '';
-        if (role === 'admin' || role === 'editor') {
-            $('btnUpload').style.display = '';
-            const helpBtn = $('btnFormatHelp');
-            if (helpBtn) helpBtn.style.display = '';
-        }
-        if (role === 'admin') { show('btnClear'); $('btnTargets').style.display = ''; }
-        else { hide('btnClear'); $('btnTargets').style.display = 'none'; }
+        const role = currentProfile ? currentProfile.role : 'viewer';
+        if (role !== 'admin') { hide('btnClear'); $('btnTargets').style.display = 'none'; }
         const dates = allData.map(r => r._date);
         const minD = new Date(Math.min(...dates)), maxD = new Date(Math.max(...dates));
         $('hdrSub').textContent = `${fmtDate(minD)} — ${fmtDate(maxD)} | ${allData.length} записів`;
@@ -94,12 +103,12 @@ async function loadHarvestingDataAndRender() {
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
-setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); });
+setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); showRoleButtons(); });
 setHideButtonsCallback(hideButtons);
-setFileHandlerLoadAndRender(loadAndRender);
+setFileHandlerLoadAndRender(async () => { await loadAndRender(); showRoleButtons(); });
 setLoadForestCallback(loadForestDataAndRender);
 setLoadHarvestingCallback(loadHarvestingDataAndRender);
-setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); });
+setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); showRoleButtons(); });
 setRenderForestCallback(renderForestDashboard);
 setRenderHarvestingCallback(renderHarvestingDashboard);
 
