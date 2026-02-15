@@ -29,7 +29,7 @@ function findOfficeCell(row) {
 
 export function parsePlanFactFile(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
 
     // Find first data row (contains a known office name)
     let dataStartIdx = -1;
@@ -62,23 +62,29 @@ export function parsePlanFactFile(wb) {
         // Must be a known office
         if (!KNOWN_OFFICES.some(o => lower.includes(o))) continue;
 
+        const apr = cleanNumber(r[colMap.apr]);
+        const apf = cleanNumber(r[colMap.apf]);
+        const apt = cleanNumber(r[colMap.apt]) || (apr + apf);
+        const npr = cleanNumber(r[colMap.npr]);
+        const npf = cleanNumber(r[colMap.npf]);
+        const npt = cleanNumber(r[colMap.npt]) || (npr + npf);
+        const hr = cleanNumber(r[colMap.hr]);
+        const hf = cleanNumber(r[colMap.hf]);
+        const ht = cleanNumber(r[colMap.ht]) || (hr + hf);
+        const p9t = cleanNumber(r[colMap.p9t]) || (npt > 0 ? ht / npt * 100 : 0);
+        const p9r = cleanNumber(r[colMap.p9r]) || (npr > 0 ? hr / npr * 100 : 0);
+        const p9f = cleanNumber(r[colMap.p9f]) || (npf > 0 ? hf / npf * 100 : 0);
+        const pat = cleanNumber(r[colMap.pat]) || (apt > 0 ? ht / apt * 100 : 0);
+        const par = cleanNumber(r[colMap.par]) || (apr > 0 ? hr / apr * 100 : 0);
+        const paf = cleanNumber(r[colMap.paf]) || (apf > 0 ? hf / apf * 100 : 0);
+
         records.push({
             regional_office: officeName,
-            annual_plan_total: cleanNumber(r[colMap.apt]),
-            annual_plan_rgk: cleanNumber(r[colMap.apr]),
-            annual_plan_rfiol: cleanNumber(r[colMap.apf]),
-            nine_month_plan_total: cleanNumber(r[colMap.npt]),
-            nine_month_plan_rgk: cleanNumber(r[colMap.npr]),
-            nine_month_plan_rfiol: cleanNumber(r[colMap.npf]),
-            harvested_total: cleanNumber(r[colMap.ht]),
-            harvested_rgk: cleanNumber(r[colMap.hr]),
-            harvested_rfiol: cleanNumber(r[colMap.hf]),
-            pct_nine_month_total: cleanNumber(r[colMap.p9t]),
-            pct_nine_month_rgk: cleanNumber(r[colMap.p9r]),
-            pct_nine_month_rfiol: cleanNumber(r[colMap.p9f]),
-            pct_annual_total: cleanNumber(r[colMap.pat]),
-            pct_annual_rgk: cleanNumber(r[colMap.par]),
-            pct_annual_rfiol: cleanNumber(r[colMap.paf]),
+            annual_plan_total: apt, annual_plan_rgk: apr, annual_plan_rfiol: apf,
+            nine_month_plan_total: npt, nine_month_plan_rgk: npr, nine_month_plan_rfiol: npf,
+            harvested_total: ht, harvested_rgk: hr, harvested_rfiol: hf,
+            pct_nine_month_total: p9t, pct_nine_month_rgk: p9r, pct_nine_month_rfiol: p9f,
+            pct_annual_total: pat, pct_annual_rgk: par, pct_annual_rfiol: paf,
         });
     }
     return records;

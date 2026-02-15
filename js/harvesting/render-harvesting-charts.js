@@ -77,7 +77,7 @@ export function renderZsuByRegion() {
 export function renderZsuDeclaredVsShipped() {
     if (!filteredZsu.length) return;
     kill('zsuDeclaredVsShipped');
-    const canvas = freshCanvas('wrapZsuDeclVsShip', 'cZsuDeclVsShip');
+    const canvas = freshCanvas('wrapZsuDeclaredVsShipped', 'cZsuDeclaredVsShipped');
     const ctx = canvas.getContext('2d');
     const labels = filteredZsu.map(r => r.regional_office.replace(/\s*ЛО$/i, ''));
     const declared = filteredZsu.map(r => (r.forest_products_declared_m3 || 0) + (r.lumber_declared_m3 || 0));
@@ -100,7 +100,7 @@ export function renderZsuDeclaredVsShipped() {
 export function renderZsuProductBreakdown() {
     if (!filteredZsu.length) return;
     kill('zsuProductBreakdown');
-    const canvas = freshCanvas('wrapZsuBreakdown', 'cZsuBreakdown');
+    const canvas = freshCanvas('wrapZsuProductBreakdown', 'cZsuProductBreakdown');
     const ctx = canvas.getContext('2d');
     const fpTotal = filteredZsu.reduce((s, r) => s + (r.forest_products_shipped_m3 || 0), 0);
     const lTotal = filteredZsu.reduce((s, r) => s + (r.lumber_shipped_m3 || 0), 0);

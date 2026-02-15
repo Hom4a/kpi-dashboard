@@ -13,7 +13,7 @@ const KNOWN_OFFICES = ['карпатськ', 'південн', 'північн',
 
 export function parseZsuFile(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
 
     // Find header row with product category keywords
     let headerIdx = -1;
