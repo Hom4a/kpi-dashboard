@@ -17,7 +17,7 @@ export function parseKpiFile(file) {
         reader.onload = e => {
             try {
                 const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-                const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true });
                 const out = [];
                 for (let i = 1; i < rows.length; i++) {
                     const r = rows[i]; if (!r || !r[0]) continue;
@@ -27,14 +27,17 @@ export function parseKpiFile(file) {
                     const indicator = (r[1] || '').toString().trim();
                     const rawVal = r[2], unit = (r[3] || '').toString().trim();
                     let value;
-                    if (typeof rawVal === 'string') {
-                        const td = new Date(rawVal);
-                        if (!isNaN(td.getTime()) && rawVal.includes('-') && td.getFullYear() < 1950) {
-                            const XL = new Date(1899, 11, 30); value = Math.round((td.getTime() - XL.getTime()) / 864e5);
-                        } else value = parseFloat(rawVal.replace(/[^\d.\-]/g, '')) || 0;
+                    if (typeof rawVal === 'number') {
+                        value = rawVal;
                     } else if (rawVal instanceof Date) {
-                        const XL = new Date(1899, 11, 30); value = Math.round((rawVal.getTime() - XL.getTime()) / 864e5);
-                    } else value = typeof rawVal === 'number' ? rawVal : 0;
+                        const XL = new Date(1899, 11, 30);
+                        value = Math.round((rawVal.getTime() - XL.getTime()) / 864e5);
+                    } else if (typeof rawVal === 'string') {
+                        const cleaned = rawVal.replace(/[\s\u00A0]/g, '').replace(',', '.');
+                        value = parseFloat(cleaned) || 0;
+                    } else {
+                        value = 0;
+                    }
                     const type = classifyIndicator(indicator);
                     if (type !== 'unknown') out.push({ date: dateStr, indicator, type, value, unit });
                 }

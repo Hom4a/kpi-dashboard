@@ -62,3 +62,27 @@ export async function loadZsuData() {
     }
     return all;
 }
+
+export async function clearPlanFactData() {
+    const { error } = await sb.from('harvesting_plan_fact').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw new Error(error.message);
+    await sb.from('forest_upload_history').delete().eq('data_type', 'harvesting_plan_fact');
+}
+
+export async function clearZsuData() {
+    const { error } = await sb.from('harvesting_zsu').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw new Error(error.message);
+    await sb.from('forest_upload_history').delete().eq('data_type', 'harvesting_zsu');
+}
+
+export async function getPlanFactCount() {
+    const { count, error } = await sb.from('harvesting_plan_fact').select('*', { count: 'exact', head: true });
+    if (error) throw new Error(error.message);
+    return count || 0;
+}
+
+export async function getZsuCount() {
+    const { count, error } = await sb.from('harvesting_zsu').select('*', { count: 'exact', head: true });
+    if (error) throw new Error(error.message);
+    return count || 0;
+}

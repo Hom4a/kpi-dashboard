@@ -104,3 +104,15 @@ export async function getInventoryCount() {
     if (error) throw new Error(error.message);
     return count || 0;
 }
+
+export async function clearPricesData() {
+    const { error } = await sb.from('forest_prices').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw new Error(error.message);
+    await sb.from('forest_upload_history').delete().eq('data_type', 'prices');
+}
+
+export async function clearInventoryData() {
+    const { error } = await sb.from('forest_inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw new Error(error.message);
+    await sb.from('forest_upload_history').delete().eq('data_type', 'inventory');
+}

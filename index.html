@@ -97,7 +97,7 @@
         <button class="icon-btn" id="btnFormatHelp" style="display:none" onclick="openFormatHelp()" title="Формати файлів"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
         <button class="icon-btn" id="btnTargets" style="display:none" onclick="openTargetModal()" title="Налаштувати цілі"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></button>
         <button class="icon-btn" id="btnViewerAccess" style="display:none" onclick="openViewerAccess()" title="Доступ глядачів"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
-        <button class="btn btn-sm btn-danger" id="btnClear" style="display:none" title="Очистити базу"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+        <button class="btn btn-sm btn-danger" id="btnClear" style="display:none" onclick="openDataManage()" title="Керування даними"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v2"/></svg></button>
     </div>
 </header>
 
@@ -478,6 +478,17 @@
         <h3>Налаштування доступу глядачів</h3>
         <div id="viewerAccessList"></div>
         <button class="btn" style="margin-top:16px" onclick="saveViewerAccess()">Зберегти</button>
+    </div>
+</div>
+
+<!-- Data Management modal -->
+<div class="modal-overlay" id="dataManageModal">
+    <div class="modal" style="max-width:600px">
+        <button class="modal-close" onclick="closeDataManage()">&times;</button>
+        <h3>Керування даними</h3>
+        <div id="dataManageContent">
+            <p style="color:var(--text3);font-size:12px">Завантаження...</p>
+        </div>
     </div>
 </div>
 

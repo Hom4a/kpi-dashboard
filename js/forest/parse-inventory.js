@@ -2,7 +2,7 @@
 
 export function parseInventoryFile(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
 
     // Find header row (look for "Філія" or "Надлісництво" in first 15 rows)
     let headerIdx = -1;

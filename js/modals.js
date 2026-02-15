@@ -1,8 +1,11 @@
-// ===== Modals: Drill-down, Targets, Fullscreen, Viewer Access =====
+// ===== Modals: Drill-down, Targets, Fullscreen, Viewer Access, Data Management =====
 import { $, fmt, toast, themeColor } from './utils.js';
 import { allData, charts, targets, MO, setTargets } from './state.js';
 import { kill, freshCanvas, getTargetAnnotation } from './charts-common.js';
 import { sb } from './config.js';
+import { getRecordCount, getUploadHistory } from './db-kpi.js';
+import { getPricesCount, getInventoryCount } from './forest/db-forest.js';
+import { getPlanFactCount, getZsuCount } from './harvesting/db-harvesting.js';
 
 let _renderAllFn = null;
 export function setRenderAllCallback(fn) { _renderAllFn = fn; }
@@ -104,3 +107,54 @@ export async function saveViewerAccess() {
     closeViewerAccess();
     toast('Доступ збережено');
 }
+
+// ===== Data Management =====
+
+function fmtDateTime(iso) {
+    try { return new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+    catch(e) { return iso; }
+}
+
+function dataSection(title, count, lastUpload, clearOnclick, undoOnclick) {
+    return `<div class="glass" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>
+                <div style="font-size:13px;font-weight:600;color:var(--primary)">${title}</div>
+                <div style="font-size:11px;color:var(--text3)">${count} записів</div>
+            </div>
+        </div>
+        ${lastUpload ? `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Останнє: ${lastUpload.file_name} (${lastUpload.row_count} зап., ${fmtDateTime(lastUpload.uploaded_at)})</div>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${undoOnclick && lastUpload ? `<button class="btn btn-sm" onclick="${undoOnclick}">Скасувати останнє</button>` : ''}
+            ${count > 0 ? `<button class="btn btn-sm btn-danger" onclick="${clearOnclick}">Очистити все</button>` : ''}
+            ${count === 0 && !lastUpload ? '<span style="font-size:11px;color:var(--text3)">Немає даних</span>' : ''}
+        </div>
+    </div>`;
+}
+
+export async function openDataManage() {
+    $('dataManageModal').classList.add('on');
+    const content = $('dataManageContent');
+    content.innerHTML = '<p style="color:var(--text3);font-size:12px">Завантаження статистики...</p>';
+    try {
+        const [kpiCount, pricesCount, inventoryCount, pfCount, zsuCount, kpiHistory] = await Promise.all([
+            getRecordCount(), getPricesCount(), getInventoryCount(),
+            getPlanFactCount(), getZsuCount(), getUploadHistory('kpi')
+        ]);
+        const [pricesHistory, inventoryHistory, pfHistory, zsuHistory] = await Promise.all([
+            getUploadHistory('prices'), getUploadHistory('inventory'),
+            getUploadHistory('harvesting_plan_fact'), getUploadHistory('harvesting_zsu')
+        ]);
+        content.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">
+            ${dataSection('KPI (Обсяги / Фінанси)', kpiCount, kpiHistory[0] || null, 'clearKpiData()', 'undoLastKpi()')}
+            ${dataSection('Середньозважені ціни', pricesCount, pricesHistory[0] || null, 'clearPrices()')}
+            ${dataSection('Залишки лісопродукції', inventoryCount, inventoryHistory[0] || null, 'clearInventory()')}
+            ${dataSection('План-факт заготівлі', pfCount, pfHistory[0] || null, 'clearPlanFact()')}
+            ${dataSection('Довідка ЗСУ', zsuCount, zsuHistory[0] || null, 'clearZsu()')}
+        </div>`;
+    } catch(e) {
+        content.innerHTML = `<p style="color:var(--rose);font-size:12px">Помилка: ${e.message}</p>`;
+    }
+}
+
+export function closeDataManage() { $('dataManageModal').classList.remove('on'); }

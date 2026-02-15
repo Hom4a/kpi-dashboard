@@ -6,22 +6,22 @@ import { initTheme, toggleTheme, setRenderAllCallback as setThemeRenderAll } fro
 import { handleLogin, handleLogout, showAuthScreen, hideButtons, showAppForUser, initAuthListener, setLoadAndRenderCallback as setAuthLoadAndRender, setHideButtonsCallback } from './auth.js';
 import { switchPage, openMobileUpload, initSwipeGestures } from './navigation.js';
 import { populateFilters, applyFilter, resetFilters, initFilterEvents, setRenderAllCallback as setFilterRenderAll } from './filters.js';
-import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, saveViewerAccess, setRenderAllCallback as setModalsRenderAll } from './modals.js';
+import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, saveViewerAccess, openDataManage, closeDataManage, setRenderAllCallback as setModalsRenderAll } from './modals.js';
 import { renderAll } from './render-all.js';
 import { setMainMode, renderTable } from './render-volumes.js';
 import { exportExcel } from './export.js';
-import { loadAllRecords, clearDB } from './db-kpi.js';
+import { loadAllRecords, clearDB, undoLastKpiUpload } from './db-kpi.js';
 import { handleFile, setLoadAndRenderCallback as setFileHandlerLoadAndRender, setLoadForestCallback, setLoadHarvestingCallback } from './file-handler.js';
 import { startAutoRefresh, stopAutoRefresh, checkThresholds, setLoadAndRenderCallback as setAutoRefreshLoadAndRender } from './auto-refresh.js';
 // Forest modules
 import { setPricesData, setInventoryData, setFilteredPrices, setFilteredInventory } from './forest/state-forest.js';
-import { loadPricesData, loadInventoryData } from './forest/db-forest.js';
+import { loadPricesData, loadInventoryData, clearPricesData, clearInventoryData } from './forest/db-forest.js';
 import { populateForestFilters, applyForestFilter, initForestFilterEvents, setRenderForestCallback } from './forest/filters-forest.js';
 import { renderForestDashboard } from './forest/render-forest.js';
 import { renderPricesTable, renderInventoryTable, setPricesGroupBy, setInventoryGroupBy } from './forest/render-forest-table.js';
 // Harvesting modules
 import { setPlanFactData, setZsuData } from './harvesting/state-harvesting.js';
-import { loadPlanFactData, loadZsuData } from './harvesting/db-harvesting.js';
+import { loadPlanFactData, loadZsuData, clearPlanFactData, clearZsuData } from './harvesting/db-harvesting.js';
 import { populateHarvestingFilters, applyHarvestingFilter, initHarvestingFilterEvents, setRenderHarvestingCallback } from './harvesting/filters-harvesting.js';
 import { renderHarvestingDashboard } from './harvesting/render-harvesting.js';
 
@@ -129,6 +129,78 @@ window.exportExcel = exportExcel;
 window.openViewerAccess = openViewerAccess;
 window.closeViewerAccess = closeViewerAccess;
 window.saveViewerAccess = saveViewerAccess;
+window.openDataManage = openDataManage;
+window.closeDataManage = closeDataManage;
+
+// ===== Data Management action handlers =====
+window.clearKpiData = async () => {
+    if (!confirm('Очистити всі дані KPI (обсяги та фінанси)?')) return;
+    showLoader(true);
+    try {
+        await clearDB();
+        setAllData([]); setFiltered([]);
+        Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} }); setCharts({});
+        await loadAndRender(); showRoleButtons();
+        toast('Дані KPI очищено');
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
+window.undoLastKpi = async () => {
+    if (!confirm('Скасувати останнє завантаження KPI?')) return;
+    showLoader(true);
+    try {
+        const result = await undoLastKpiUpload();
+        toast(`Скасовано: ${result.fileName} (${result.removed} записів)`);
+        await loadAndRender(); showRoleButtons();
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
+window.clearPrices = async () => {
+    if (!confirm('Очистити дані середньозважених цін?')) return;
+    showLoader(true);
+    try {
+        await clearPricesData();
+        await loadForestDataAndRender();
+        toast('Дані цін очищено');
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
+window.clearInventory = async () => {
+    if (!confirm('Очистити дані залишків лісопродукції?')) return;
+    showLoader(true);
+    try {
+        await clearInventoryData();
+        await loadForestDataAndRender();
+        toast('Дані залишків очищено');
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
+window.clearPlanFact = async () => {
+    if (!confirm('Очистити дані план-факт заготівлі?')) return;
+    showLoader(true);
+    try {
+        await clearPlanFactData();
+        await loadHarvestingDataAndRender();
+        toast('Дані план-факт очищено');
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
+window.clearZsu = async () => {
+    if (!confirm('Очистити дані ЗСУ?')) return;
+    showLoader(true);
+    try {
+        await clearZsuData();
+        await loadHarvestingDataAndRender();
+        toast('Дані ЗСУ очищено');
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
 
 // ===== Error handlers =====
 window.onerror = function(msg, url, line) {
@@ -199,18 +271,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.classList.add('active'); setInventoryGroupBy(btn.dataset.g); renderInventoryTable();
     });
 
-    // Clear DB
-    $('btnClear').addEventListener('click', async () => {
-        if (!confirm('Очистити всю базу даних?')) return;
-        showLoader(true);
-        try {
-            await clearDB(); setAllData([]); setFiltered([]);
-            Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} }); setCharts({});
-            await loadAndRender(); toast('Базу очищено');
-        } catch (err) { toast('Помилка: ' + err.message, true); }
-        showLoader(false);
-    });
-
     // Auth keyboard shortcuts
     $('authPass').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
     $('authEmail').addEventListener('keydown', e => { if (e.key === 'Enter') $('authPass').focus(); });
@@ -219,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.chart-card.fullscreen').forEach(c => c.classList.remove('fullscreen'));
-            closeDrillDown(); closeTargetModal(); closeFormatHelp(); closeViewerAccess();
+            closeDrillDown(); closeTargetModal(); closeFormatHelp(); closeViewerAccess(); closeDataManage();
         }
     });
 

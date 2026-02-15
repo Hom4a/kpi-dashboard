@@ -19,7 +19,7 @@ export function setLoadHarvestingCallback(fn) { _loadHarvestingFn = fn; }
 
 export function detectFileType(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, raw: false });
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, raw: true });
     for (let i = 0; i < Math.min(15, rows.length); i++) {
         const row = (rows[i] || []).map(c => (c || '').toString().toLowerCase());
         const joined = row.join(' ');
@@ -84,7 +84,7 @@ export async function handleFile(file) {
         const records = await parseKpiFile(file);
         if (!records.length) { toast('Файл не містить даних. Перевірте формат.', true); showLoader(false); return; }
 
-        const result = await saveRecords(records);
+        const result = await saveRecords(records, file.name);
         if (result.added === 0) {
             toast(`Нових даних не знайдено. ${result.skipped} записів вже існують в базі.`);
         } else {
