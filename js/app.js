@@ -33,6 +33,11 @@ async function loadAndRender() {
         }
         hide('empty'); $('dash').style.display = 'block';
         $('btnExport').style.display = ''; $('btnPrint').style.display = ''; $('liveInfo').style.display = '';
+        if (role === 'admin' || role === 'editor') {
+            $('btnUpload').style.display = '';
+            const helpBtn = $('btnFormatHelp');
+            if (helpBtn) helpBtn.style.display = '';
+        }
         if (role === 'admin') { show('btnClear'); $('btnTargets').style.display = ''; }
         else { hide('btnClear'); $('btnTargets').style.display = 'none'; }
         const dates = allData.map(r => r._date);
