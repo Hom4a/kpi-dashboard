@@ -1,0 +1,20 @@
+/* ===== THEME VARIABLES ===== */
+:root,[data-theme="dark"]{
+    --bg:#0F1419;--bg2:#1a1f2e;--glass:rgba(26,31,46,0.6);--glass-hover:rgba(36,41,56,0.7);
+    --border:rgba(255,255,255,0.06);--text:#e8eaed;--text2:rgba(255,255,255,0.5);--text3:rgba(255,255,255,0.25);
+    --primary:#4A9D6F;--secondary:#9CAF88;--accent:#D4A574;
+    --green:#22c55e;--amber:#fbbf24;--rose:#fb7185;
+    --r:16px;--sidebar-w:64px;--sidebar-exp:200px;
+    --chart-grid:rgba(255,255,255,0.04);--chart-text:rgba(255,255,255,0.35);
+    --tooltip-bg:rgba(15,15,35,0.92);--tooltip-border:rgba(74,157,111,0.2);
+    --orb-show:0.3;--shadow:none;--card-border:var(--border)
+}
+[data-theme="light"]{
+    --bg:#F3F4F6;--bg2:#E5E7EB;--glass:rgba(255,255,255,0.85);--glass-hover:rgba(255,255,255,0.95);
+    --border:rgba(0,0,0,0.08);--text:#1F2937;--text2:rgba(0,0,0,0.5);--text3:rgba(0,0,0,0.25);
+    --primary:#059669;--secondary:#6B7280;--accent:#92400E;
+    --green:#16a34a;--amber:#d97706;--rose:#e11d48;
+    --chart-grid:rgba(0,0,0,0.06);--chart-text:rgba(0,0,0,0.4);
+    --tooltip-bg:rgba(255,255,255,0.95);--tooltip-border:rgba(5,150,105,0.2);
+    --orb-show:0;--shadow:0 1px 3px rgba(0,0,0,0.1);--card-border:rgba(0,0,0,0.06)
+}
