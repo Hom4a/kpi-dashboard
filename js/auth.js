@@ -61,7 +61,7 @@ export async function handleLogout() {
 }
 
 export function hideButtons() {
-    ['btnUpload','btnFormatHelp','btnClear','btnExport','btnPrint','btnTargets','liveInfo'].forEach(id => {
+    ['btnUpload','btnFormatHelp','btnClear','btnExport','btnPrint','btnTargets','btnViewerAccess','liveInfo'].forEach(id => {
         try { $(id).style.display = 'none'; } catch(e){}
     });
 }
@@ -88,6 +88,23 @@ export async function showAppForUser(user) {
             const helpBtn = $('btnFormatHelp');
             if (helpBtn) helpBtn.style.display = 'none';
         }
+        // Show/hide viewer access button for admin
+        const vaBtn = $('btnViewerAccess');
+        if (vaBtn) vaBtn.style.display = role === 'admin' ? '' : 'none';
+
+        // Hide restricted nav items for viewer
+        if (role === 'viewer' && profile && profile.allowed_pages) {
+            document.querySelectorAll('.nav-item[data-page]').forEach(n => {
+                n.style.display = profile.allowed_pages.includes(n.dataset.page) ? '' : 'none';
+            });
+            document.querySelectorAll('.mobile-nav-item[data-page]').forEach(n => {
+                n.style.display = profile.allowed_pages.includes(n.dataset.page) ? '' : 'none';
+            });
+        } else {
+            document.querySelectorAll('.nav-item[data-page]').forEach(n => n.style.display = '');
+            document.querySelectorAll('.mobile-nav-item[data-page]').forEach(n => n.style.display = '');
+        }
+
         setupChartDefaults();
         const { getRecordCount } = await import('./db-kpi.js');
         const count = await withTimeout(getRecordCount(), 8000, 0);

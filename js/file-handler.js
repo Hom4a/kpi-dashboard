@@ -6,11 +6,16 @@ import { saveRecords } from './db-kpi.js';
 import { parsePricesFile } from './forest/parse-prices.js';
 import { parseInventoryFile } from './forest/parse-inventory.js';
 import { savePricesData, saveInventoryData } from './forest/db-forest.js';
+import { parsePlanFactFile } from './harvesting/parse-plan-fact.js';
+import { parseZsuFile } from './harvesting/parse-zsu.js';
+import { savePlanFactData, saveZsuData } from './harvesting/db-harvesting.js';
 
 let _loadAndRenderFn = null;
 let _loadForestFn = null;
+let _loadHarvestingFn = null;
 export function setLoadAndRenderCallback(fn) { _loadAndRenderFn = fn; }
 export function setLoadForestCallback(fn) { _loadForestFn = fn; }
+export function setLoadHarvestingCallback(fn) { _loadHarvestingFn = fn; }
 
 export function detectFileType(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -20,13 +25,15 @@ export function detectFileType(wb) {
         const joined = row.join(' ');
         if (joined.includes('середньозважен') || (joined.includes('вартість') && joined.includes('продукція'))) return 'prices';
         if (joined.includes('залишок') || joined.includes('надлісництво')) return 'inventory';
+        if (joined.includes('виконання планових') || joined.includes('планових показників') || (joined.includes('річн') && joined.includes('план') && joined.includes('заготів'))) return 'harvesting_plan_fact';
+        if (joined.includes('вилучення') || (joined.includes('лісопродукції') && joined.includes('зсу'))) return 'harvesting_zsu';
     }
     return 'kpi';
 }
 
 export async function handleFile(file) {
     const role = currentProfile ? currentProfile.role : 'viewer';
-    if (role === 'viewer') { toast('У вас немає прав для завантаження даних', true); return; }
+    if (role !== 'admin' && role !== 'editor') { toast('У вас немає прав для завантаження даних', true); return; }
     showLoader(true);
     try {
         const buffer = await file.arrayBuffer();
@@ -49,6 +56,26 @@ export async function handleFile(file) {
             const result = await saveInventoryData(records, file.name);
             toast(`Залишки завантажено: ${result.count} записів`);
             if (_loadForestFn) await _loadForestFn();
+            showLoader(false);
+            return;
+        }
+
+        if (fileType === 'harvesting_plan_fact') {
+            const records = parsePlanFactFile(wb);
+            if (!records.length) { toast('Файл не містить даних план-факт. Перевірте формат.', true); showLoader(false); return; }
+            const result = await savePlanFactData(records, file.name);
+            toast(`План-факт завантажено: ${result.count} записів`);
+            if (_loadHarvestingFn) await _loadHarvestingFn();
+            showLoader(false);
+            return;
+        }
+
+        if (fileType === 'harvesting_zsu') {
+            const records = parseZsuFile(wb);
+            if (!records.length) { toast('Файл не містить даних ЗСУ. Перевірте формат.', true); showLoader(false); return; }
+            const result = await saveZsuData(records, file.name);
+            toast(`Дані ЗСУ завантажено: ${result.count} записів`);
+            if (_loadHarvestingFn) await _loadHarvestingFn();
             showLoader(false);
             return;
         }

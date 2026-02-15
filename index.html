@@ -63,6 +63,10 @@
             <svg viewBox="0 0 24 24"><path d="M17 20V8l-5-6-5 6v12"/><path d="M12 2L7 8h10l-5-6z"/><path d="M7 8L2 14h5"/><path d="M17 8l5 6h-5"/><line x1="12" y1="14" x2="12" y2="20"/></svg>
             <span>Продукція</span>
         </div>
+        <div class="nav-item" data-page="harvesting" onclick="switchPage('harvesting')">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <span>Заготівля</span>
+        </div>
     </div>
     <div class="sidebar-bottom">
         <button class="theme-btn" onclick="toggleTheme()">
@@ -92,6 +96,7 @@
         <label class="btn btn-sm" id="btnUpload" style="display:none"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Завантажити<input type="file" id="fileHdr" accept=".xlsx,.xls"></label>
         <button class="icon-btn" id="btnFormatHelp" style="display:none" onclick="openFormatHelp()" title="Формати файлів"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
         <button class="icon-btn" id="btnTargets" style="display:none" onclick="openTargetModal()" title="Налаштувати цілі"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></button>
+        <button class="icon-btn" id="btnViewerAccess" style="display:none" onclick="openViewerAccess()" title="Доступ глядачів"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
         <button class="btn btn-sm btn-danger" id="btnClear" style="display:none" title="Очистити базу"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
     </div>
 </header>
@@ -196,6 +201,12 @@
                 <p style="font-size:15px;margin-bottom:8px">Фінансові дані відсутні</p>
                 <p style="font-size:12px">Завантажте Excel з даними грошових надходжень</p>
             </div>
+        </div>
+
+        <!-- Harvesting filter bar (hidden by default) -->
+        <div class="filter-bar" id="harvestingFilterBar" style="display:none">
+            <select class="filter-select" id="hOffice"><option value="">Обласне управління</option></select>
+            <button class="filter-reset" id="harvestingFilterReset" title="Скинути">✕</button>
         </div>
 
         <!-- Forest filter bar (hidden by default) -->
@@ -321,6 +332,75 @@
                 </div>
             </div>
         </div>
+
+        <!-- Harvesting page -->
+        <div class="page-section" id="pageHarvesting">
+            <div id="harvestingEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
+                <p style="font-size:15px;margin-bottom:8px">Дані заготівлі відсутні</p>
+                <p style="font-size:12px">Завантажте Excel з планом-фактом або довідкою ЗСУ</p>
+            </div>
+
+            <div id="harvestingContent" style="display:none">
+                <!-- Plan-Fact Section -->
+                <div id="planFactSection">
+                    <div class="section-title" style="font-size:14px;font-weight:700;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Виконання планових показників заготівлі</div>
+                    <div class="kpi-grid" id="kpiGridHarvesting"></div>
+
+                    <div class="chart-row cols-2">
+                        <div class="glass chart-card" id="planVsActualCard">
+                            <div class="chart-hdr"><div><h3>План vs Факт по регіонах</h3><small>Річний план та фактична заготівля, тис м³</small></div>
+                                <button class="icon-btn" onclick="toggleFullscreen('planVsActualCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                            </div>
+                            <div class="chart-wrap medium" id="wrapPlanVsActual"><canvas id="cPlanVsActual"></canvas></div>
+                        </div>
+                        <div class="glass chart-card" id="executionByRegionCard">
+                            <div class="chart-hdr"><div><h3>% виконання по регіонах</h3><small>Відсоток виконання річного плану</small></div>
+                                <button class="icon-btn" onclick="toggleFullscreen('executionByRegionCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                            </div>
+                            <div class="chart-wrap medium" id="wrapExecutionByRegion"><canvas id="cExecutionByRegion"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="glass chart-card" style="margin-bottom:20px">
+                        <div class="chart-hdr"><div><h3>Таблиця план-факт</h3></div></div>
+                        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Регіон</th><th>Річний план</th><th>9-міс план</th><th>Заготовлено</th><th>% 9-міс</th><th>% річного</th></tr></thead><tbody id="tblBodyPlanFact"></tbody></table></div>
+                    </div>
+                </div>
+
+                <!-- ZSU Section -->
+                <div id="zsuSection">
+                    <div class="section-title" style="font-size:14px;font-weight:700;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Вилучення лісопродукції на потреби ЗСУ</div>
+
+                    <div class="chart-row cols-2">
+                        <div class="glass chart-card" id="zsuByRegionCard">
+                            <div class="chart-hdr"><div><h3>ЗСУ по регіонах</h3><small>Відвантажено, м³</small></div>
+                                <button class="icon-btn" onclick="toggleFullscreen('zsuByRegionCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                            </div>
+                            <div class="chart-wrap medium" id="wrapZsuByRegion"><canvas id="cZsuByRegion"></canvas></div>
+                        </div>
+                        <div class="glass chart-card" id="zsuDeclaredVsShippedCard">
+                            <div class="chart-hdr"><div><h3>Заявлено vs Відвантажено</h3><small>Порівняння по регіонах, м³</small></div>
+                                <button class="icon-btn" onclick="toggleFullscreen('zsuDeclaredVsShippedCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                            </div>
+                            <div class="chart-wrap medium" id="wrapZsuDeclaredVsShipped"><canvas id="cZsuDeclaredVsShipped"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="chart-row cols-2">
+                        <div class="glass chart-card" id="zsuProductBreakdownCard">
+                            <div class="chart-hdr"><div><h3>Структура ЗСУ</h3><small>Лісопродукція vs Пиломатеріали</small></div>
+                                <button class="icon-btn" onclick="toggleFullscreen('zsuProductBreakdownCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                            </div>
+                            <div class="chart-wrap medium" id="wrapZsuProductBreakdown"><canvas id="cZsuProductBreakdown"></canvas></div>
+                        </div>
+                        <div class="glass chart-card">
+                            <div class="chart-hdr"><div><h3>Таблиця ЗСУ</h3></div></div>
+                            <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Регіон</th><th>Лісопр. заявл.</th><th>Лісопр. відвант.</th><th>Вартість</th><th>Пилом. заявл.</th><th>Пилом. відвант.</th><th>Вартість</th></tr></thead><tbody id="tblBodyZsu"></tbody></table></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </main>
 
@@ -371,9 +451,33 @@
                 Дані повністю замінюються при кожному завантаженні.
             </div>
         </div>
+        <div style="margin-bottom:16px">
+            <div style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:6px">4. План-факт заготівлі</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.6;padding-left:12px">
+                Excel «Виконання планових показників заготівлі» з регіональними обласними управліннями.<br>
+                Дані повністю замінюються при кожному завантаженні.
+            </div>
+        </div>
+        <div style="margin-bottom:16px">
+            <div style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:6px">5. Довідка ЗСУ</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.6;padding-left:12px">
+                Excel «Довідка по вилученню лісопродукції на потреби ЗСУ».<br>
+                Дані повністю замінюються при кожному завантаженні.
+            </div>
+        </div>
         <div style="font-size:11px;color:var(--text3);padding:10px;background:rgba(74,157,111,0.06);border-radius:8px;border:1px solid rgba(74,157,111,0.1)">
             Формат файлу визначається автоматично за заголовками таблиці.
         </div>
+    </div>
+</div>
+
+<!-- Viewer Access modal -->
+<div class="modal-overlay" id="viewerAccessModal">
+    <div class="modal" style="max-width:550px">
+        <button class="modal-close" onclick="closeViewerAccess()">&times;</button>
+        <h3>Налаштування доступу глядачів</h3>
+        <div id="viewerAccessList"></div>
+        <button class="btn" style="margin-top:16px" onclick="saveViewerAccess()">Зберегти</button>
     </div>
 </div>
 
@@ -393,6 +497,10 @@
         <button class="mobile-nav-item" data-page="forest" onclick="switchPage('forest')">
             <svg viewBox="0 0 24 24"><path d="M17 20V8l-5-6-5 6v12"/><line x1="12" y1="14" x2="12" y2="20"/></svg>
             <span>Продукція</span>
+        </button>
+        <button class="mobile-nav-item" data-page="harvesting" onclick="switchPage('harvesting')">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <span>Заготівля</span>
         </button>
         <button class="mobile-nav-item" onclick="openMobileUpload()">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>

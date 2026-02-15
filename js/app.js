@@ -6,12 +6,12 @@ import { initTheme, toggleTheme, setRenderAllCallback as setThemeRenderAll } fro
 import { handleLogin, handleLogout, showAuthScreen, hideButtons, showAppForUser, initAuthListener, setLoadAndRenderCallback as setAuthLoadAndRender, setHideButtonsCallback } from './auth.js';
 import { switchPage, openMobileUpload, initSwipeGestures } from './navigation.js';
 import { populateFilters, applyFilter, resetFilters, initFilterEvents, setRenderAllCallback as setFilterRenderAll } from './filters.js';
-import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, setRenderAllCallback as setModalsRenderAll } from './modals.js';
+import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, saveViewerAccess, setRenderAllCallback as setModalsRenderAll } from './modals.js';
 import { renderAll } from './render-all.js';
 import { setMainMode, renderTable } from './render-volumes.js';
 import { exportExcel } from './export.js';
 import { loadAllRecords, clearDB } from './db-kpi.js';
-import { handleFile, setLoadAndRenderCallback as setFileHandlerLoadAndRender, setLoadForestCallback } from './file-handler.js';
+import { handleFile, setLoadAndRenderCallback as setFileHandlerLoadAndRender, setLoadForestCallback, setLoadHarvestingCallback } from './file-handler.js';
 import { startAutoRefresh, stopAutoRefresh, checkThresholds, setLoadAndRenderCallback as setAutoRefreshLoadAndRender } from './auto-refresh.js';
 // Forest modules
 import { setPricesData, setInventoryData, setFilteredPrices, setFilteredInventory } from './forest/state-forest.js';
@@ -19,6 +19,11 @@ import { loadPricesData, loadInventoryData } from './forest/db-forest.js';
 import { populateForestFilters, applyForestFilter, initForestFilterEvents, setRenderForestCallback } from './forest/filters-forest.js';
 import { renderForestDashboard } from './forest/render-forest.js';
 import { renderPricesTable, renderInventoryTable, setPricesGroupBy, setInventoryGroupBy } from './forest/render-forest-table.js';
+// Harvesting modules
+import { setPlanFactData, setZsuData } from './harvesting/state-harvesting.js';
+import { loadPlanFactData, loadZsuData } from './harvesting/db-harvesting.js';
+import { populateHarvestingFilters, applyHarvestingFilter, initHarvestingFilterEvents, setRenderHarvestingCallback } from './harvesting/filters-harvesting.js';
+import { renderHarvestingDashboard } from './harvesting/render-harvesting.js';
 
 // ===== Load & Render KPI =====
 async function loadAndRender() {
@@ -70,16 +75,33 @@ async function loadForestDataAndRender() {
     } catch(e) { console.error('loadForestDataAndRender error:', e); }
 }
 
+// ===== Load & Render Harvesting =====
+async function loadHarvestingDataAndRender() {
+    try {
+        const [planFact, zsu] = await Promise.all([loadPlanFactData(), loadZsuData()]);
+        console.log('Harvesting loaded:', planFact.length, 'plan-fact,', zsu.length, 'zsu');
+        setPlanFactData(planFact);
+        setZsuData(zsu);
+        if (planFact.length || zsu.length) {
+            hide('empty'); $('dash').style.display = 'block';
+        }
+        populateHarvestingFilters();
+        applyHarvestingFilter();
+    } catch(e) { console.error('loadHarvestingDataAndRender error:', e); }
+}
+
 // ===== Wire callbacks =====
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
-setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); });
+setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); });
 setHideButtonsCallback(hideButtons);
 setFileHandlerLoadAndRender(loadAndRender);
 setLoadForestCallback(loadForestDataAndRender);
-setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); });
+setLoadHarvestingCallback(loadHarvestingDataAndRender);
+setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); });
 setRenderForestCallback(renderForestDashboard);
+setRenderHarvestingCallback(renderHarvestingDashboard);
 
 // ===== Expose global functions for onclick handlers in HTML =====
 window.handleLogin = handleLogin;
@@ -95,6 +117,9 @@ window.saveTargets = saveTargets;
 window.openFormatHelp = openFormatHelp;
 window.closeFormatHelp = closeFormatHelp;
 window.exportExcel = exportExcel;
+window.openViewerAccess = openViewerAccess;
+window.closeViewerAccess = closeViewerAccess;
+window.saveViewerAccess = saveViewerAccess;
 
 // ===== Error handlers =====
 window.onerror = function(msg, url, line) {
@@ -131,6 +156,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Forest Filters
     initForestFilterEvents();
+
+    // Harvesting Filters
+    initHarvestingFilterEvents();
 
     // Main chart toggle
     $('tglMain').addEventListener('click', e => {
@@ -182,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.chart-card.fullscreen').forEach(c => c.classList.remove('fullscreen'));
-            closeDrillDown(); closeTargetModal(); closeFormatHelp();
+            closeDrillDown(); closeTargetModal(); closeFormatHelp(); closeViewerAccess();
         }
     });
 
