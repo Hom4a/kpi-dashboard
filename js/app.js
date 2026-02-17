@@ -32,10 +32,10 @@ function showRoleButtons() {
         $('btnUpload').style.display = '';
         const helpBtn = $('btnFormatHelp');
         if (helpBtn) helpBtn.style.display = '';
-    }
-    if (role === 'admin') {
         $('btnTargets').style.display = '';
         show('btnClear');
+    }
+    if (role === 'admin') {
         const vaBtn = $('btnViewerAccess');
         if (vaBtn) vaBtn.style.display = '';
     }
@@ -53,7 +53,7 @@ async function loadAndRender() {
         hide('empty'); $('dash').style.display = 'block';
         $('btnExport').style.display = ''; $('btnPrint').style.display = ''; $('liveInfo').style.display = '';
         const role = currentProfile ? currentProfile.role : 'viewer';
-        if (role !== 'admin') { hide('btnClear'); $('btnTargets').style.display = 'none'; }
+        if (role !== 'admin' && role !== 'editor') { hide('btnClear'); $('btnTargets').style.display = 'none'; }
         const dates = allData.map(r => r._date);
         const minD = new Date(Math.min(...dates)), maxD = new Date(Math.max(...dates));
         $('hdrSub').textContent = `${fmtDate(minD)} — ${fmtDate(maxD)} | ${allData.length} записів`;
