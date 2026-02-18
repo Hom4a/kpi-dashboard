@@ -19,6 +19,7 @@ export function renderExecutiveDashboard() {
     renderScorecard(m.scorecard);
     renderCumulativeChart(m);
     renderCashChart(m.monthlyCash);
+    renderExecMarketChart(m);
     renderAlerts(m.alerts);
     renderBubbleChart(m);
     renderStackedChart(m);
@@ -287,4 +288,56 @@ function renderStackedChart(m) {
         }
     });
     const ec = execCharts; ec.cExecStacked = c; setExecCharts(ec);
+}
+
+function renderExecMarketChart(m) {
+    kill('cExecMarket');
+    const wrap = $('wrapExecMarket');
+    if (!wrap) return;
+
+    if (!m.marketBySpecies || !m.marketBySpecies.length) {
+        wrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text3);font-size:13px">Немає ринкових даних</div>';
+        return;
+    }
+
+    const canvas = freshCanvas('wrapExecMarket', 'cExecMarket');
+    const ctx = canvas.getContext('2d');
+
+    const labels = m.marketBySpecies.map(d => d.label);
+    const pc = themeColor('--primary');
+    const ac = themeColor('--amber');
+
+    const c = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Україна, EUR/м\u00B3',
+                    data: m.marketBySpecies.map(d => d.uaPrice),
+                    backgroundColor: pc + '99', borderColor: pc,
+                    borderWidth: 1, borderRadius: 3
+                },
+                {
+                    label: 'Середня Європа, EUR/м\u00B3',
+                    data: m.marketBySpecies.map(d => d.euPrice),
+                    backgroundColor: ac + '99', borderColor: ac,
+                    borderWidth: 1, borderRadius: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: { beginAtZero: true, ticks: { callback: v => '\u20AC' + v } },
+                y: { ticks: { font: { size: 11 } } }
+            },
+            plugins: {
+                legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } },
+                tooltip: { callbacks: { label: i => ` ${i.dataset.label}: \u20AC${fmt(i.parsed.x, 2)}` } }
+            }
+        }
+    });
+    const ec2 = execCharts; ec2.cExecMarket = c; setExecCharts(ec2);
 }

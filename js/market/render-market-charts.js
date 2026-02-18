@@ -19,6 +19,12 @@ function fmtMonth(dateStr) {
     return MO_UA[d.getMonth() + 1] + ' ' + d.getFullYear().toString().slice(2);
 }
 
+function showEmptyState(wrapperId, msg = 'Немає даних для відображення') {
+    const wrap = document.getElementById(wrapperId);
+    if (!wrap) return;
+    wrap.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text3);font-size:13px;text-align:center;padding:20px">${msg}</div>`;
+}
+
 // ===== 1. Country Comparison (grouped bar) =====
 export function renderCountryComparison() {
     kill('marketCountry');
@@ -26,7 +32,7 @@ export function renderCountryComparison() {
     const ctx = canvas.getContext('2d');
 
     const countries = filteredMarketPrices.filter(r => r.row_type === 'country');
-    if (!countries.length) return;
+    if (!countries.length) { showEmptyState('wrapMarketCountry'); return; }
 
     const labels = countries.map(r => r.country);
     const fields = ['pine_business', 'spruce_business', 'alder_business', 'birch_business', 'oak_business'];
@@ -66,7 +72,7 @@ export function renderUkraineVsEurope() {
     const countries = filteredMarketPrices.filter(r => r.row_type === 'country');
     const ua = countries.find(r => r.country.toLowerCase().startsWith('україна'));
     const avg = filteredMarketPrices.find(r => r.row_type === 'average');
-    if (!ua && !avg) return;
+    if (!ua && !avg) { showEmptyState('wrapMarketUaVsEu'); return; }
 
     const fields = ['pine_business', 'spruce_business', 'alder_business', 'birch_business', 'oak_business'];
     const labels = fields.map(f => SPECIES_LABELS[f]);
@@ -105,7 +111,7 @@ export function renderSpeciesRanking() {
     const ctx = canvas.getContext('2d');
 
     const ua = filteredMarketPrices.find(r => r.row_type === 'country' && r.country.toLowerCase().startsWith('україна'));
-    if (!ua) return;
+    if (!ua) { showEmptyState('wrapMarketSpecies'); return; }
 
     const all = Object.entries(SPECIES_LABELS).map(([key, label]) => ({
         label, value: ua[key] || 0,
@@ -142,7 +148,7 @@ export function renderTimeSeries() {
     const ctx = canvas.getContext('2d');
 
     const countryData = marketHistory.filter(r => r.data_type === 'country_avg');
-    if (!countryData.length) return;
+    if (!countryData.length) { showEmptyState('wrapMarketTimeSeries', 'Немає історичних даних. Завантажте файл цін'); return; }
 
     // Unique months sorted
     const months = [...new Set(countryData.map(r => r.month_date))].sort();
@@ -186,7 +192,7 @@ export function renderUaExchangeBreakdown() {
     const activePeriod = marketFilterState.period || allPeriods[0] || '';
     const periodUa = activePeriod ? marketUaDetail.filter(r => r.period === activePeriod) : marketUaDetail;
     const data = periodUa.filter(r => exchanges.includes(r.exchange) && r.avg_price_uah > 0);
-    if (!data.length) return;
+    if (!data.length) { showEmptyState('wrapMarketExchange'); return; }
 
     const species = [...new Set(data.map(r => r.species))];
     const colors = ['#3b82f6', '#22c55e', '#f59e0b'];
@@ -226,7 +232,7 @@ export function renderPriceDynamics() {
     const ctx = canvas.getContext('2d');
 
     const speciesData = marketHistory.filter(r => r.data_type === 'ua_species');
-    if (!speciesData.length) return;
+    if (!speciesData.length) { showEmptyState('wrapMarketDynamics', 'Немає історичних даних. Завантажте файл цін'); return; }
 
     const months = [...new Set(speciesData.map(r => r.month_date))].sort();
     const entities = [...new Set(speciesData.map(r => r.entity_name))];

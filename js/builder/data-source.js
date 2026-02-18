@@ -62,6 +62,48 @@ const SYSTEM_SOURCES = {
             { name: 'lumber_declared_m3', label: 'Пилом. заявл.', type: 'number' },
             { name: 'lumber_shipped_m3', label: 'Пилом. відвант.', type: 'number' }
         ]
+    },
+    market_prices: {
+        table: 'market_prices',
+        label: 'Ринкові ціни (міжнародні)',
+        fields: [
+            { name: 'period', label: 'Період', type: 'text' },
+            { name: 'country', label: 'Країна', type: 'text' },
+            { name: 'row_type', label: 'Тип', type: 'text' },
+            { name: 'pine_business', label: 'Сосна', type: 'number' },
+            { name: 'spruce_business', label: 'Ялина', type: 'number' },
+            { name: 'alder_business', label: 'Вільха', type: 'number' },
+            { name: 'birch_business', label: 'Береза', type: 'number' },
+            { name: 'oak_business', label: 'Дуб', type: 'number' },
+            { name: 'pine_firewood', label: 'Сосна (др.)', type: 'number' },
+            { name: 'spruce_firewood', label: 'Ялина (др.)', type: 'number' },
+            { name: 'birch_firewood', label: 'Береза (др.)', type: 'number' },
+            { name: 'avg_price', label: 'Середня ціна', type: 'number' },
+            { name: 'eur_rate', label: 'Курс EUR', type: 'number' }
+        ]
+    },
+    market_prices_ua: {
+        table: 'market_prices_ua',
+        label: 'Ринкові ціни (Україна, біржі)',
+        fields: [
+            { name: 'period', label: 'Період', type: 'text' },
+            { name: 'exchange', label: 'Біржа', type: 'text' },
+            { name: 'species', label: 'Порода', type: 'text' },
+            { name: 'volume_m3', label: 'Обсяг м³', type: 'number' },
+            { name: 'total_uah', label: 'Сума грн', type: 'number' },
+            { name: 'avg_price_uah', label: 'Ціна грн/м³', type: 'number' },
+            { name: 'avg_price_eur', label: 'Ціна EUR', type: 'number' }
+        ]
+    },
+    market_price_history: {
+        table: 'market_price_history',
+        label: 'Динаміка ринкових цін',
+        fields: [
+            { name: 'data_type', label: 'Тип', type: 'text' },
+            { name: 'entity_name', label: 'Назва', type: 'text' },
+            { name: 'month_date', label: 'Місяць', type: 'date' },
+            { name: 'price_eur', label: 'Ціна EUR', type: 'number' }
+        ]
     }
 };
 

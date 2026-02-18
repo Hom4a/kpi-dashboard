@@ -244,7 +244,7 @@ export async function openDataManage() {
             ${dataSection('KPI (Обсяги / Фінанси)', kpiCount, kpiHistory[0] || null, 'clearKpiData()', 'undoLastKpi()')}
             ${dataSection('Середньозважені ціни', pricesCount, pricesHistory[0] || null, 'clearPrices()')}
             ${dataSection('Залишки лісопродукції', inventoryCount, inventoryHistory[0] || null, 'clearInventory()')}
-            ${dataSection('Ринкові ціни (міжнародні)', marketCount, marketHistory[0] || null, 'clearMarketData()')}
+            ${dataSection('Ринкові ціни (міжнародні)', marketCount, marketHistory[0] || null, 'clearMarketData()', 'undoLastMarketUpload()')}
             ${dataSection('План-факт заготівлі', pfCount, pfHistory[0] || null, 'clearPlanFact()')}
             ${dataSection('Довідка ЗСУ', zsuCount, zsuHistory[0] || null, 'clearZsu()')}
         </div>`;

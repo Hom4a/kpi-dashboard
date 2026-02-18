@@ -28,7 +28,7 @@ import { renderHarvestingDashboard } from './harvesting/render-harvesting.js';
 import { renderExecutiveDashboard } from './executive/render-executive.js';
 // Market modules
 import { setMarketPrices, setMarketUaDetail, setMarketHistory, setEurRates, setMarketMeta, setAllPeriods } from './market/state-market.js';
-import { loadMarketPrices, loadMarketUaDetail, loadMarketHistory, loadEurRates, clearMarketData as clearMarketDB } from './market/db-market.js';
+import { loadMarketPrices, loadMarketUaDetail, loadMarketHistory, loadEurRates, clearMarketData as clearMarketDB, undoLastMarketUpload as undoMarketDB } from './market/db-market.js';
 import { populateMarketFilters, applyMarketFilter, initMarketFilterEvents, setRenderMarketCallback } from './market/filters-market.js';
 import { renderMarketDashboard } from './market/render-market.js';
 import { setLoadMarketCallback } from './file-handler.js';
@@ -158,9 +158,9 @@ setModalsRenderAll(renderAll);
 setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); await loadMarketDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); });
 setHideButtonsCallback(hideButtons);
 setFileHandlerLoadAndRender(async () => { await loadAndRender(); showRoleButtons(); });
-setLoadForestCallback(loadForestDataAndRender);
-setLoadHarvestingCallback(loadHarvestingDataAndRender);
-setLoadMarketCallback(loadMarketDataAndRender);
+setLoadForestCallback(async () => { await loadForestDataAndRender(); renderExecutiveDashboard(); });
+setLoadHarvestingCallback(async () => { await loadHarvestingDataAndRender(); renderExecutiveDashboard(); });
+setLoadMarketCallback(async () => { await loadMarketDataAndRender(); renderExecutiveDashboard(); });
 setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); await loadMarketDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); });
 setRenderForestCallback(renderForestDashboard);
 setRenderHarvestingCallback(renderHarvestingDashboard);
@@ -227,6 +227,7 @@ window.clearPrices = async () => {
     try {
         await clearPricesData();
         await loadForestDataAndRender();
+        renderExecutiveDashboard();
         toast('Дані цін очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
@@ -238,6 +239,7 @@ window.clearInventory = async () => {
     try {
         await clearInventoryData();
         await loadForestDataAndRender();
+        renderExecutiveDashboard();
         toast('Дані залишків очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
@@ -249,6 +251,7 @@ window.clearPlanFact = async () => {
     try {
         await clearPlanFactData();
         await loadHarvestingDataAndRender();
+        renderExecutiveDashboard();
         toast('Дані план-факт очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
@@ -260,6 +263,7 @@ window.clearZsu = async () => {
     try {
         await clearZsuData();
         await loadHarvestingDataAndRender();
+        renderExecutiveDashboard();
         toast('Дані ЗСУ очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
@@ -273,7 +277,20 @@ window.clearMarketData = async () => {
         await clearMarketDB();
         setMarketPrices([]); setMarketUaDetail([]); setMarketHistory([]); setEurRates([]);
         await loadMarketDataAndRender();
+        renderExecutiveDashboard();
         toast('Дані ринкових цін очищено');
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
+window.undoLastMarketUpload = async () => {
+    if (!confirm('Скасувати останнє завантаження ринкових цін?')) return;
+    showLoader(true);
+    try {
+        await undoMarketDB();
+        await loadMarketDataAndRender();
+        renderExecutiveDashboard();
+        toast('Останнє завантаження ринкових цін скасовано');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
     showLoader(false);

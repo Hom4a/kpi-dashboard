@@ -18,10 +18,11 @@ function cleanNum(v) {
     return isNaN(n) ? null : n;
 }
 
-function excelDateToISO(serial) {
-    if (typeof serial !== 'number' || serial < 1000) return null;
-    const d = new Date((serial - 25569) * 86400 * 1000);
-    return d.toISOString().slice(0, 10);
+function dateToISO(val) {
+    if (val instanceof Date) return val.toISOString().slice(0, 10);
+    if (typeof val === 'number' && val > 1000)
+        return new Date((val - 25569) * 86400 * 1000).toISOString().slice(0, 10);
+    return null;
 }
 
 function findSheet(wb, keywords) {
@@ -193,7 +194,7 @@ function parseHistorySheets(wb, result) {
             // Row 0: date serials in cols 1+
             const months = [];
             for (let c = 1; c < (rows[0] || []).length; c++) {
-                const iso = excelDateToISO(rows[0][c]);
+                const iso = dateToISO(rows[0][c]);
                 if (iso) months.push({ col: c, date: iso });
             }
 
@@ -223,11 +224,11 @@ function parseHistorySheets(wb, result) {
         // Find UA species section: row with "Україна" and date serials after it
         for (let r = 0; r < rows.length; r++) {
             const c0 = (rows[r][0] || '').toString().trim().toLowerCase();
-            if (c0 === 'україна' && typeof rows[r][1] === 'number' && rows[r][1] > 40000) {
+            if (c0 === 'україна' && (rows[r][1] instanceof Date || (typeof rows[r][1] === 'number' && rows[r][1] > 40000))) {
                 // This row has dates: rows[r][1..N]
                 const months = [];
                 for (let c = 1; c < rows[r].length; c++) {
-                    const iso = excelDateToISO(rows[r][c]);
+                    const iso = dateToISO(rows[r][c]);
                     if (iso) months.push({ col: c, date: iso });
                 }
                 // Following rows are species

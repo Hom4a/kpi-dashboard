@@ -109,6 +109,26 @@ export async function getMarketPricesCount() {
     return count || 0;
 }
 
+export async function undoLastMarketUpload() {
+    const { data: history, error: hErr } = await sb.from('forest_upload_history')
+        .select('*')
+        .eq('data_type', 'market_prices')
+        .order('uploaded_at', { ascending: false })
+        .limit(1);
+    if (hErr) throw new Error(hErr.message);
+    if (!history || !history.length) throw new Error('Немає завантажень для скасування');
+
+    const last = history[0];
+    const bid = last.batch_id;
+
+    await sb.from('market_prices').delete().eq('upload_batch_id', bid);
+    await sb.from('market_prices_ua').delete().eq('upload_batch_id', bid);
+    await sb.from('market_price_history').delete().eq('upload_batch_id', bid);
+    await sb.from('eur_rates').delete().eq('upload_batch_id', bid);
+
+    await sb.from('forest_upload_history').delete().eq('id', last.id);
+}
+
 export async function clearMarketData() {
     await sb.from('market_prices').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await sb.from('market_prices_ua').delete().neq('id', '00000000-0000-0000-0000-000000000000');

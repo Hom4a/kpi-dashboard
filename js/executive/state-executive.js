@@ -79,6 +79,20 @@ export function computeExecMetrics() {
     const marketDiff = marketAvgEu > 0 ? ((marketAvgUa - marketAvgEu) / marketAvgEu) * 100 : 0;
     const eurRate = marketMeta.eurRate || 0;
 
+    // Market by species for executive chart
+    const speciesKeys = [
+        { key: 'pine_business', label: 'Сосна' },
+        { key: 'spruce_business', label: 'Ялина' },
+        { key: 'alder_business', label: 'Вільха' },
+        { key: 'birch_business', label: 'Береза' },
+        { key: 'oak_business', label: 'Дуб' }
+    ];
+    const marketBySpecies = speciesKeys.map(f => ({
+        label: f.label,
+        uaPrice: uaRow ? (uaRow[f.key] || 0) : 0,
+        euPrice: avgRow ? (avgRow[f.key] || 0) : 0
+    })).filter(d => d.uaPrice > 0 || d.euPrice > 0);
+
     // --- Regional scorecard ---
     const scorecard = buildScorecard();
 
@@ -93,7 +107,7 @@ export function computeExecMetrics() {
         inventoryTotal, coverageDays, zsuTotalShipped, zsuPct,
         pctAnnual, pfTotal,
         realizedSpark, harvestedSpark,
-        marketAvgUa, marketAvgEu, marketDiff, eurRate,
+        marketAvgUa, marketAvgEu, marketDiff, eurRate, marketBySpecies,
         scorecard, monthlyCash, alerts,
         targets,
         hasData: allData.length > 0 || planFactData.length > 0 || pricesData.length > 0 || marketPrices.length > 0
