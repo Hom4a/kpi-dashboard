@@ -27,7 +27,7 @@ import { renderHarvestingDashboard } from './harvesting/render-harvesting.js';
 // Executive modules
 import { renderExecutiveDashboard } from './executive/render-executive.js';
 // Market modules
-import { setMarketPrices, setMarketUaDetail, setMarketHistory, setEurRates, setMarketMeta } from './market/state-market.js';
+import { setMarketPrices, setMarketUaDetail, setMarketHistory, setEurRates, setMarketMeta, setAllPeriods } from './market/state-market.js';
 import { loadMarketPrices, loadMarketUaDetail, loadMarketHistory, loadEurRates, clearMarketData as clearMarketDB } from './market/db-market.js';
 import { populateMarketFilters, applyMarketFilter, initMarketFilterEvents, setRenderMarketCallback } from './market/filters-market.js';
 import { renderMarketDashboard } from './market/render-market.js';
@@ -136,9 +136,12 @@ async function loadMarketDataAndRender() {
         setMarketUaDetail(uaDetail);
         setMarketHistory(history);
         setEurRates(rates);
-        // Extract meta from first record
+        // Build sorted period list and set meta from latest
+        const periods = [...new Set(prices.map(r => r.period).filter(Boolean))].sort().reverse();
+        setAllPeriods(periods);
         if (prices.length) {
-            setMarketMeta({ period: prices[0].period || '', eurRate: prices[0].eur_rate || 0 });
+            const latest = prices.find(r => r.period === periods[0]) || prices[0];
+            setMarketMeta({ period: latest.period || '', eurRate: latest.eur_rate || 0 });
         }
         if (prices.length || history.length) {
             hide('empty'); $('dash').style.display = 'block';

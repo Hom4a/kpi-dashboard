@@ -1,27 +1,62 @@
 // ===== Market Dashboard — KPI Cards =====
 import { $, fmt } from '../utils.js';
-import { marketPrices, marketMeta } from './state-market.js';
+import { marketPrices, marketMeta, allPeriods, marketFilterState } from './state-market.js';
 
 export function renderMarketKPIs() {
     const grid = $('kpiGridMarket');
     if (!grid) return;
 
-    const countries = marketPrices.filter(r => r.row_type === 'country');
+    const activePeriod = marketFilterState.period || allPeriods[0] || '';
+    const curPrices = activePeriod
+        ? marketPrices.filter(r => r.period === activePeriod)
+        : marketPrices;
+
+    const countries = curPrices.filter(r => r.row_type === 'country');
     const ua = countries.find(r => r.country.toLowerCase().startsWith('україна'));
-    const avg = marketPrices.find(r => r.row_type === 'average');
+    const avg = curPrices.find(r => r.row_type === 'average');
     const rate = marketMeta.eurRate || 1;
 
-    // UA average business price
     const uaBusiness = ua ? avgBusiness(ua) : 0;
     const uaUah = uaBusiness * rate;
-
-    // EU average
     const euBusiness = avg ? avgBusiness(avg) : 0;
-
-    // Difference %
     const diff = euBusiness > 0 ? ((uaBusiness - euBusiness) / euBusiness * 100) : 0;
     const diffSign = diff >= 0 ? '+' : '';
     const diffColor = diff >= 0 ? 'var(--green)' : 'var(--rose)';
+
+    // Previous period comparison
+    const prevPeriod = findPrevPeriod(activePeriod);
+    let deltaHtml = '';
+    if (prevPeriod) {
+        const prevPrices = marketPrices.filter(r => r.period === prevPeriod);
+        const prevUa = prevPrices.find(r => r.row_type === 'country' && r.country.toLowerCase().startsWith('україна'));
+        const prevEu = prevPrices.find(r => r.row_type === 'average');
+        const prevUaVal = prevUa ? avgBusiness(prevUa) : 0;
+        const prevEuVal = prevEu ? avgBusiness(prevEu) : 0;
+
+        const uaDelta = prevUaVal > 0 ? ((uaBusiness - prevUaVal) / prevUaVal * 100) : 0;
+        const euDelta = prevEuVal > 0 ? ((euBusiness - prevEuVal) / prevEuVal * 100) : 0;
+
+        deltaHtml = `
+            <div class="kpi-card glass">
+                <div class="kpi-label">Зміна vs ${prevPeriod}</div>
+                <div style="display:flex;gap:16px;align-items:center;margin-top:8px">
+                    <div style="text-align:center">
+                        <div style="font-size:10px;color:var(--text3)">UA</div>
+                        <div class="kpi-value" style="font-size:18px;color:${uaDelta >= 0 ? 'var(--green)' : 'var(--rose)'}">
+                            ${uaDelta >= 0 ? '▲' : '▼'} ${Math.abs(uaDelta).toFixed(1)}%
+                        </div>
+                        <div style="font-size:10px;color:var(--text3)">€${fmt(prevUaVal, 1)} → €${fmt(uaBusiness, 1)}</div>
+                    </div>
+                    <div style="text-align:center">
+                        <div style="font-size:10px;color:var(--text3)">EU сер.</div>
+                        <div class="kpi-value" style="font-size:18px;color:${euDelta >= 0 ? 'var(--green)' : 'var(--rose)'}">
+                            ${euDelta >= 0 ? '▲' : '▼'} ${Math.abs(euDelta).toFixed(1)}%
+                        </div>
+                        <div style="font-size:10px;color:var(--text3)">€${fmt(prevEuVal, 1)} → €${fmt(euBusiness, 1)}</div>
+                    </div>
+                </div>
+            </div>`;
+    }
 
     grid.innerHTML = `
         <div class="kpi-card glass">
@@ -42,8 +77,9 @@ export function renderMarketKPIs() {
         <div class="kpi-card glass">
             <div class="kpi-label">Курс EUR</div>
             <div class="kpi-value" style="color:var(--amber)">₴${fmt(rate, 2)}</div>
-            <div class="kpi-sub">${marketMeta.period || '—'}</div>
+            <div class="kpi-sub">${activePeriod || '—'}</div>
         </div>
+        ${deltaHtml}
     `;
 }
 
@@ -51,4 +87,11 @@ function avgBusiness(row) {
     const vals = [row.pine_business, row.spruce_business, row.alder_business, row.birch_business, row.oak_business]
         .filter(v => v != null && v > 0);
     return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+}
+
+function findPrevPeriod(current) {
+    if (!current || allPeriods.length < 2) return null;
+    const idx = allPeriods.indexOf(current);
+    if (idx < 0) return allPeriods.length >= 2 ? allPeriods[1] : null;
+    return idx + 1 < allPeriods.length ? allPeriods[idx + 1] : null;
 }

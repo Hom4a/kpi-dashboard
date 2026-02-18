@@ -2,7 +2,7 @@
 import { fmt, themeColor } from '../utils.js';
 import { charts, setCharts } from '../state.js';
 import { kill, freshCanvas } from '../charts-common.js';
-import { filteredMarketPrices, marketUaDetail, marketHistory, marketMeta } from './state-market.js';
+import { filteredMarketPrices, marketUaDetail, marketHistory, marketMeta, marketFilterState, allPeriods } from './state-market.js';
 
 const SPECIES_LABELS = {
     pine_business: 'Сосна', spruce_business: 'Ялина', alder_business: 'Вільха',
@@ -183,7 +183,9 @@ export function renderUaExchangeBreakdown() {
     const ctx = canvas.getContext('2d');
 
     const exchanges = ['УЕБ', 'УУБ', 'УРБ'];
-    const data = marketUaDetail.filter(r => exchanges.includes(r.exchange) && r.avg_price_uah > 0);
+    const activePeriod = marketFilterState.period || allPeriods[0] || '';
+    const periodUa = activePeriod ? marketUaDetail.filter(r => r.period === activePeriod) : marketUaDetail;
+    const data = periodUa.filter(r => exchanges.includes(r.exchange) && r.avg_price_uah > 0);
     if (!data.length) return;
 
     const species = [...new Set(data.map(r => r.species))];

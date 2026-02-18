@@ -24,12 +24,30 @@ export async function saveMarketData(parsedResult, fileName) {
     const { data: { user } } = await sb.auth.getUser();
     const userId = user ? user.id : null;
     const batchId = crypto.randomUUID();
+    const period = (parsedResult.meta.period || '').trim();
 
-    // Clear existing data
-    await sb.from('market_prices').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await sb.from('market_prices_ua').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await sb.from('market_price_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await sb.from('eur_rates').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    // Delete only data for the same period (keep other periods)
+    if (period) {
+        await sb.from('market_prices').delete().eq('period', period);
+        await sb.from('market_prices_ua').delete().eq('period', period);
+    } else {
+        // No period — full replace for safety
+        await sb.from('market_prices').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await sb.from('market_prices_ua').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    }
+
+    // History: delete matching entity+month combos to avoid duplicates
+    // (time series may overlap between files — same months reported in both)
+    const historyMonths = [...new Set(parsedResult.history.map(r => r.month_date))];
+    for (const month of historyMonths) {
+        await sb.from('market_price_history').delete().eq('month_date', month);
+    }
+
+    // EUR rates: delete matching dates
+    const rateDates = [...new Set(parsedResult.eurRates.map(r => r.rate_date))];
+    for (const d of rateDates) {
+        await sb.from('eur_rates').delete().eq('rate_date', d);
+    }
 
     let total = 0;
     total += await batchInsert('market_prices', parsedResult.prices, batchId, userId);
@@ -54,7 +72,7 @@ export async function loadMarketPrices() {
     let from = 0;
     while (true) {
         const { data, error } = await sb.from('market_prices')
-            .select('*').range(from, from + 999).order('row_type').order('country');
+            .select('*').range(from, from + 999).order('period', { ascending: false }).order('row_type').order('country');
         if (error) throw error;
         if (!data || !data.length) break;
         all.push(...data);
@@ -66,7 +84,7 @@ export async function loadMarketPrices() {
 
 export async function loadMarketUaDetail() {
     const { data, error } = await sb.from('market_prices_ua')
-        .select('*').order('exchange').order('species');
+        .select('*').order('period', { ascending: false }).order('exchange').order('species');
     if (error) throw error;
     return data || [];
 }

@@ -1,6 +1,6 @@
 // ===== Market Dashboard — Table =====
 import { $, fmt } from '../utils.js';
-import { filteredMarketPrices, marketUaDetail, marketMeta } from './state-market.js';
+import { filteredMarketPrices, marketUaDetail, marketMeta, marketFilterState, allPeriods } from './state-market.js';
 
 let _tableMode = 'countries'; // 'countries' | 'sources' | 'exchanges'
 
@@ -60,7 +60,9 @@ function renderPricesTable(thead, tbody) {
 
 function renderExchangeTable(thead, tbody) {
     const exchanges = ['УЕБ', 'УУБ', 'УРБ'];
-    const data = marketUaDetail.filter(r => exchanges.includes(r.exchange));
+    const activePeriod = marketFilterState.period || allPeriods[0] || '';
+    const periodUa = activePeriod ? marketUaDetail.filter(r => r.period === activePeriod) : marketUaDetail;
+    const data = periodUa.filter(r => exchanges.includes(r.exchange));
 
     if (thead) {
         thead.innerHTML = `<tr>

@@ -1,12 +1,21 @@
 // ===== Market Dashboard — Filters =====
 import { $ } from '../utils.js';
-import { marketPrices, marketFilterState, setFilteredMarketPrices, setMarketFilterState } from './state-market.js';
+import { marketPrices, marketUaDetail, marketFilterState, allPeriods,
+         setFilteredMarketPrices, setMarketFilterState, setMarketMeta } from './state-market.js';
 import { setMarketTableMode } from './render-market-table.js';
 
 let _renderFn = null;
 export function setRenderMarketCallback(fn) { _renderFn = fn; }
 
 export function populateMarketFilters() {
+    // Period dropdown
+    const periodSelect = $('mPeriod');
+    if (periodSelect) {
+        periodSelect.innerHTML = '<option value="">Останній період</option>' +
+            allPeriods.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+
+    // Country dropdown (from all data, or filtered by period)
     const countrySelect = $('mCountry');
     if (!countrySelect) return;
 
@@ -19,8 +28,19 @@ export function populateMarketFilters() {
 }
 
 export function applyMarketFilter() {
-    const { country } = marketFilterState;
-    let filtered = [...marketPrices];
+    const { country, period } = marketFilterState;
+
+    // Determine active period
+    const activePeriod = period || allPeriods[0] || '';
+    let filtered = activePeriod
+        ? marketPrices.filter(r => r.period === activePeriod)
+        : [...marketPrices];
+
+    // Update meta for the active period
+    if (activePeriod && filtered.length) {
+        const rec = filtered[0];
+        setMarketMeta({ period: rec.period || '', eurRate: rec.eur_rate || 0 });
+    }
 
     if (country) {
         filtered = filtered.filter(r =>
@@ -33,6 +53,14 @@ export function applyMarketFilter() {
 }
 
 export function initMarketFilterEvents() {
+    const periodSelect = $('mPeriod');
+    if (periodSelect) {
+        periodSelect.addEventListener('change', () => {
+            setMarketFilterState({ ...marketFilterState, period: periodSelect.value });
+            applyMarketFilter();
+        });
+    }
+
     const countrySelect = $('mCountry');
     if (countrySelect) {
         countrySelect.addEventListener('change', () => {
@@ -56,13 +84,14 @@ export function initMarketFilterEvents() {
     const reset = $('marketFilterReset');
     if (reset) {
         reset.addEventListener('click', () => {
+            if (periodSelect) periodSelect.value = '';
             if (countrySelect) countrySelect.value = '';
             const tglBtns = $('tglWoodType');
             if (tglBtns) {
                 tglBtns.querySelectorAll('button').forEach(b => b.classList.remove('active'));
                 tglBtns.querySelector('[data-w="all"]')?.classList.add('active');
             }
-            setMarketFilterState({ country: '', woodType: 'all' });
+            setMarketFilterState({ country: '', woodType: 'all', period: '' });
             applyMarketFilter();
         });
     }
