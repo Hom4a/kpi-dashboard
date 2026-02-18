@@ -1,0 +1,112 @@
+/* ===== Executive Dashboard Styles ===== */
+
+/* Scorecard badges */
+.exec-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.badge-green {
+    background: rgba(74, 157, 111, 0.15);
+    color: #4A9D6F;
+    border: 1px solid rgba(74, 157, 111, 0.3);
+}
+
+.badge-amber {
+    background: rgba(245, 166, 35, 0.15);
+    color: #F5A623;
+    border: 1px solid rgba(245, 166, 35, 0.3);
+}
+
+.badge-red {
+    background: rgba(231, 76, 60, 0.15);
+    color: #E74C3C;
+    border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+/* Scorecard table */
+#execScorecardTable th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text2);
+}
+
+#execScorecardTable td {
+    vertical-align: middle;
+}
+
+/* Alert items */
+.exec-alert {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.exec-alert-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.exec-alert-danger {
+    background: rgba(231, 76, 60, 0.08);
+    border: 1px solid rgba(231, 76, 60, 0.2);
+    color: var(--text);
+}
+
+.exec-alert-warning {
+    background: rgba(245, 166, 35, 0.08);
+    border: 1px solid rgba(245, 166, 35, 0.2);
+    color: var(--text);
+}
+
+.exec-alert-success {
+    background: rgba(74, 157, 111, 0.08);
+    border: 1px solid rgba(74, 157, 111, 0.2);
+    color: var(--text);
+}
+
+/* Role badge colors for new roles */
+.role-badge.director {
+    background: rgba(155, 89, 182, 0.15);
+    color: #9B59B6;
+    border-color: rgba(155, 89, 182, 0.3);
+}
+
+.role-badge.analyst {
+    background: rgba(52, 152, 219, 0.15);
+    color: #3498DB;
+    border-color: rgba(52, 152, 219, 0.3);
+}
+
+.role-badge.accountant {
+    background: rgba(245, 166, 35, 0.15);
+    color: #F5A623;
+    border-color: rgba(245, 166, 35, 0.3);
+}
+
+.role-badge.hr {
+    background: rgba(230, 126, 34, 0.15);
+    color: #E67E22;
+    border-color: rgba(230, 126, 34, 0.3);
+}
+
+.role-badge.forester {
+    background: rgba(39, 174, 96, 0.15);
+    color: #27AE60;
+    border-color: rgba(39, 174, 96, 0.3);
+}
+
+.role-badge.operator {
+    background: rgba(52, 73, 94, 0.15);
+    color: #7f8c8d;
+    border-color: rgba(52, 73, 94, 0.3);
+}

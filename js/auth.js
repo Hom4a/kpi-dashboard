@@ -13,6 +13,47 @@ let _hideButtonsFn = null;
 export function setLoadAndRenderCallback(fn) { _loadAndRenderFn = fn; }
 export function setHideButtonsCallback(fn) { _hideButtonsFn = fn; }
 
+// ===== Role-based page access matrix =====
+const PAGE_ACCESS = {
+    volumes:     ['admin', 'director', 'analyst', 'editor', 'forester'],
+    finance:     ['admin', 'director', 'analyst', 'editor', 'accountant'],
+    forest:      ['admin', 'director', 'analyst', 'editor', 'accountant', 'forester', 'operator'],
+    harvesting:  ['admin', 'director', 'analyst', 'editor', 'forester'],
+    executive:   ['admin', 'director', 'analyst'],
+    'data-entry':['admin', 'editor', 'accountant', 'hr', 'forester', 'operator'],
+    builder:     ['admin', 'analyst'],
+};
+
+// Roles that can upload files
+const UPLOAD_ROLES = ['admin', 'editor', 'accountant', 'hr', 'forester', 'operator'];
+
+// Roles that see data management (clear/undo)
+const DATA_MANAGE_ROLES = ['admin', 'editor'];
+
+// Roles that see targets button
+const TARGET_ROLES = ['admin', 'editor'];
+
+// Role display names (Ukrainian)
+const ROLE_LABELS = {
+    admin: 'адмін', director: 'керівник', analyst: 'аналітик',
+    editor: 'редактор', accountant: 'бухгалтер', hr: 'HR',
+    forester: 'лісничий', operator: 'оператор', viewer: 'глядач'
+};
+
+/** Get pages visible for a given role + profile */
+export function getVisiblePages(role, profile) {
+    // Viewer uses allowed_pages from profile
+    if (role === 'viewer' && profile && profile.allowed_pages) {
+        return profile.allowed_pages;
+    }
+    // Other roles use PAGE_ACCESS matrix
+    return Object.entries(PAGE_ACCESS)
+        .filter(([, roles]) => roles.includes(role))
+        .map(([page]) => page);
+}
+
+export { PAGE_ACCESS, UPLOAD_ROLES, DATA_MANAGE_ROLES, TARGET_ROLES, ROLE_LABELS };
+
 export async function getCurrentProfile() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
@@ -63,7 +104,7 @@ export async function handleLogout() {
 }
 
 export function hideButtons() {
-    ['btnUpload','btnFormatHelp','btnClear','btnExport','btnPrint','btnTargets','btnViewerAccess','liveInfo'].forEach(id => {
+    ['btnUpload','btnFormatHelp','btnClear','btnExport','btnPrint','btnTargets','btnViewerAccess','btnDashboards','liveInfo'].forEach(id => {
         try { $(id).style.display = 'none'; } catch(e){}
     });
 }
@@ -87,32 +128,28 @@ export async function showAppForUser(user) {
         const displayName = p && p.full_name ? p.full_name : user.email;
         $('userInfo').style.display = 'flex';
         $('userName').textContent = displayName;
-        const badge = $('roleBadge'); badge.textContent = role; badge.className = 'role-badge ' + role;
-        if (role === 'admin' || role === 'editor') {
-            $('btnUpload').style.display = '';
-            const helpBtn = $('btnFormatHelp');
-            if (helpBtn) helpBtn.style.display = '';
-        } else {
-            $('btnUpload').style.display = 'none';
-            const helpBtn = $('btnFormatHelp');
-            if (helpBtn) helpBtn.style.display = 'none';
-        }
-        // Show/hide viewer access button for admin
+        const badge = $('roleBadge');
+        badge.textContent = ROLE_LABELS[role] || role;
+        badge.className = 'role-badge ' + role;
+
+        // Upload button — for roles that enter data
+        const canUpload = UPLOAD_ROLES.includes(role);
+        $('btnUpload').style.display = canUpload ? '' : 'none';
+        const helpBtn = $('btnFormatHelp');
+        if (helpBtn) helpBtn.style.display = canUpload ? '' : 'none';
+
+        // Admin-only: viewer access
         const vaBtn = $('btnViewerAccess');
         if (vaBtn) vaBtn.style.display = role === 'admin' ? '' : 'none';
 
-        // Hide restricted nav items for viewer
-        if (role === 'viewer' && p && p.allowed_pages) {
-            document.querySelectorAll('.nav-item[data-page]').forEach(n => {
-                n.style.display = p.allowed_pages.includes(n.dataset.page) ? '' : 'none';
-            });
-            document.querySelectorAll('.mobile-nav-item[data-page]').forEach(n => {
-                n.style.display = p.allowed_pages.includes(n.dataset.page) ? '' : 'none';
-            });
-        } else {
-            document.querySelectorAll('.nav-item[data-page]').forEach(n => n.style.display = '');
-            document.querySelectorAll('.mobile-nav-item[data-page]').forEach(n => n.style.display = '');
-        }
+        // Nav visibility — role-based page access
+        const allowedPages = getVisiblePages(role, p);
+        document.querySelectorAll('.nav-item[data-page]').forEach(n => {
+            n.style.display = allowedPages.includes(n.dataset.page) ? '' : 'none';
+        });
+        document.querySelectorAll('.mobile-nav-item[data-page]').forEach(n => {
+            n.style.display = allowedPages.includes(n.dataset.page) ? '' : 'none';
+        });
 
         setupChartDefaults();
         // Always load all data sources (not just when KPI count > 0)

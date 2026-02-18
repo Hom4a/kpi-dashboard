@@ -1,18 +1,39 @@
 // ===== Page Navigation =====
 import { $, toast } from './utils.js';
 import { charts, currentProfile } from './state.js';
+import { getVisiblePages, UPLOAD_ROLES } from './auth.js';
+
+const pageMap = {
+    volumes: 'pageVolumes',
+    finance: 'pageFinance',
+    forest: 'pageForest',
+    harvesting: 'pageHarvesting',
+    executive: 'pageExecutive',
+    'data-entry': 'pageDataEntry',
+    builder: 'pageBuilder'
+};
+
+const pageIdMap = {};
+for (const [k, v] of Object.entries(pageMap)) pageIdMap[v] = k;
+
+// Filter bar visibility per page
+const filterBarMap = {
+    volumes: 'filterBar', finance: 'filterBar',
+    forest: 'forestFilterBar', harvesting: 'harvestingFilterBar',
+    executive: null, 'data-entry': null, builder: null
+};
+
+const ALL_FILTER_BARS = ['filterBar', 'forestFilterBar', 'harvestingFilterBar'];
 
 export function switchPage(page) {
-    // Viewer page restriction guard
-    if (currentProfile && currentProfile.role === 'viewer' && currentProfile.allowed_pages) {
-        if (!currentProfile.allowed_pages.includes(page)) {
-            toast('У вас немає доступу до цієї сторінки', true);
-            return;
-        }
+    const role = currentProfile ? currentProfile.role : 'viewer';
+    const visible = getVisiblePages(role, currentProfile);
+    if (!visible.includes(page)) {
+        toast('У вас немає доступу до цієї сторінки', true);
+        return;
     }
 
     document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-    const pageMap = { volumes: 'pageVolumes', finance: 'pageFinance', forest: 'pageForest', harvesting: 'pageHarvesting' };
     const el = document.getElementById(pageMap[page]);
     if (el) el.classList.add('active');
 
@@ -21,23 +42,12 @@ export function switchPage(page) {
     );
     updateMobileNav(page);
 
-    // Show/hide the correct filter bar
-    const kpiFilter = $('filterBar');
-    const forestFilter = $('forestFilterBar');
-    const harvestingFilter = $('harvestingFilterBar');
-    if (page === 'forest') {
-        if (kpiFilter) kpiFilter.style.display = 'none';
-        if (forestFilter) forestFilter.style.display = '';
-        if (harvestingFilter) harvestingFilter.style.display = 'none';
-    } else if (page === 'harvesting') {
-        if (kpiFilter) kpiFilter.style.display = 'none';
-        if (forestFilter) forestFilter.style.display = 'none';
-        if (harvestingFilter) harvestingFilter.style.display = '';
-    } else {
-        if (kpiFilter) kpiFilter.style.display = '';
-        if (forestFilter) forestFilter.style.display = 'none';
-        if (harvestingFilter) harvestingFilter.style.display = 'none';
-    }
+    // Show/hide filter bars
+    const activeBar = filterBarMap[page] || null;
+    ALL_FILTER_BARS.forEach(id => {
+        const bar = $(id);
+        if (bar) bar.style.display = (id === activeBar) ? '' : 'none';
+    });
 
     requestAnimationFrame(() => {
         Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} });
@@ -52,13 +62,12 @@ export function updateMobileNav(page) {
 
 export function openMobileUpload() {
     const role = currentProfile ? currentProfile.role : 'viewer';
-    if (role === 'admin' || role === 'editor') { $('fileDrop').click(); }
+    if (UPLOAD_ROLES.includes(role)) { $('fileDrop').click(); }
     else { toast('Немає прав для завантаження', true); }
 }
 
 export function initSwipeGestures() {
     let startX = 0, startY = 0, swiping = false;
-    const allPages = ['volumes', 'finance', 'forest', 'harvesting'];
 
     document.addEventListener('touchstart', e => {
         if (window.innerWidth > 768) return;
@@ -71,14 +80,11 @@ export function initSwipeGestures() {
         const dx = e.changedTouches[0].clientX - startX;
         const dy = e.changedTouches[0].clientY - startY;
         if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-            let pages = allPages;
-            if (currentProfile && currentProfile.role === 'viewer' && currentProfile.allowed_pages) {
-                pages = allPages.filter(p => currentProfile.allowed_pages.includes(p));
-            }
+            const role = currentProfile ? currentProfile.role : 'viewer';
+            const pages = getVisiblePages(role, currentProfile);
             const activeEl = document.querySelector('.page-section.active');
             let curIdx = 0;
             if (activeEl) {
-                const pageIdMap = { pageVolumes: 'volumes', pageFinance: 'finance', pageForest: 'forest', pageHarvesting: 'harvesting' };
                 const curPage = pageIdMap[activeEl.id] || 'volumes';
                 curIdx = pages.indexOf(curPage);
                 if (curIdx < 0) curIdx = 0;

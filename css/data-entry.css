@@ -1,0 +1,472 @@
+/* ===== Data Entry Styles ===== */
+
+/* Form list header */
+.de-list-header {
+    margin-bottom: 24px;
+}
+.de-list-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 4px;
+}
+.de-list-sub {
+    font-size: 13px;
+    color: var(--text2);
+    margin: 0;
+}
+
+/* Section labels */
+.de-section-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text3);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Cards grid */
+.de-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+/* Card */
+.de-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+}
+.de-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.de-card-add {
+    border: 2px dashed var(--border);
+    background: transparent !important;
+}
+.de-card-add:hover {
+    border-color: var(--primary);
+}
+.de-card-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(74, 157, 111, 0.1);
+    color: var(--primary);
+    flex-shrink: 0;
+}
+.de-card-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.de-card-add .de-card-icon {
+    background: rgba(74, 157, 111, 0.05);
+}
+.de-card-info {
+    flex: 1;
+    min-width: 0;
+}
+.de-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+}
+.de-card-desc {
+    font-size: 11px;
+    color: var(--text3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.de-card-count {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 3px;
+}
+.de-card-edit {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+}
+.de-card-edit:hover {
+    background: rgba(74, 157, 111, 0.1);
+    color: var(--primary);
+}
+.de-card-edit svg {
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Empty state */
+.de-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text2);
+}
+.de-empty-msg {
+    text-align: center;
+    padding: 20px;
+    color: var(--text3);
+    font-size: 13px;
+}
+.de-more-msg {
+    text-align: center;
+    padding: 8px;
+    color: var(--text3);
+    font-size: 11px;
+}
+
+/* Form header */
+.de-form-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+.de-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.de-back-btn svg {
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.de-form-title h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+}
+.de-form-title small {
+    font-size: 12px;
+    color: var(--text3);
+}
+
+/* Toolbar */
+.de-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.de-record-count {
+    font-size: 12px;
+    color: var(--text3);
+    margin-left: auto;
+}
+
+/* Input fields */
+.de-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.de-field label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.de-required label::after {
+    content: '';
+}
+.de-input {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg2);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.15s;
+}
+.de-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(74, 157, 111, 0.15);
+}
+.de-input:disabled, .de-input.computed {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.de-input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+}
+select.de-input {
+    cursor: pointer;
+}
+textarea.de-input {
+    resize: vertical;
+    min-height: 50px;
+}
+
+/* New record card */
+.de-new-records {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.de-row-card {
+    padding: 16px;
+    border-radius: 12px;
+    border-left: 3px solid var(--primary);
+}
+.de-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.de-row-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary);
+}
+.de-row-delete {
+    background: none;
+    border: none;
+    color: var(--text3);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+.de-row-delete:hover {
+    color: var(--red, #E74C3C);
+}
+.de-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.de-row-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Existing records section */
+.de-existing-section {
+    margin-top: 20px;
+}
+.de-existing-section h4 {
+    margin: 0 0 12px;
+}
+.de-tbl td {
+    font-size: 12px;
+}
+.de-delete-existing {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.de-delete-existing:hover {
+    background: rgba(231, 76, 60, 0.1);
+    color: #E74C3C;
+}
+.de-delete-existing svg {
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Type Editor */
+.te-form {
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+.te-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.te-roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+.te-role-check {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+}
+.te-role-check input {
+    width: 16px;
+    height: 16px;
+}
+
+.te-fields-section {
+    margin-bottom: 20px;
+}
+.te-fields-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.te-fields-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+.te-fields-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.te-field-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    flex-wrap: wrap;
+}
+.te-field-drag {
+    color: var(--text3);
+    font-size: 12px;
+    cursor: grab;
+    padding: 6px 0;
+    user-select: none;
+}
+.te-field-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    flex-wrap: wrap;
+}
+.te-field-options {
+    width: 100%;
+    padding-left: 24px;
+    margin-top: 4px;
+}
+.te-field-options .de-input {
+    width: 100%;
+    margin-top: 2px;
+}
+.te-freq {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--text3);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.te-freq input {
+    width: 14px;
+    height: 14px;
+}
+.te-field-delete {
+    background: none;
+    border: none;
+    color: var(--text3);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.te-field-delete:hover {
+    color: #E74C3C;
+}
+
+.te-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+/* Button variants */
+.btn-primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+.btn-primary:hover {
+    opacity: 0.9;
+}
+.btn-danger {
+    background: rgba(231, 76, 60, 0.1);
+    color: #E74C3C;
+    border-color: rgba(231, 76, 60, 0.3);
+}
+
+/* Admin section */
+.de-admin-section {
+    margin-top: 8px;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .de-cards-grid {
+        grid-template-columns: 1fr;
+    }
+    .de-fields {
+        grid-template-columns: 1fr;
+    }
+    .te-row {
+        flex-direction: column;
+    }
+    .te-field-inputs {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .te-field-inputs .de-input {
+        width: 100% !important;
+    }
+}

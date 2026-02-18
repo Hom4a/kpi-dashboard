@@ -10,9 +10,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack-all.js"></script>
     <script>
     // CDN library check
-    window._libCheck = { xlsx: typeof XLSX !== 'undefined', chart: typeof Chart !== 'undefined', supabase: typeof supabase !== 'undefined' };
+    window._libCheck = { xlsx: typeof XLSX !== 'undefined', chart: typeof Chart !== 'undefined', supabase: typeof supabase !== 'undefined', gridstack: typeof GridStack !== 'undefined' };
     console.log('Libraries:', window._libCheck);
     </script>
     <link rel="stylesheet" href="css/variables.css">
@@ -21,6 +23,9 @@
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/mobile.css">
     <link rel="stylesheet" href="css/forest-dashboard.css">
+    <link rel="stylesheet" href="css/executive.css">
+    <link rel="stylesheet" href="css/data-entry.css">
+    <link rel="stylesheet" href="css/builder.css">
 </head>
 <body>
 
@@ -67,6 +72,14 @@
             <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             <span>Заготівля</span>
         </div>
+        <div class="nav-item" data-page="executive" onclick="switchPage('executive')">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span>Керівний</span>
+        </div>
+        <div class="nav-item" data-page="data-entry" onclick="switchPage('data-entry')">
+            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Введення</span>
+        </div>
     </div>
     <div class="sidebar-bottom">
         <button class="theme-btn" onclick="toggleTheme()">
@@ -96,6 +109,7 @@
         <label class="btn btn-sm" id="btnUpload" style="display:none"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Завантажити<input type="file" id="fileHdr" accept=".xlsx,.xls"></label>
         <button class="icon-btn" id="btnFormatHelp" style="display:none" onclick="openFormatHelp()" title="Формати файлів"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
         <button class="icon-btn" id="btnTargets" style="display:none" onclick="openTargetModal()" title="Налаштувати цілі"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></button>
+        <button class="btn btn-sm" id="btnDashboards" style="display:none" onclick="openDashboardsPage()" title="Конструктор дашбордів"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Дашборди</button>
         <button class="icon-btn" id="btnViewerAccess" style="display:none" onclick="openViewerAccess()" title="Доступ глядачів"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
         <button class="btn btn-sm btn-danger" id="btnClear" style="display:none" onclick="openDataManage()" title="Керування даними"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v2"/></svg></button>
     </div>
@@ -401,6 +415,84 @@
                 </div>
             </div>
         </div>
+
+        <!-- Executive page -->
+        <div class="page-section" id="pageExecutive">
+            <div id="execEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
+                <p style="font-size:15px;margin-bottom:8px">Завантажте дані для перегляду керівного дашборду</p>
+                <p style="font-size:12px">Агрегована інформація з усіх джерел</p>
+            </div>
+            <div id="execContent" style="display:none">
+                <div class="kpi-grid" id="kpiGridExec"></div>
+
+                <!-- Regional Scorecard -->
+                <div class="glass chart-card" style="margin-bottom:20px" id="execScorecardCard">
+                    <div class="chart-hdr"><div><h3>Scorecard регіонів</h3><small>Ключові показники по обласних управліннях</small></div></div>
+                    <div class="tbl-wrap"><table class="tbl" id="execScorecardTable">
+                        <thead><tr><th>Управління</th><th>План заготівлі %</th><th>Реалізація тис.м³</th><th>Сер. ціна грн/м³</th><th>Залишки тис.м³</th><th>ЗСУ %</th></tr></thead>
+                        <tbody id="tblBodyScorecard"></tbody>
+                    </table></div>
+                </div>
+
+                <!-- Trend charts -->
+                <div class="chart-row cols-2">
+                    <div class="glass chart-card" id="execCumCard">
+                        <div class="chart-hdr"><div><h3>Реалізація vs План</h3><small>Кумулятивно з початку року</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('execCumCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapExecCum"><canvas id="cExecCum"></canvas></div>
+                    </div>
+                    <div class="glass chart-card" id="execCashCard">
+                        <div class="chart-hdr"><div><h3>Грошові надходження</h3><small>Помісячна динаміка, млн грн</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('execCashCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapExecCash"><canvas id="cExecCash"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Alerts -->
+                <div class="glass chart-card" style="margin-bottom:20px">
+                    <div class="chart-hdr"><div><h3>Операційні алерти</h3><small>Потребують уваги керівництва</small></div></div>
+                    <div id="execAlerts" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto"></div>
+                </div>
+
+                <!-- Resource distribution -->
+                <div class="chart-row cols-2">
+                    <div class="glass chart-card" id="execBubbleCard">
+                        <div class="chart-hdr"><div><h3>Регіони: план × факт</h3><small>Bubble: розмір = залишки</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('execBubbleCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapExecBubble"><canvas id="cExecBubble"></canvas></div>
+                    </div>
+                    <div class="glass chart-card" id="execStackedCard">
+                        <div class="chart-hdr"><div><h3>Продукція по регіонах</h3><small>Структура обсягів продажу</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('execStackedCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapExecStacked"><canvas id="cExecStacked"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Entry page -->
+        <div class="page-section" id="pageDataEntry">
+            <div id="dataEntryContent">
+                <div class="de-list-header">
+                    <h3>Введення даних</h3>
+                    <p class="de-list-sub">Завантаження форм...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Builder page -->
+        <div class="page-section" id="pageBuilder">
+            <div id="builderContent">
+                <div class="de-list-header">
+                    <h3>Дашборди</h3>
+                    <p class="de-list-sub">Завантаження...</p>
+                </div>
+            </div>
+        </div>
     </div>
 </main>
 
@@ -471,13 +563,13 @@
     </div>
 </div>
 
-<!-- Viewer Access modal -->
+<!-- User Management modal -->
 <div class="modal-overlay" id="viewerAccessModal">
-    <div class="modal" style="max-width:550px">
+    <div class="modal" style="max-width:700px;max-height:85vh;overflow-y:auto">
         <button class="modal-close" onclick="closeViewerAccess()">&times;</button>
-        <h3>Налаштування доступу глядачів</h3>
-        <div id="viewerAccessList"></div>
-        <button class="btn" style="margin-top:16px" onclick="saveViewerAccess()">Зберегти</button>
+        <h3>Управління користувачами</h3>
+        <div id="viewerAccessList" style="display:flex;flex-direction:column;gap:2px"></div>
+        <button class="btn" style="margin-top:16px" onclick="saveViewerAccess()">Зберегти всі зміни</button>
     </div>
 </div>
 
@@ -512,6 +604,14 @@
         <button class="mobile-nav-item" data-page="harvesting" onclick="switchPage('harvesting')">
             <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             <span>Заготівля</span>
+        </button>
+        <button class="mobile-nav-item" data-page="executive" onclick="switchPage('executive')">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span>Керівний</span>
+        </button>
+        <button class="mobile-nav-item" data-page="data-entry" onclick="switchPage('data-entry')">
+            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Введення</span>
         </button>
         <button class="mobile-nav-item" onclick="openMobileUpload()">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>

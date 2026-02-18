@@ -3,7 +3,7 @@ import { sb } from './config.js';
 import { $, show, hide, showLoader, toast, fmtDate } from './utils.js';
 import { allData, filtered, charts, tblTab, currentProfile, setAllData, setFiltered, setCharts, setTblTab } from './state.js';
 import { initTheme, toggleTheme, setRenderAllCallback as setThemeRenderAll } from './theme.js';
-import { handleLogin, handleLogout, showAuthScreen, hideButtons, showAppForUser, initAuthListener, setLoadAndRenderCallback as setAuthLoadAndRender, setHideButtonsCallback } from './auth.js';
+import { handleLogin, handleLogout, showAuthScreen, hideButtons, showAppForUser, initAuthListener, setLoadAndRenderCallback as setAuthLoadAndRender, setHideButtonsCallback, UPLOAD_ROLES, DATA_MANAGE_ROLES, TARGET_ROLES } from './auth.js';
 import { switchPage, openMobileUpload, initSwipeGestures } from './navigation.js';
 import { populateFilters, applyFilter, resetFilters, initFilterEvents, setRenderAllCallback as setFilterRenderAll } from './filters.js';
 import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, saveViewerAccess, openDataManage, closeDataManage, setRenderAllCallback as setModalsRenderAll } from './modals.js';
@@ -24,20 +24,39 @@ import { setPlanFactData, setZsuData } from './harvesting/state-harvesting.js';
 import { loadPlanFactData, loadZsuData, clearPlanFactData, clearZsuData } from './harvesting/db-harvesting.js';
 import { populateHarvestingFilters, applyHarvestingFilter, initHarvestingFilterEvents, setRenderHarvestingCallback } from './harvesting/filters-harvesting.js';
 import { renderHarvestingDashboard } from './harvesting/render-harvesting.js';
+// Executive modules
+import { renderExecutiveDashboard } from './executive/render-executive.js';
+// Data Entry modules
+import { initDataEntry, setDataEntryReloadCallback } from './data-entry/data-entry.js';
+// Builder modules
+import { initDashboardList } from './builder/dashboard-list.js';
 
 // ===== Show buttons based on role (called after ALL data loads) =====
 function showRoleButtons() {
     const role = currentProfile ? currentProfile.role : 'viewer';
-    if (role === 'admin' || role === 'editor') {
+    // Upload button
+    if (UPLOAD_ROLES.includes(role)) {
         $('btnUpload').style.display = '';
         const helpBtn = $('btnFormatHelp');
         if (helpBtn) helpBtn.style.display = '';
+    }
+    // Targets button
+    if (TARGET_ROLES.includes(role)) {
         $('btnTargets').style.display = '';
+    }
+    // Data management button
+    if (DATA_MANAGE_ROLES.includes(role)) {
         show('btnClear');
     }
+    // Admin-only: viewer access
     if (role === 'admin') {
         const vaBtn = $('btnViewerAccess');
         if (vaBtn) vaBtn.style.display = '';
+    }
+    // Dashboards button (admin + analyst)
+    if (['admin', 'analyst'].includes(role)) {
+        const dbBtn = $('btnDashboards');
+        if (dbBtn) dbBtn.style.display = '';
     }
 }
 
@@ -53,7 +72,8 @@ async function loadAndRender() {
         hide('empty'); $('dash').style.display = 'block';
         $('btnExport').style.display = ''; $('btnPrint').style.display = ''; $('liveInfo').style.display = '';
         const role = currentProfile ? currentProfile.role : 'viewer';
-        if (role !== 'admin' && role !== 'editor') { hide('btnClear'); $('btnTargets').style.display = 'none'; }
+        if (!DATA_MANAGE_ROLES.includes(role)) { hide('btnClear'); }
+        if (!TARGET_ROLES.includes(role)) { $('btnTargets').style.display = 'none'; }
         const dates = allData.map(r => r._date);
         const minD = new Date(Math.min(...dates)), maxD = new Date(Math.max(...dates));
         $('hdrSub').textContent = `${fmtDate(minD)} — ${fmtDate(maxD)} | ${allData.length} записів`;
@@ -103,14 +123,22 @@ async function loadHarvestingDataAndRender() {
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
-setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); showRoleButtons(); });
+setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); });
 setHideButtonsCallback(hideButtons);
 setFileHandlerLoadAndRender(async () => { await loadAndRender(); showRoleButtons(); });
 setLoadForestCallback(loadForestDataAndRender);
 setLoadHarvestingCallback(loadHarvestingDataAndRender);
-setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); showRoleButtons(); });
+setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); });
 setRenderForestCallback(renderForestDashboard);
 setRenderHarvestingCallback(renderHarvestingDashboard);
+
+// Data entry reload: when user modifies data via forms, refresh the relevant dashboard
+setDataEntryReloadCallback(async (targetTable) => {
+    if (targetTable === 'kpi_records') { await loadAndRender(); showRoleButtons(); }
+    else if (targetTable === 'forest_prices' || targetTable === 'forest_inventory') { await loadForestDataAndRender(); }
+    else if (targetTable === 'harvesting_plan_fact' || targetTable === 'harvesting_zsu') { await loadHarvestingDataAndRender(); }
+    renderExecutiveDashboard();
+});
 
 // ===== Expose global functions for onclick handlers in HTML =====
 window.handleLogin = handleLogin;
@@ -131,6 +159,7 @@ window.closeViewerAccess = closeViewerAccess;
 window.saveViewerAccess = saveViewerAccess;
 window.openDataManage = openDataManage;
 window.closeDataManage = closeDataManage;
+window.openDashboardsPage = () => { switchPage('builder'); initDashboardList($('builderContent')); };
 
 // ===== Data Management action handlers =====
 window.clearKpiData = async () => {

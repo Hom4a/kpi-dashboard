@@ -1,0 +1,164 @@
+// ===== Executive Dashboard State =====
+// Aggregates data from all sources: KPI, Forest, Harvesting
+
+import { allData, targets } from '../state.js';
+import { pricesData, inventoryData } from '../forest/state-forest.js';
+import { planFactData, zsuData } from '../harvesting/state-harvesting.js';
+
+export let execCharts = {};
+export function setExecCharts(v) { execCharts = v; }
+
+/** Compute all executive metrics from existing data stores */
+export function computeExecMetrics() {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+
+    // --- KPI aggregation ---
+    const ytdRecords = allData.filter(r => r._date >= yearStart);
+    const realized = ytdRecords.filter(r => r.type === 'realized');
+    const harvested = ytdRecords.filter(r => r.type === 'harvested');
+    const cashDaily = ytdRecords.filter(r => r.type === 'cash_daily');
+    const cashMonthly = ytdRecords.filter(r => r.type === 'cash_monthly');
+
+    const realizedTotal = realized.reduce((s, r) => s + (r.value || 0), 0);
+    const harvestedTotal = harvested.reduce((s, r) => s + (r.value || 0), 0);
+    const cashDailyTotal = cashDaily.reduce((s, r) => s + (r.value || 0), 0);
+    const cashMonthlyTotal = cashMonthly.reduce((s, r) => s + (r.value || 0), 0);
+    const cashTotal = cashMonthlyTotal || cashDailyTotal;
+
+    // Sparkline data (last 30 days)
+    const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+    const realizedSpark = allData.filter(r => r.type === 'realized' && r._date >= d30)
+        .sort((a, b) => a._date - b._date).map(r => r.value);
+    const harvestedSpark = allData.filter(r => r.type === 'harvested' && r._date >= d30)
+        .sort((a, b) => a._date - b._date).map(r => r.value);
+
+    // --- Forest prices aggregation ---
+    const avgPrice = pricesData.length
+        ? pricesData.reduce((s, r) => s + (r.weighted_price_uah || 0), 0) / pricesData.length
+        : 0;
+    const totalVolumeSold = pricesData.reduce((s, r) => s + (r.volume_m3 || 0), 0);
+
+    // Previous period avg price (no historical data in current schema, show 0)
+    const prevAvgPrice = 0;
+
+    // --- Forest inventory aggregation ---
+    const inventoryTotal = inventoryData.reduce((s, r) => s + (r.remaining_volume_m3 || 0), 0);
+    // Coverage days: inventory / average daily realized
+    const daysInYear = Math.max(1, Math.floor((now - yearStart) / 86400000));
+    const avgDailyRealized = realized.length ? realizedTotal / daysInYear : 0;
+    const coverageDays = avgDailyRealized > 0 ? Math.round(inventoryTotal / avgDailyRealized) : 0;
+
+    // --- Harvesting plan-fact ---
+    const pfTotal = planFactData.reduce((acc, r) => ({
+        annualPlan: acc.annualPlan + (r.annual_plan_total || 0),
+        harvested: acc.harvested + (r.harvested_total || 0),
+        ninePlan: acc.ninePlan + (r.nine_month_plan_total || 0)
+    }), { annualPlan: 0, harvested: 0, ninePlan: 0 });
+
+    const pctAnnual = pfTotal.annualPlan > 0 ? (pfTotal.harvested / pfTotal.annualPlan) * 100 : 0;
+
+    // --- ZSU ---
+    const zsuTotalDeclared = zsuData.reduce((s, r) => s + (r.forest_products_declared_m3 || 0) + (r.lumber_declared_m3 || 0), 0);
+    const zsuTotalShipped = zsuData.reduce((s, r) => s + (r.forest_products_shipped_m3 || 0) + (r.lumber_shipped_m3 || 0), 0);
+    const zsuPct = zsuTotalDeclared > 0 ? (zsuTotalShipped / zsuTotalDeclared) * 100 : 0;
+
+    // --- Regional scorecard ---
+    const scorecard = buildScorecard();
+
+    // --- Monthly cash for chart ---
+    const monthlyCash = buildMonthlyCash();
+
+    // --- Alerts ---
+    const alerts = buildAlerts(scorecard, avgDailyRealized);
+
+    return {
+        realizedTotal, harvestedTotal, cashTotal, avgPrice, prevAvgPrice,
+        inventoryTotal, coverageDays, zsuTotalShipped, zsuPct,
+        pctAnnual, pfTotal,
+        realizedSpark, harvestedSpark,
+        scorecard, monthlyCash, alerts,
+        targets,
+        hasData: allData.length > 0 || planFactData.length > 0 || pricesData.length > 0
+    };
+}
+
+function buildScorecard() {
+    // Map regional offices to their data across sources
+    const regions = {};
+
+    planFactData.forEach(r => {
+        const name = r.regional_office;
+        if (!regions[name]) regions[name] = { name, planPct: 0, harvested: 0, avgPrice: 0, inventory: 0, zsuPct: 0 };
+        regions[name].planPct = r.annual_plan_total > 0 ? (r.harvested_total / r.annual_plan_total) * 100 : 0;
+        regions[name].harvested = r.harvested_total || 0;
+    });
+
+    zsuData.forEach(r => {
+        const name = r.regional_office;
+        if (!regions[name]) regions[name] = { name, planPct: 0, harvested: 0, avgPrice: 0, inventory: 0, zsuPct: 0 };
+        const declared = (r.forest_products_declared_m3 || 0) + (r.lumber_declared_m3 || 0);
+        const shipped = (r.forest_products_shipped_m3 || 0) + (r.lumber_shipped_m3 || 0);
+        regions[name].zsuPct = declared > 0 ? (shipped / declared) * 100 : 0;
+    });
+
+    // Sort by worst plan execution
+    return Object.values(regions).sort((a, b) => a.planPct - b.planPct);
+}
+
+function buildMonthlyCash() {
+    const months = {};
+    allData.filter(r => r.type === 'cash_daily' || r.type === 'cash_monthly').forEach(r => {
+        const key = r.date ? r.date.substring(0, 7) : null; // YYYY-MM
+        if (!key) return;
+        if (!months[key]) months[key] = 0;
+        months[key] += r.value || 0;
+    });
+    return Object.entries(months).sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, total]) => ({ month, total }));
+}
+
+function buildAlerts(scorecard, avgDailyRealized) {
+    const alerts = [];
+
+    // Regions below 80% plan execution
+    scorecard.filter(r => r.planPct > 0 && r.planPct < 80).forEach(r => {
+        alerts.push({
+            type: 'danger',
+            icon: '⚠',
+            text: `${r.name}: виконання плану лише ${r.planPct.toFixed(1)}%`
+        });
+    });
+
+    // ZSU fulfillment issues
+    zsuData.forEach(r => {
+        const declared = (r.forest_products_declared_m3 || 0) + (r.lumber_declared_m3 || 0);
+        const shipped = (r.forest_products_shipped_m3 || 0) + (r.lumber_shipped_m3 || 0);
+        if (declared > 0 && shipped / declared < 0.5) {
+            alerts.push({
+                type: 'warning',
+                icon: '🔶',
+                text: `ЗСУ ${r.regional_office}: відвантажено лише ${((shipped/declared)*100).toFixed(0)}% від заявленого`
+            });
+        }
+    });
+
+    // Low inventory coverage
+    if (avgDailyRealized > 0) {
+        const totalInv = inventoryData.reduce((s, r) => s + (r.remaining_volume_m3 || 0), 0);
+        const days = totalInv / avgDailyRealized;
+        if (days < 30) {
+            alerts.push({
+                type: 'warning',
+                icon: '📦',
+                text: `Залишків вистачить на ~${Math.round(days)} днів при поточному темпі реалізації`
+            });
+        }
+    }
+
+    if (alerts.length === 0) {
+        alerts.push({ type: 'success', icon: '✓', text: 'Критичних відхилень не виявлено' });
+    }
+
+    return alerts;
+}
