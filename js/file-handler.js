@@ -23,7 +23,7 @@ export function setLoadMarketCallback(fn) { _loadMarketFn = fn; }
 
 const MARKET_COUNTRIES = ['україна', 'фінляндія', 'німеччина', 'польща', 'латвія', 'литва', 'швеція', 'норвегія', 'естонія', 'австрія'];
 
-export function detectFileType(wb) {
+export function detectFileType(wb, fileName) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, raw: true });
     let countryHits = 0;
@@ -36,13 +36,12 @@ export function detectFileType(wb) {
         if (joined.includes('залишок') || joined.includes('надлісництво')) return 'inventory';
         if (joined.includes('виконання планових') || joined.includes('планових показників') || (joined.includes('річн') && joined.includes('план') && joined.includes('заготів'))) return 'harvesting_plan_fact';
         if (joined.includes('вилучення') || (joined.includes('лісопродукції') && joined.includes('зсу'))) return 'harvesting_zsu';
-        // Count known country mentions for broader market detection
         MARKET_COUNTRIES.forEach(c => { if (joined.includes(c)) countryHits++; });
     }
-    // If 3+ country names found in first 15 rows — likely a market prices file
     if (countryHits >= 3) return 'market_prices';
-    // Also check sheet names for "ціни" / "prices" keyword
-    if (wb.SheetNames.some(n => /ціни|prices/i.test(n))) return 'market_prices';
+    // Check sheet names or file name for market price indicators
+    const namePool = [...wb.SheetNames, fileName || ''].map(n => n.toLowerCase()).join(' ');
+    if (/ціни|ціна|prices/i.test(namePool)) return 'market_prices';
     return 'kpi';
 }
 
@@ -53,7 +52,7 @@ export async function handleFile(file) {
     try {
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
-        const fileType = detectFileType(wb);
+        const fileType = detectFileType(wb, file.name);
 
         if (fileType === 'market_prices') {
             const parsed = parseMarketPricesFile(wb);
