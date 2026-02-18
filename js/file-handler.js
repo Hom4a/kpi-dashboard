@@ -21,9 +21,12 @@ export function setLoadForestCallback(fn) { _loadForestFn = fn; }
 export function setLoadHarvestingCallback(fn) { _loadHarvestingFn = fn; }
 export function setLoadMarketCallback(fn) { _loadMarketFn = fn; }
 
+const MARKET_COUNTRIES = ['україна', 'фінляндія', 'німеччина', 'польща', 'латвія', 'литва', 'швеція', 'норвегія', 'естонія', 'австрія'];
+
 export function detectFileType(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, raw: true });
+    let countryHits = 0;
     for (let i = 0; i < Math.min(15, rows.length); i++) {
         const row = (rows[i] || []).map(c => (c || '').toString().toLowerCase());
         const joined = row.join(' ');
@@ -33,7 +36,13 @@ export function detectFileType(wb) {
         if (joined.includes('залишок') || joined.includes('надлісництво')) return 'inventory';
         if (joined.includes('виконання планових') || joined.includes('планових показників') || (joined.includes('річн') && joined.includes('план') && joined.includes('заготів'))) return 'harvesting_plan_fact';
         if (joined.includes('вилучення') || (joined.includes('лісопродукції') && joined.includes('зсу'))) return 'harvesting_zsu';
+        // Count known country mentions for broader market detection
+        MARKET_COUNTRIES.forEach(c => { if (joined.includes(c)) countryHits++; });
     }
+    // If 3+ country names found in first 15 rows — likely a market prices file
+    if (countryHits >= 3) return 'market_prices';
+    // Also check sheet names for "ціни" / "prices" keyword
+    if (wb.SheetNames.some(n => /ціни|prices/i.test(n))) return 'market_prices';
     return 'kpi';
 }
 
@@ -49,7 +58,7 @@ export async function handleFile(file) {
         if (fileType === 'market_prices') {
             const parsed = parseMarketPricesFile(wb);
             const total = parsed.prices.length + parsed.uaDetail.length + parsed.history.length + parsed.eurRates.length;
-            if (!total) { toast('Файл не містить даних ринкових цін. Перевірте формат.', true); showLoader(false); return; }
+            if (!total) { toast('Файл не містить числових даних для імпорту.'); showLoader(false); return; }
             const result = await saveMarketData(parsed, file.name);
             toast(`Ринкові ціни завантажено: ${result.count} записів`);
             if (_loadMarketFn) await _loadMarketFn();
