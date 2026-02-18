@@ -4,6 +4,7 @@
 import { allData, targets } from '../state.js';
 import { pricesData, inventoryData } from '../forest/state-forest.js';
 import { planFactData, zsuData } from '../harvesting/state-harvesting.js';
+import { marketPrices, marketMeta } from '../market/state-market.js';
 
 export let execCharts = {};
 export function setExecCharts(v) { execCharts = v; }
@@ -63,6 +64,21 @@ export function computeExecMetrics() {
     const zsuTotalShipped = zsuData.reduce((s, r) => s + (r.forest_products_shipped_m3 || 0) + (r.lumber_shipped_m3 || 0), 0);
     const zsuPct = zsuTotalDeclared > 0 ? (zsuTotalShipped / zsuTotalDeclared) * 100 : 0;
 
+    // --- Market prices aggregation ---
+    const countryRows = marketPrices.filter(r => r.row_type === 'country');
+    const avgRow = marketPrices.find(r => r.row_type === 'average');
+    const uaRow = countryRows.find(r => (r.country || '').toLowerCase().includes('україна'));
+
+    const avgBiz = (row) => {
+        if (!row) return 0;
+        const vals = [row.pine_business, row.spruce_business, row.alder_business, row.birch_business, row.oak_business].filter(v => v > 0);
+        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    };
+    const marketAvgUa = avgBiz(uaRow);
+    const marketAvgEu = avgBiz(avgRow);
+    const marketDiff = marketAvgEu > 0 ? ((marketAvgUa - marketAvgEu) / marketAvgEu) * 100 : 0;
+    const eurRate = marketMeta.eurRate || 0;
+
     // --- Regional scorecard ---
     const scorecard = buildScorecard();
 
@@ -77,9 +93,10 @@ export function computeExecMetrics() {
         inventoryTotal, coverageDays, zsuTotalShipped, zsuPct,
         pctAnnual, pfTotal,
         realizedSpark, harvestedSpark,
+        marketAvgUa, marketAvgEu, marketDiff, eurRate,
         scorecard, monthlyCash, alerts,
         targets,
-        hasData: allData.length > 0 || planFactData.length > 0 || pricesData.length > 0
+        hasData: allData.length > 0 || planFactData.length > 0 || pricesData.length > 0 || marketPrices.length > 0
     };
 }
 
@@ -153,6 +170,26 @@ function buildAlerts(scorecard, avgDailyRealized) {
                 icon: '📦',
                 text: `Залишків вистачить на ~${Math.round(days)} днів при поточному темпі реалізації`
             });
+        }
+    }
+
+    // Market price gap alert
+    if (marketPrices.length > 0) {
+        const uaR = marketPrices.find(r => (r.country || '').toLowerCase().includes('україна') && r.row_type === 'country');
+        const avgR = marketPrices.find(r => r.row_type === 'average');
+        if (uaR && avgR) {
+            const biz = (row) => {
+                const v = [row.pine_business, row.spruce_business, row.alder_business, row.birch_business, row.oak_business].filter(x => x > 0);
+                return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+            };
+            const ua = biz(uaR), eu = biz(avgR);
+            if (eu > 0 && ua < eu * 0.8) {
+                alerts.push({
+                    type: 'warning',
+                    icon: '💶',
+                    text: `Ціна UA €${ua.toFixed(0)} нижче середньої Європи €${eu.toFixed(0)} на ${(((eu - ua) / eu) * 100).toFixed(0)}%`
+                });
+            }
         }
     }
 

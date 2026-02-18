@@ -72,6 +72,10 @@
             <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             <span>Заготівля</span>
         </div>
+        <div class="nav-item" data-page="market" onclick="switchPage('market')">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>Ринок</span>
+        </div>
         <div class="nav-item" data-page="executive" onclick="switchPage('executive')">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             <span>Керівний</span>
@@ -221,6 +225,17 @@
         <div class="filter-bar" id="harvestingFilterBar" style="display:none">
             <select class="filter-select" id="hOffice"><option value="">Обласне управління</option></select>
             <button class="filter-reset" id="harvestingFilterReset" title="Скинути">✕</button>
+        </div>
+
+        <!-- Market filter bar (hidden by default) -->
+        <div class="filter-bar" id="marketFilterBar" style="display:none">
+            <select class="filter-select" id="mCountry"><option value="">Всі країни</option></select>
+            <div class="toggle" id="tglWoodType">
+                <button class="active" data-w="all">Все</button>
+                <button data-w="business">Ділова</button>
+                <button data-w="firewood">Дрова</button>
+            </div>
+            <button class="filter-reset" id="marketFilterReset" title="Скинути">✕</button>
         </div>
 
         <!-- Forest filter bar (hidden by default) -->
@@ -416,6 +431,78 @@
             </div>
         </div>
 
+        <!-- Market page -->
+        <div class="page-section" id="pageMarket">
+            <div id="marketEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
+                <p style="font-size:15px;margin-bottom:8px">Дані міжнародних цін відсутні</p>
+                <p style="font-size:12px">Завантажте Excel з порівнянням цін на деревину</p>
+            </div>
+            <div id="marketContent" style="display:none">
+                <div class="section-title" style="font-size:14px;font-weight:700;margin:20px 0 12px;color:var(--text)">Міжнародне порівняння цін на деревину</div>
+                <div class="kpi-grid" id="kpiGridMarket"></div>
+
+                <div class="chart-row cols-2">
+                    <div class="glass chart-card" id="marketCountryCard">
+                        <div class="chart-hdr"><div><h3>Ціни по країнах</h3><small>EUR/м³, ділова деревина</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('marketCountryCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapMarketCountry"><canvas id="cMarketCountry"></canvas></div>
+                    </div>
+                    <div class="glass chart-card" id="marketUaVsEuCard">
+                        <div class="chart-hdr"><div><h3>Україна vs Європа</h3><small>Порівняння по породах, EUR/м³</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('marketUaVsEuCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapMarketUaVsEu"><canvas id="cMarketUaVsEu"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="chart-row cols-2">
+                    <div class="glass chart-card" id="marketSpeciesCard">
+                        <div class="chart-hdr"><div><h3>Рейтинг порід (Україна)</h3><small>Ціна в EUR/м³</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('marketSpeciesCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapMarketSpecies"><canvas id="cMarketSpecies"></canvas></div>
+                    </div>
+                    <div class="glass chart-card" id="marketTimeSeriesCard">
+                        <div class="chart-hdr"><div><h3>Динаміка по країнах</h3><small>Середня ціна, EUR/м³</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('marketTimeSeriesCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapMarketTimeSeries"><canvas id="cMarketTimeSeries"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="chart-row cols-2">
+                    <div class="glass chart-card" id="marketExchangeCard">
+                        <div class="chart-hdr"><div><h3>Біржі України</h3><small>УЕБ / УУБ / УРБ, грн/м³</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('marketExchangeCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapMarketExchange"><canvas id="cMarketExchange"></canvas></div>
+                    </div>
+                    <div class="glass chart-card" id="marketDynamicsCard">
+                        <div class="chart-hdr"><div><h3>Динаміка цін (Україна)</h3><small>По породах, EUR/м³</small></div>
+                            <button class="icon-btn" onclick="toggleFullscreen('marketDynamicsCard')" title="На весь екран"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        </div>
+                        <div class="chart-wrap medium" id="wrapMarketDynamics"><canvas id="cMarketDynamics"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="glass chart-card" style="margin-bottom:20px">
+                    <div class="chart-hdr">
+                        <div><h3>Таблиця цін</h3></div>
+                        <div class="toggle" id="tglMarketTable">
+                            <button class="active" data-g="countries">Країни</button>
+                            <button data-g="sources">Джерела</button>
+                            <button data-g="exchanges">Біржі</button>
+                        </div>
+                    </div>
+                    <div class="tbl-wrap"><table class="tbl">
+                        <thead id="tblHeadMarket"><tr><th>Назва</th><th>Сосна</th><th>Ялина</th><th>Вільха</th><th>Береза</th><th>Дуб</th><th>Сосна (др.)</th><th>Ялина (др.)</th><th>Береза (др.)</th><th>Сер.</th></tr></thead>
+                        <tbody id="tblBodyMarket"></tbody>
+                    </table></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Executive page -->
         <div class="page-section" id="pageExecutive">
             <div id="execEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
@@ -604,6 +691,10 @@
         <button class="mobile-nav-item" data-page="harvesting" onclick="switchPage('harvesting')">
             <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             <span>Заготівля</span>
+        </button>
+        <button class="mobile-nav-item" data-page="market" onclick="switchPage('market')">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>Ринок</span>
         </button>
         <button class="mobile-nav-item" data-page="executive" onclick="switchPage('executive')">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>

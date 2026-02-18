@@ -19,6 +19,7 @@ const PAGE_ACCESS = {
     finance:     ['admin', 'director', 'analyst', 'editor', 'accountant'],
     forest:      ['admin', 'director', 'analyst', 'editor', 'accountant', 'forester', 'operator'],
     harvesting:  ['admin', 'director', 'analyst', 'editor', 'forester'],
+    market:      ['admin', 'director', 'analyst', 'editor', 'forester'],
     executive:   ['admin', 'director', 'analyst'],
     'data-entry':['admin', 'editor', 'accountant', 'hr', 'forester', 'operator'],
     builder:     ['admin', 'analyst'],

@@ -26,6 +26,12 @@ import { populateHarvestingFilters, applyHarvestingFilter, initHarvestingFilterE
 import { renderHarvestingDashboard } from './harvesting/render-harvesting.js';
 // Executive modules
 import { renderExecutiveDashboard } from './executive/render-executive.js';
+// Market modules
+import { setMarketPrices, setMarketUaDetail, setMarketHistory, setEurRates, setMarketMeta } from './market/state-market.js';
+import { loadMarketPrices, loadMarketUaDetail, loadMarketHistory, loadEurRates, clearMarketData as clearMarketDB } from './market/db-market.js';
+import { populateMarketFilters, applyMarketFilter, initMarketFilterEvents, setRenderMarketCallback } from './market/filters-market.js';
+import { renderMarketDashboard } from './market/render-market.js';
+import { setLoadMarketCallback } from './file-handler.js';
 // Data Entry modules
 import { initDataEntry, setDataEntryReloadCallback } from './data-entry/data-entry.js';
 // Builder modules
@@ -119,24 +125,50 @@ async function loadHarvestingDataAndRender() {
     } catch(e) { console.error('loadHarvestingDataAndRender error:', e); }
 }
 
+// ===== Load & Render Market =====
+async function loadMarketDataAndRender() {
+    try {
+        const [prices, uaDetail, history, rates] = await Promise.all([
+            loadMarketPrices(), loadMarketUaDetail(), loadMarketHistory(), loadEurRates()
+        ]);
+        console.log('Market loaded:', prices.length, 'prices,', uaDetail.length, 'ua,', history.length, 'history,', rates.length, 'rates');
+        setMarketPrices(prices);
+        setMarketUaDetail(uaDetail);
+        setMarketHistory(history);
+        setEurRates(rates);
+        // Extract meta from first record
+        if (prices.length) {
+            setMarketMeta({ period: prices[0].period || '', eurRate: prices[0].eur_rate || 0 });
+        }
+        if (prices.length || history.length) {
+            hide('empty'); $('dash').style.display = 'block';
+        }
+        populateMarketFilters();
+        applyMarketFilter();
+    } catch(e) { console.error('loadMarketDataAndRender error:', e); }
+}
+
 // ===== Wire callbacks =====
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
-setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); });
+setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); await loadMarketDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); });
 setHideButtonsCallback(hideButtons);
 setFileHandlerLoadAndRender(async () => { await loadAndRender(); showRoleButtons(); });
 setLoadForestCallback(loadForestDataAndRender);
 setLoadHarvestingCallback(loadHarvestingDataAndRender);
-setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); });
+setLoadMarketCallback(loadMarketDataAndRender);
+setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); await loadMarketDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); });
 setRenderForestCallback(renderForestDashboard);
 setRenderHarvestingCallback(renderHarvestingDashboard);
+setRenderMarketCallback(renderMarketDashboard);
 
 // Data entry reload: when user modifies data via forms, refresh the relevant dashboard
 setDataEntryReloadCallback(async (targetTable) => {
     if (targetTable === 'kpi_records') { await loadAndRender(); showRoleButtons(); }
     else if (targetTable === 'forest_prices' || targetTable === 'forest_inventory') { await loadForestDataAndRender(); }
     else if (targetTable === 'harvesting_plan_fact' || targetTable === 'harvesting_zsu') { await loadHarvestingDataAndRender(); }
+    else if (['market_prices', 'market_prices_ua', 'market_price_history', 'eur_rates'].includes(targetTable)) { await loadMarketDataAndRender(); }
     renderExecutiveDashboard();
 });
 
@@ -231,6 +263,19 @@ window.clearZsu = async () => {
     showLoader(false);
 };
 
+window.clearMarketData = async () => {
+    if (!confirm('Очистити дані ринкових цін?')) return;
+    showLoader(true);
+    try {
+        await clearMarketDB();
+        setMarketPrices([]); setMarketUaDetail([]); setMarketHistory([]); setEurRates([]);
+        await loadMarketDataAndRender();
+        toast('Дані ринкових цін очищено');
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
+
 // ===== Error handlers =====
 window.onerror = function(msg, url, line) {
     console.error('Global error:', msg, url, line);
@@ -269,6 +314,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Harvesting Filters
     initHarvestingFilterEvents();
+
+    // Market Filters
+    initMarketFilterEvents();
 
     // Main chart toggle
     $('tglMain').addEventListener('click', e => {

@@ -8,6 +8,7 @@ const pageMap = {
     finance: 'pageFinance',
     forest: 'pageForest',
     harvesting: 'pageHarvesting',
+    market: 'pageMarket',
     executive: 'pageExecutive',
     'data-entry': 'pageDataEntry',
     builder: 'pageBuilder'
@@ -20,10 +21,11 @@ for (const [k, v] of Object.entries(pageMap)) pageIdMap[v] = k;
 const filterBarMap = {
     volumes: 'filterBar', finance: 'filterBar',
     forest: 'forestFilterBar', harvesting: 'harvestingFilterBar',
+    market: 'marketFilterBar',
     executive: null, 'data-entry': null, builder: null
 };
 
-const ALL_FILTER_BARS = ['filterBar', 'forestFilterBar', 'harvestingFilterBar'];
+const ALL_FILTER_BARS = ['filterBar', 'forestFilterBar', 'harvestingFilterBar', 'marketFilterBar'];
 
 export function switchPage(page) {
     const role = currentProfile ? currentProfile.role : 'viewer';

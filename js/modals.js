@@ -6,6 +6,7 @@ import { sb } from './config.js';
 import { getRecordCount, getUploadHistory } from './db-kpi.js';
 import { getPricesCount, getInventoryCount } from './forest/db-forest.js';
 import { getPlanFactCount, getZsuCount } from './harvesting/db-harvesting.js';
+import { getMarketPricesCount } from './market/db-market.js';
 
 let _renderAllFn = null;
 export function setRenderAllCallback(fn) { _renderAllFn = fn; }
@@ -67,6 +68,7 @@ const ALL_PAGES = [
     { id: 'finance', label: 'Фінанси' },
     { id: 'forest', label: 'Продукція' },
     { id: 'harvesting', label: 'Заготівля' },
+    { id: 'market', label: 'Ринок' },
     { id: 'executive', label: 'Керівний' },
     { id: 'data-entry', label: 'Введення' },
     { id: 'builder', label: 'Дашборди' }
@@ -229,18 +231,20 @@ export async function openDataManage() {
     const content = $('dataManageContent');
     content.innerHTML = '<p style="color:var(--text3);font-size:12px">Завантаження статистики...</p>';
     try {
-        const [kpiCount, pricesCount, inventoryCount, pfCount, zsuCount, kpiHistory] = await Promise.all([
+        const [kpiCount, pricesCount, inventoryCount, pfCount, zsuCount, marketCount, kpiHistory] = await Promise.all([
             getRecordCount(), getPricesCount(), getInventoryCount(),
-            getPlanFactCount(), getZsuCount(), getUploadHistory('kpi')
+            getPlanFactCount(), getZsuCount(), getMarketPricesCount(), getUploadHistory('kpi')
         ]);
-        const [pricesHistory, inventoryHistory, pfHistory, zsuHistory] = await Promise.all([
+        const [pricesHistory, inventoryHistory, pfHistory, zsuHistory, marketHistory] = await Promise.all([
             getUploadHistory('prices'), getUploadHistory('inventory'),
-            getUploadHistory('harvesting_plan_fact'), getUploadHistory('harvesting_zsu')
+            getUploadHistory('harvesting_plan_fact'), getUploadHistory('harvesting_zsu'),
+            getUploadHistory('market_prices')
         ]);
         content.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">
             ${dataSection('KPI (Обсяги / Фінанси)', kpiCount, kpiHistory[0] || null, 'clearKpiData()', 'undoLastKpi()')}
             ${dataSection('Середньозважені ціни', pricesCount, pricesHistory[0] || null, 'clearPrices()')}
             ${dataSection('Залишки лісопродукції', inventoryCount, inventoryHistory[0] || null, 'clearInventory()')}
+            ${dataSection('Ринкові ціни (міжнародні)', marketCount, marketHistory[0] || null, 'clearMarketData()')}
             ${dataSection('План-факт заготівлі', pfCount, pfHistory[0] || null, 'clearPlanFact()')}
             ${dataSection('Довідка ЗСУ', zsuCount, zsuHistory[0] || null, 'clearZsu()')}
         </div>`;

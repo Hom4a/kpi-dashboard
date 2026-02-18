@@ -9,13 +9,17 @@ import { savePricesData, saveInventoryData } from './forest/db-forest.js';
 import { parsePlanFactFile } from './harvesting/parse-plan-fact.js';
 import { parseZsuFile } from './harvesting/parse-zsu.js';
 import { savePlanFactData, saveZsuData } from './harvesting/db-harvesting.js';
+import { parseMarketPricesFile } from './market/parse-market-prices.js';
+import { saveMarketData } from './market/db-market.js';
 
 let _loadAndRenderFn = null;
 let _loadForestFn = null;
 let _loadHarvestingFn = null;
+let _loadMarketFn = null;
 export function setLoadAndRenderCallback(fn) { _loadAndRenderFn = fn; }
 export function setLoadForestCallback(fn) { _loadForestFn = fn; }
 export function setLoadHarvestingCallback(fn) { _loadHarvestingFn = fn; }
+export function setLoadMarketCallback(fn) { _loadMarketFn = fn; }
 
 export function detectFileType(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -23,6 +27,8 @@ export function detectFileType(wb) {
     for (let i = 0; i < Math.min(15, rows.length); i++) {
         const row = (rows[i] || []).map(c => (c || '').toString().toLowerCase());
         const joined = row.join(' ');
+        if (joined.includes('ціна за 1 м3') || joined.includes('ціна за 1 м³') ||
+            (joined.includes('країна') && (joined.includes('сосна') || joined.includes('ялина')) && joined.includes('дуб'))) return 'market_prices';
         if (joined.includes('середньозважен') || (joined.includes('вартість') && joined.includes('продукція'))) return 'prices';
         if (joined.includes('залишок') || joined.includes('надлісництво')) return 'inventory';
         if (joined.includes('виконання планових') || joined.includes('планових показників') || (joined.includes('річн') && joined.includes('план') && joined.includes('заготів'))) return 'harvesting_plan_fact';
@@ -39,6 +45,17 @@ export async function handleFile(file) {
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
         const fileType = detectFileType(wb);
+
+        if (fileType === 'market_prices') {
+            const parsed = parseMarketPricesFile(wb);
+            const total = parsed.prices.length + parsed.uaDetail.length + parsed.history.length + parsed.eurRates.length;
+            if (!total) { toast('Файл не містить даних ринкових цін. Перевірте формат.', true); showLoader(false); return; }
+            const result = await saveMarketData(parsed, file.name);
+            toast(`Ринкові ціни завантажено: ${result.count} записів`);
+            if (_loadMarketFn) await _loadMarketFn();
+            showLoader(false);
+            return;
+        }
 
         if (fileType === 'prices') {
             const records = parsePricesFile(wb);

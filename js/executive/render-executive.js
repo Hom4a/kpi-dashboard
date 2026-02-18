@@ -46,7 +46,9 @@ function renderExecKPIs(m) {
             label: 'Середня ціна', val: fmt(m.avgPrice, 0), unit: 'грн/м\u00B3',
             cls: 'neon-accent',
             change: m.prevAvgPrice > 0 ? ((m.avgPrice - m.prevAvgPrice) / m.prevAvgPrice * 100) : null,
-            sub: 'Середньозважена'
+            sub: m.marketAvgUa > 0
+                ? `Євр: €${fmt(m.marketAvgUa, 0)} (${m.marketDiff >= 0 ? '+' : ''}${m.marketDiff.toFixed(0)}% vs EU)`
+                : 'Середньозважена'
         },
         {
             label: 'Залишки', val: fmt(m.inventoryTotal / 1000, 1), unit: 'тис.м\u00B3',
