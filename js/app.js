@@ -6,7 +6,7 @@ import { initTheme, toggleTheme, setRenderAllCallback as setThemeRenderAll } fro
 import { handleLogin, handleLogout, showAuthScreen, hideButtons, showAppForUser, initAuthListener, setLoadAndRenderCallback as setAuthLoadAndRender, setHideButtonsCallback, UPLOAD_ROLES, DATA_MANAGE_ROLES, TARGET_ROLES } from './auth.js';
 import { switchPage, openMobileUpload, initSwipeGestures } from './navigation.js';
 import { populateFilters, applyFilter, resetFilters, initFilterEvents, setRenderAllCallback as setFilterRenderAll } from './filters.js';
-import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, saveViewerAccess, openDataManage, closeDataManage, setRenderAllCallback as setModalsRenderAll } from './modals.js';
+import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, saveViewerAccess, openDataManage, closeDataManage, setRenderAllCallback as setModalsRenderAll, createUser, toggleAddUserForm, generateNewUserPassword } from './modals.js';
 import { renderAll } from './render-all.js';
 import { setMainMode, renderTable } from './render-volumes.js';
 import { exportExcel } from './export.js';
@@ -192,6 +192,9 @@ window.exportExcel = exportExcel;
 window.openViewerAccess = openViewerAccess;
 window.closeViewerAccess = closeViewerAccess;
 window.saveViewerAccess = saveViewerAccess;
+window.createUser = createUser;
+window.toggleAddUserForm = toggleAddUserForm;
+window.generateNewUserPassword = generateNewUserPassword;
 window.openDataManage = openDataManage;
 window.closeDataManage = closeDataManage;
 window.openDashboardsPage = () => { switchPage('builder'); initDashboardList($('builderContent')); };
