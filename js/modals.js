@@ -87,6 +87,43 @@ const ORG_LEVELS = [
     { value: 'forest_unit', label: 'Лісництво' }
 ];
 
+const ROLE_DESCRIPTIONS = {
+    admin:      { desc: 'Повний доступ до системи', pages: 'Усі сторінки', caps: ['завантаження', 'керування даними', 'цілі', 'користувачі'] },
+    director:   { desc: 'Перегляд усіх аналітичних дашбордів', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Керівний', caps: ['перегляд'] },
+    analyst:    { desc: 'Аналітика + конструктор дашбордів', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Керівний, Дашборди', caps: ['перегляд', 'конструктор'] },
+    editor:     { desc: 'Введення та керування даними', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Введення', caps: ['завантаження', 'керування даними', 'цілі'] },
+    accountant: { desc: 'Фінанси та продукція', pages: 'Фінанси, Продукція, Введення', caps: ['завантаження'] },
+    hr:         { desc: 'Кадрові дані', pages: 'Введення', caps: ['завантаження'] },
+    forester:   { desc: 'Лісогосподарські дані', pages: 'Обсяги, Продукція, Заготівля, Ринок, Введення', caps: ['завантаження'] },
+    operator:   { desc: 'Складські операції', pages: 'Продукція, Введення', caps: ['завантаження'] },
+    viewer:     { desc: 'Індивідуальний набір сторінок', pages: 'Налаштовується чекбоксами', caps: ['перегляд'] }
+};
+
+const PAGE_DESCRIPTIONS = {
+    volumes:     { desc: 'Реалізація та заготівля деревини: денна/місячна динаміка', data: 'KPI файл (дата, показник, значення)' },
+    finance:     { desc: 'Грошові надходження, залишок каси, динаміка доходів', data: 'KPI файл (ті самі дані)' },
+    forest:      { desc: 'Середньозважені ціни та залишки лісопродукції по філіях', data: 'Excel цін + Excel залишків' },
+    harvesting:  { desc: 'Виконання плану заготівлі по регіонах', data: 'Excel план-факт + Excel довідка ЗСУ' },
+    market:      { desc: 'Міжнародне порівняння цін на деревину', data: 'Excel міжнародних цін' },
+    executive:   { desc: 'Агрегований дашборд для керівництва: scorecard, тренди', data: 'Всі вищезазначені джерела' },
+    'data-entry':{ desc: 'Сторінка завантаження файлів та введення даних', data: '—' },
+    builder:     { desc: 'Конструктор кастомних дашбордів з віджетами', data: 'Використовує існуючі дані' }
+};
+
+const CAP_ICONS = {
+    'перегляд': '\u{1F441}', 'завантаження': '\u2B06', 'керування даними': '\u270E',
+    'цілі': '\u{1F3AF}', 'користувачі': '\u{1F465}', 'конструктор': '\u{1F4CA}'
+};
+
+function renderRoleDesc(role) {
+    const rd = ROLE_DESCRIPTIONS[role];
+    if (!rd) return '';
+    const icons = rd.caps.map(c => `${CAP_ICONS[c] || ''} ${c}`).join('  ');
+    return `<div style="font-size:11px;color:var(--text2);line-height:1.5">${rd.desc}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px"><b>Сторінки:</b> ${rd.pages}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:1px"><b>Можливості:</b> ${icons}</div>`;
+}
+
 function generatePassword() {
     const upper = 'ABCDEFGHJKMNPQRSTUVWXYZ';
     const lower = 'abcdefghjkmnpqrstuvwxyz';
@@ -136,8 +173,50 @@ export async function openViewerAccess() {
             orgUnits = ou || [];
         } catch(e) { /* org_units table may not exist yet */ }
 
+        const rolesRefHTML = `<div id="rolesRefPanel" style="display:none;margin-top:8px;margin-bottom:12px">
+            <div class="glass" style="padding:14px">
+                <div style="font-size:12px;font-weight:600;color:var(--primary);margin-bottom:10px">Ролі та їхні права</div>
+                <div style="display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;font-size:11px;align-items:baseline">
+                    <div style="font-weight:600;color:var(--text2);border-bottom:1px solid var(--border);padding-bottom:4px">Роль</div>
+                    <div style="font-weight:600;color:var(--text2);border-bottom:1px solid var(--border);padding-bottom:4px">Сторінки</div>
+                    <div style="font-weight:600;color:var(--text2);border-bottom:1px solid var(--border);padding-bottom:4px">Можливості</div>
+                    ${ALL_ROLES.map(r => {
+                        const rd = ROLE_DESCRIPTIONS[r];
+                        const icons = rd.caps.map(c => CAP_ICONS[c] || '').join(' ');
+                        return `<div style="color:var(--text);font-weight:500">${ROLE_LABELS[r]}</div>
+                            <div style="color:var(--text3)">${rd.pages}</div>
+                            <div title="${rd.caps.join(', ')}">${icons}</div>`;
+                    }).join('')}
+                </div>
+                <div style="margin-top:10px;font-size:10px;color:var(--text3);line-height:1.6;border-top:1px solid var(--border);padding-top:8px">
+                    \u{1F441} перегляд &nbsp; \u2B06 завантаження &nbsp; \u270E керування даними &nbsp; \u{1F3AF} цілі &nbsp; \u{1F465} користувачі &nbsp; \u{1F4CA} конструктор
+                </div>
+            </div>
+        </div>`;
+
+        const pagesRefHTML = `<div id="pagesRefPanel" style="display:none;margin-top:8px;margin-bottom:12px">
+            <div class="glass" style="padding:14px">
+                <div style="font-size:12px;font-weight:600;color:var(--primary);margin-bottom:10px">Дашборди та необхідні дані</div>
+                ${ALL_PAGES.map(p => {
+                    const pd = PAGE_DESCRIPTIONS[p.id];
+                    if (!pd) return '';
+                    return `<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+                        <div style="font-size:12px;font-weight:600;color:var(--text)">${p.label}</div>
+                        <div style="font-size:11px;color:var(--text2);margin-top:2px">${pd.desc}</div>
+                        <div style="font-size:10px;color:var(--text3);margin-top:2px">Дані: ${pd.data}</div>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>`;
+
         const addUserHTML = `<div style="margin-bottom:16px">
-            <button class="btn btn-sm" onclick="toggleAddUserForm()" style="margin-bottom:12px">+ Додати користувача</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+                <button class="btn btn-sm" onclick="toggleAddUserForm()">+ Додати користувача</button>
+                <button class="btn btn-sm" style="color:var(--text2);border-color:var(--border)" onclick="var p=document.getElementById('rolesRefPanel');p.style.display=p.style.display==='none'?'':'none'">&#9432; Довідка по ролях</button>
+                <button class="btn btn-sm" style="color:var(--text2);border-color:var(--border)" onclick="var p=document.getElementById('pagesRefPanel');p.style.display=p.style.display==='none'?'':'none'">&#9432; Довідка по дашбордах</button>
+            </div>
+            ${rolesRefHTML}
+            ${pagesRefHTML}
             <div id="addUserForm" class="glass" style="display:none;padding:16px;margin-bottom:12px;border-left:3px solid var(--primary)">
                 <div style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:12px">Новий користувач</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -161,11 +240,14 @@ export async function openViewerAccess() {
                             <option value="">—</option>
                             ${orgUnits.map(ou => `<option value="${ou.name}">${ou.name}</option>`).join('')}
                         </select></div>
+                    <div id="newUserRoleDesc" style="grid-column:1/-1;padding:6px 10px;background:rgba(74,157,111,0.05);border-left:2px solid rgba(74,157,111,0.3);border-radius:6px">
+                        ${renderRoleDesc('viewer')}
+                    </div>
                 </div>
-                <div id="newUserViewerPages" style="display:none;margin-top:10px">
+                <div id="newUserViewerPages" style="margin-top:10px">
                     <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">Доступні сторінки</label>
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
-                        ${ALL_PAGES.map(p => `<label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer">
+                        ${ALL_PAGES.map(p => `<label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer" title="${PAGE_DESCRIPTIONS[p.id]?.desc || ''} | Дані: ${PAGE_DESCRIPTIONS[p.id]?.data || ''}">
                             <input type="checkbox" class="new-user-page" data-page="${p.id}" checked> ${p.label}
                         </label>`).join('')}
                     </div>
@@ -209,10 +291,13 @@ export async function openViewerAccess() {
                             </select>
                         </div>
                     </div>
+                    <div class="ua-role-desc" style="margin-top:8px;padding:6px 10px;background:rgba(74,157,111,0.05);border-left:2px solid rgba(74,157,111,0.3);border-radius:6px">
+                        ${renderRoleDesc(u.role)}
+                    </div>
                     ${isViewer ? `<div style="margin-top:8px">
                         <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">Доступні сторінки</label>
                         <div class="ua-pages-wrap" style="display:flex;gap:8px;flex-wrap:wrap">
-                            ${ALL_PAGES.map(p => `<label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer">
+                            ${ALL_PAGES.map(p => `<label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer" title="${PAGE_DESCRIPTIONS[p.id]?.desc || ''} | Дані: ${PAGE_DESCRIPTIONS[p.id]?.data || ''}">
                                 <input type="checkbox" data-page="${p.id}" ${(u.allowed_pages || ALL_PAGES.map(x => x.id)).includes(p.id) ? 'checked' : ''}> ${p.label}
                             </label>`).join('')}
                         </div>
@@ -220,19 +305,21 @@ export async function openViewerAccess() {
                 </div>`;
             }).join('');
 
-        // Show/hide viewer pages on role change
+        // Show/hide viewer pages + update role description on role change
         list.querySelectorAll('.ua-role-select').forEach(sel => {
             sel.addEventListener('change', () => {
                 const card = sel.closest('[data-user-id]');
                 const pagesWrap = card.querySelector('.ua-pages-wrap');
+                // Update role description
+                const descDiv = card.querySelector('.ua-role-desc');
+                if (descDiv) descDiv.innerHTML = renderRoleDesc(sel.value);
                 if (sel.value === 'viewer') {
                     if (!pagesWrap) {
-                        // Add pages checkboxes
                         const div = document.createElement('div');
                         div.style.cssText = 'margin-top:8px';
                         div.innerHTML = `<label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">Доступні сторінки</label>
                             <div class="ua-pages-wrap" style="display:flex;gap:8px;flex-wrap:wrap">
-                                ${ALL_PAGES.map(p => `<label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer">
+                                ${ALL_PAGES.map(p => `<label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer" title="${PAGE_DESCRIPTIONS[p.id]?.desc || ''} | Дані: ${PAGE_DESCRIPTIONS[p.id]?.data || ''}">
                                     <input type="checkbox" data-page="${p.id}" checked> ${p.label}
                                 </label>`).join('')}
                             </div>`;
@@ -244,12 +331,14 @@ export async function openViewerAccess() {
             });
         });
 
-        // Show/hide viewer pages for new user form
+        // Show/hide viewer pages + update role description for new user form
         const newRoleSel = document.getElementById('newUserRole');
         if (newRoleSel) {
             newRoleSel.addEventListener('change', () => {
                 const pDiv = document.getElementById('newUserViewerPages');
                 if (pDiv) pDiv.style.display = newRoleSel.value === 'viewer' ? '' : 'none';
+                const descDiv = document.getElementById('newUserRoleDesc');
+                if (descDiv) descDiv.innerHTML = renderRoleDesc(newRoleSel.value);
             });
         }
     } catch(e) { toast('Помилка: ' + e.message, true); }
