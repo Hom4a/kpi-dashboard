@@ -48,9 +48,11 @@ export function getVisiblePages(role, profile) {
         return profile.allowed_pages;
     }
     // Other roles use PAGE_ACCESS matrix
-    return Object.entries(PAGE_ACCESS)
+    const pages = Object.entries(PAGE_ACCESS)
         .filter(([, roles]) => roles.includes(role))
         .map(([page]) => page);
+    // Fallback: always show at least volumes if no pages matched
+    return pages.length ? pages : ['volumes'];
 }
 
 export { PAGE_ACCESS, UPLOAD_ROLES, DATA_MANAGE_ROLES, TARGET_ROLES, ROLE_LABELS };
@@ -59,7 +61,10 @@ export async function getCurrentProfile() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
     const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
-    if (error) return null;
+    if (error) {
+        console.warn('Profile fetch error:', error.message, 'for user:', user.id, user.email);
+        return null;
+    }
     return data;
 }
 
@@ -145,6 +150,7 @@ export async function showAppForUser(user) {
 
         // Nav visibility — role-based page access
         const allowedPages = getVisiblePages(role, p);
+        console.log('Auth profile:', p ? `${p.email} role=${p.role}` : 'NULL', 'Pages:', allowedPages);
         document.querySelectorAll('.nav-item[data-page]').forEach(n => {
             n.style.display = allowedPages.includes(n.dataset.page) ? '' : 'none';
         });
