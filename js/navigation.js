@@ -11,7 +11,8 @@ const pageMap = {
     market: 'pageMarket',
     executive: 'pageExecutive',
     'data-entry': 'pageDataEntry',
-    builder: 'pageBuilder'
+    builder: 'pageBuilder',
+    'api-system': 'pageApiSystem'
 };
 
 const pageIdMap = {};
@@ -22,7 +23,7 @@ const filterBarMap = {
     volumes: 'filterBar', finance: 'filterBar',
     forest: 'forestFilterBar', harvesting: 'harvestingFilterBar',
     market: 'marketFilterBar',
-    executive: null, 'data-entry': null, builder: null
+    executive: null, 'data-entry': null, builder: null, 'api-system': null
 };
 
 const ALL_FILTER_BARS = ['filterBar', 'forestFilterBar', 'harvestingFilterBar', 'marketFilterBar'];

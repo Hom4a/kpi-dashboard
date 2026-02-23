@@ -1,6 +1,18 @@
 // ===== KPI Database Operations (Smart Merge + Batch Tracking) =====
 import { sb } from './config.js';
 
+// ===== RPC-based aggregation (server-side, fast) =====
+export async function fetchKpiSummary(dateFrom = null, dateTo = null) {
+    try {
+        const params = {};
+        if (dateFrom) params.p_date_from = dateFrom;
+        if (dateTo) params.p_date_to = dateTo;
+        const { data, error } = await sb.rpc('get_kpi_summary', params);
+        if (error || !data) return null;
+        return data;
+    } catch { return null; }
+}
+
 export async function saveRecords(records, fileName) {
     const { data: { user } } = await sb.auth.getUser();
     const batchId = crypto.randomUUID();

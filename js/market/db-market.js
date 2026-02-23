@@ -1,6 +1,17 @@
 // ===== Market Prices — Database Layer =====
 import { sb } from '../config.js';
 
+// ===== RPC-based aggregation (server-side, fast) =====
+export async function fetchMarketComparison(period = null) {
+    try {
+        const params = {};
+        if (period) params.p_period = period;
+        const { data, error } = await sb.rpc('get_market_comparison', params);
+        if (error || !data) return null;
+        return data;
+    } catch { return null; }
+}
+
 const BATCH_SIZE = 500;
 
 async function batchInsert(table, records, batchId, userId) {

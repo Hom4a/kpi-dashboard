@@ -36,6 +36,8 @@ import { setLoadMarketCallback } from './file-handler.js';
 import { initDataEntry, setDataEntryReloadCallback } from './data-entry/data-entry.js';
 // Builder modules
 import { initDashboardList } from './builder/dashboard-list.js';
+// API System modules
+import { renderApiSystemPage } from './api-system/render-api.js';
 
 // ===== Show buttons based on role (called after ALL data loads) =====
 function showRoleButtons() {
@@ -155,7 +157,7 @@ async function loadMarketDataAndRender() {
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
-setAuthLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); });
+setAuthLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); renderApiSystemPage(); });
 setHideButtonsCallback(hideButtons);
 setFileHandlerLoadAndRender(async () => { await loadAndRender(); showRoleButtons(); });
 setLoadForestCallback(async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); });
@@ -198,6 +200,7 @@ window.generateNewUserPassword = generateNewUserPassword;
 window.openDataManage = openDataManage;
 window.closeDataManage = closeDataManage;
 window.openDashboardsPage = () => { switchPage('builder'); initDashboardList($('builderContent')); };
+window.openApiSystemPage = () => { switchPage('api-system'); renderApiSystemPage(); };
 
 // ===== Data Management action handlers =====
 window.clearKpiData = async () => {

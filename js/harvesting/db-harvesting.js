@@ -1,6 +1,15 @@
 // ===== Harvesting Database Operations =====
 import { sb } from '../config.js';
 
+// ===== RPC-based aggregation (server-side, fast) =====
+export async function fetchHarvestingSummary() {
+    try {
+        const { data, error } = await sb.rpc('get_harvesting_summary');
+        if (error || !data) return null;
+        return data;
+    } catch { return null; }
+}
+
 export async function savePlanFactData(records, fileName) {
     const { data: { user } } = await sb.auth.getUser();
     const batchId = crypto.randomUUID();

@@ -23,6 +23,7 @@ const PAGE_ACCESS = {
     executive:   ['admin', 'director', 'analyst'],
     'data-entry':['admin', 'editor', 'accountant', 'hr', 'forester', 'operator'],
     builder:     ['admin', 'analyst'],
+    'api-system':['admin', 'analyst'],
 };
 
 // Roles that can upload files

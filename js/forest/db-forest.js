@@ -1,6 +1,19 @@
 // ===== Forest Database Operations =====
 import { sb } from '../config.js';
 
+// ===== RPC-based aggregation (server-side, fast) =====
+export async function fetchForestSummary(branch = null, product = null, species = null) {
+    try {
+        const params = {};
+        if (branch) params.p_branch = branch;
+        if (product) params.p_product = product;
+        if (species) params.p_species = species;
+        const { data, error } = await sb.rpc('get_forest_summary', params);
+        if (error || !data) return null;
+        return data;
+    } catch { return null; }
+}
+
 // DELETE ALL + batch INSERT (full replacement strategy)
 export async function savePricesData(records, fileName) {
     const { data: { user } } = await sb.auth.getUser();
