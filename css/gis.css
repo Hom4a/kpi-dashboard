@@ -41,6 +41,63 @@
     color: #fff !important;
 }
 
+/* ===== Map + Sidebar Layout ===== */
+.gis-map-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 16px;
+}
+
+.gis-map-col {
+    min-width: 0;
+}
+
+.gis-sidebar-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ===== Drill-down ===== */
+#gisRegionDetail .chart-row.cols-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+#gisRegionDetail .kpi-grid {
+    margin-bottom: 12px;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1024px) {
+    .gis-map-layout {
+        grid-template-columns: 1fr;
+    }
+    .gis-sidebar-col {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    .gis-sidebar-col > .glass {
+        flex: 1 1 280px;
+    }
+}
+
 @media (max-width: 768px) {
     #gisMap { height: 350px !important; }
+    #gisRegionDetail .chart-row.cols-2 {
+        grid-template-columns: 1fr;
+    }
+    #gisRegionDetail .kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* ===== Admin Modal ===== */
+#gisAdminModal .ga-oblasts label {
+    user-select: none;
+}
+
+#gisAdminModal .ga-oblasts input[type="checkbox"] {
+    accent-color: var(--primary);
 }

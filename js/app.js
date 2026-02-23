@@ -44,6 +44,10 @@ import { registerSW, initInstallPrompt } from './pwa.js';
 import { startRealtime } from './realtime.js';
 // GIS
 import { renderGisMap } from './gis/render-gis.js';
+import { loadRegionalOffices } from './gis/db-gis.js';
+import { setRegionalOffices } from './gis/state-gis.js';
+import { openGisAdmin, closeGisAdmin, saveGisAdmin, addNewOffice } from './gis/gis-admin.js';
+import { closeGisDrilldown } from './gis/gis-controls.js';
 
 // ===== Show buttons based on role (called after ALL data loads) =====
 function showRoleButtons() {
@@ -71,6 +75,11 @@ function showRoleButtons() {
     if (['admin', 'analyst'].includes(role)) {
         const dbBtn = $('btnDashboards');
         if (dbBtn) dbBtn.style.display = '';
+    }
+    // GIS admin button
+    if (role === 'admin') {
+        const gisBtn = $('btnGisAdmin');
+        if (gisBtn) gisBtn.style.display = '';
     }
 }
 
@@ -164,7 +173,9 @@ setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
 setAuthLoadAndRender(async () => {
-    await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]);
+    // Load regional offices in parallel with data
+    const officesPromise = loadRegionalOffices().then(o => setRegionalOffices(o)).catch(e => console.warn('Regional offices not loaded (table may not exist):', e.message));
+    await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender(), officesPromise]);
     await renderExecutiveDashboard();
     showRoleButtons();
     initDataEntry();
@@ -173,8 +184,8 @@ setAuthLoadAndRender(async () => {
     // Start Realtime subscriptions
     startRealtime({
         kpi_records: async () => { await loadAndRender(); showRoleButtons(); },
-        forest_prices: async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); },
-        forest_inventory: async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); },
+        forest_prices: async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
+        forest_inventory: async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
         harvesting_plan_fact: async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
         harvesting_zsu: async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
         market_prices: async () => { await loadMarketDataAndRender(); await renderExecutiveDashboard(); }
@@ -224,6 +235,11 @@ window.closeDataManage = closeDataManage;
 window.openDashboardsPage = () => { switchPage('builder'); initDashboardList($('builderContent')); };
 window.openApiSystemPage = () => { switchPage('api-system'); renderApiSystemPage(); };
 window.openGisPage = () => { switchPage('gis'); renderGisMap(); };
+window.openGisAdmin = openGisAdmin;
+window.closeGisAdmin = closeGisAdmin;
+window.saveGisAdmin = saveGisAdmin;
+window.addNewOffice = addNewOffice;
+window.closeGisDrilldown = closeGisDrilldown;
 
 // ===== Data Management action handlers =====
 window.clearKpiData = async () => {
@@ -405,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.chart-card.fullscreen').forEach(c => c.classList.remove('fullscreen'));
-            closeDrillDown(); closeTargetModal(); closeFormatHelp(); closeViewerAccess(); closeDataManage();
+            closeDrillDown(); closeTargetModal(); closeFormatHelp(); closeViewerAccess(); closeDataManage(); closeGisAdmin();
         }
     });
 

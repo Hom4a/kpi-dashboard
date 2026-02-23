@@ -1,24 +1,26 @@
 // ===== GIS Map Renderer =====
-// Interactive Leaflet map showing harvesting plan execution by regional office
+// Interactive Leaflet map showing all KPI metrics by regional office
 import { fmt } from '../utils.js';
+import { pricesData, inventoryData } from '../forest/state-forest.js';
 import { planFactData, zsuData } from '../harvesting/state-harvesting.js';
-import { OFFICES_GEOJSON, OFFICE_CENTERS } from './gis-data.js';
+import { OFFICES_GEOJSON, getOfficeCenters, getBranchToOffice, fuzzyMatchBranch, getOfficeOblasts } from './gis-data.js';
+import { regionalOffices, setGisMetrics } from './state-gis.js';
 import { getRegionColor, renderLegend, renderRegionDetail } from './gis-controls.js';
+import { renderGisSummary } from './gis-summary.js';
 
 let _map = null;
 let _geoLayer = null;
-let _initialized = false;
+let _labelMarkers = [];
 
 export function renderGisMap() {
     const container = document.getElementById('gisMap');
     if (!container) return;
 
-    // Build metrics from harvesting state
     const metrics = buildRegionMetrics();
+    setGisMetrics(metrics);
 
     // Initialize map once
     if (!_map) {
-        // Check if Leaflet is loaded
         if (typeof L === 'undefined') {
             container.innerHTML = '<p style="padding:40px;text-align:center;color:var(--text2)">Leaflet.js не завантажено</p>';
             return;
@@ -33,20 +35,16 @@ export function renderGisMap() {
             maxZoom: 10
         });
 
-        // Dark tile layer matching dashboard theme
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 12,
             attribution: '&copy; OpenStreetMap'
         }).addTo(_map);
-
-        _initialized = true;
     }
 
-    // Remove previous layer
-    if (_geoLayer) {
-        _map.removeLayer(_geoLayer);
-        _geoLayer = null;
-    }
+    // Remove previous layers
+    if (_geoLayer) { _map.removeLayer(_geoLayer); _geoLayer = null; }
+    _labelMarkers.forEach(m => _map.removeLayer(m));
+    _labelMarkers = [];
 
     // Add GeoJSON layer
     _geoLayer = L.geoJSON(OFFICES_GEOJSON, {
@@ -66,38 +64,44 @@ export function renderGisMap() {
             const name = feature.properties.name;
             const m = metrics[name];
 
-            // Tooltip
-            const tooltipHtml = m
-                ? `<b>${name}</b><br>План: ${m.planPct.toFixed(1)}%<br>Заготовлено: ${fmt(m.harvested / 1000, 1)} тис.м³`
-                : `<b>${name}</b><br>Немає даних`;
+            // Rich tooltip with all metrics
+            let tooltipHtml;
+            if (m) {
+                tooltipHtml = `<b>${name}</b>`;
+                if (m.annualPlan > 0) tooltipHtml += `<br>План: ${m.planPct.toFixed(1)}%`;
+                if (m.harvested > 0) tooltipHtml += `<br>Заготовлено: ${fmt(m.harvested / 1000, 1)} тис.м\u00B3`;
+                if (m.avgPrice > 0) tooltipHtml += `<br>Сер. ціна: ${fmt(m.avgPrice, 0)} грн/м\u00B3`;
+                if (m.inventory > 0) tooltipHtml += `<br>Залишки: ${fmt(m.inventory / 1000, 1)} тис.м\u00B3`;
+                if (m.zsuDeclared > 0) tooltipHtml += `<br>ЗСУ: ${m.zsuPct.toFixed(0)}%`;
+            } else {
+                tooltipHtml = `<b>${name}</b><br>Немає даних`;
+            }
 
-            layer.bindTooltip(tooltipHtml, {
-                sticky: true,
-                className: 'gis-tooltip'
-            });
+            layer.bindTooltip(tooltipHtml, { sticky: true, className: 'gis-tooltip' });
 
-            // Click → details
+            // Click → drill-down
             layer.on('click', () => {
+                // Show detail
+                const placeholder = document.getElementById('gisRegionPlaceholder');
+                if (placeholder) placeholder.style.display = 'none';
                 renderRegionDetail('gisRegionDetail', m);
+
+                // Highlight
                 if (_geoLayer) _geoLayer.resetStyle();
                 layer.setStyle({ weight: 3, color: '#4A9D6F', fillOpacity: 0.7 });
             });
 
-            // Hover
-            layer.on('mouseover', () => {
-                layer.setStyle({ fillOpacity: 0.7, weight: 2 });
-            });
-            layer.on('mouseout', () => {
-                if (_geoLayer) _geoLayer.resetStyle(layer);
-            });
+            layer.on('mouseover', () => { layer.setStyle({ fillOpacity: 0.7, weight: 2 }); });
+            layer.on('mouseout', () => { if (_geoLayer) _geoLayer.resetStyle(layer); });
         }
     }).addTo(_map);
 
     // Add office labels
-    for (const [name, center] of Object.entries(OFFICE_CENTERS)) {
+    const officeCenters = getOfficeCenters();
+    for (const [name, center] of Object.entries(officeCenters)) {
         const m = metrics[name];
-        const pct = m ? m.planPct.toFixed(0) + '%' : '—';
-        L.marker(center, {
+        const pct = m && m.annualPlan > 0 ? m.planPct.toFixed(0) + '%' : '\u2014';
+        const marker = L.marker(center, {
             icon: L.divIcon({
                 className: 'gis-label',
                 html: `<div style="text-align:center;color:#fff;font-size:11px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.8)">${name.replace(' ЛО', '')}<br><span style="font-size:14px">${pct}</span></div>`,
@@ -105,39 +109,44 @@ export function renderGisMap() {
                 iconAnchor: [50, 15]
             })
         }).addTo(_map);
+        _labelMarkers.push(marker);
     }
 
     renderLegend('gisLegend');
+    renderGisSummary(metrics);
 
-    // Fix map size when container becomes visible
-    setTimeout(() => {
-        if (_map) _map.invalidateSize();
-    }, 200);
+    setTimeout(() => { if (_map) _map.invalidateSize(); }, 200);
 }
 
 function buildRegionMetrics() {
     const metrics = {};
+    const branchMap = getBranchToOffice();
 
-    // Plan-Fact data
+    // Initialize all known offices
+    const offices = regionalOffices.length
+        ? regionalOffices
+        : OFFICES_GEOJSON.features.map(f => ({ name: f.properties.name }));
+
+    for (const office of offices) {
+        metrics[office.name] = {
+            name: office.name,
+            oblasts: getOfficeOblasts(office.name),
+            planPct: 0, harvested: 0, annualPlan: 0, ninePlan: 0,
+            zsuPct: 0, zsuDeclared: 0, zsuShipped: 0,
+            avgPrice: 0, totalVolume: 0, totalValue: 0,
+            inventory: 0,
+            priceRecords: 0, inventoryRecords: 0
+        };
+    }
+
+    // Harvesting plan-fact
     planFactData.forEach(r => {
         const name = r.regional_office;
-        if (!name) return;
-        if (!metrics[name]) {
-            metrics[name] = {
-                name,
-                planPct: 0,
-                harvested: 0,
-                annualPlan: 0,
-                ninePlan: 0,
-                zsuPct: 0
-            };
-        }
+        if (!name || !metrics[name]) return;
         metrics[name].annualPlan += (r.annual_plan_total || 0);
         metrics[name].harvested += (r.harvested_total || 0);
         metrics[name].ninePlan += (r.nine_month_plan_total || 0);
     });
-
-    // Calculate plan %
     for (const m of Object.values(metrics)) {
         m.planPct = m.annualPlan > 0 ? (m.harvested / m.annualPlan) * 100 : 0;
     }
@@ -145,23 +154,44 @@ function buildRegionMetrics() {
     // ZSU data
     zsuData.forEach(r => {
         const name = r.regional_office;
-        if (!name) return;
-        if (!metrics[name]) {
-            metrics[name] = { name, planPct: 0, harvested: 0, annualPlan: 0, ninePlan: 0, zsuPct: 0 };
-        }
+        if (!name || !metrics[name]) return;
         const declared = (r.forest_products_declared_m3 || 0) + (r.lumber_declared_m3 || 0);
         const shipped = (r.forest_products_shipped_m3 || 0) + (r.lumber_shipped_m3 || 0);
-        metrics[name].zsuPct = declared > 0 ? (shipped / declared) * 100 : 0;
+        metrics[name].zsuDeclared += declared;
+        metrics[name].zsuShipped += shipped;
+    });
+    for (const m of Object.values(metrics)) {
+        m.zsuPct = m.zsuDeclared > 0 ? (m.zsuShipped / m.zsuDeclared) * 100 : 0;
+    }
+
+    // Forest prices — map branch → office
+    pricesData.forEach(r => {
+        const office = branchMap[r.branch] || fuzzyMatchBranch(r.branch);
+        if (!office || !metrics[office]) return;
+        metrics[office].totalVolume += (r.volume_m3 || 0);
+        metrics[office].totalValue += (r.total_value_uah || 0);
+        metrics[office].priceRecords++;
+    });
+    for (const m of Object.values(metrics)) {
+        m.avgPrice = m.totalVolume > 0 ? m.totalValue / m.totalVolume : 0;
+    }
+
+    // Forest inventory — map branch → office
+    inventoryData.forEach(r => {
+        const office = branchMap[r.branch] || fuzzyMatchBranch(r.branch);
+        if (!office || !metrics[office]) return;
+        metrics[office].inventory += (r.remaining_volume_m3 || 0);
+        metrics[office].inventoryRecords++;
     });
 
     return metrics;
 }
 
 export function resetGisMap() {
-    _initialized = false;
     if (_map) {
         _map.remove();
         _map = null;
         _geoLayer = null;
+        _labelMarkers = [];
     }
 }

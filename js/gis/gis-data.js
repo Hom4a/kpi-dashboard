@@ -1,39 +1,97 @@
-// ===== GIS Data: Regional Office Boundaries & Mapping =====
-// Simplified polygons for 9 regional offices of ДП Ліси України
-// Coordinates are approximate boundaries covering the oblasts in each office
+// ===== GIS Data: Regional Office Boundaries & Dynamic Mapping =====
+// GeoJSON polygons are static (geographic boundaries).
+// Office→oblast mapping is loaded from DB via state-gis.js.
+// Fallback constants are used when DB table is not yet created.
 
-export const REGIONAL_OFFICES = {
-    'Карпатська ЛО': ['Закарпатська', 'Івано-Франківська', 'Чернівецька', 'Львівська'],
-    'Південна ЛО': ['Одеська', 'Миколаївська', 'Херсонська'],
-    'Північна ЛО': ['Чернігівська'],
-    'Подільська ЛО': ['Вінницька', 'Хмельницька', 'Тернопільська'],
-    'Поліська ЛО': ['Волинська', 'Рівненська', 'Житомирська'],
-    'Слобожанська ЛО': ['Харківська', 'Сумська'],
-    'Столична ЛО': ['Київська'],
-    'Центральна ЛО': ['Черкаська', 'Кіровоградська', 'Полтавська'],
-    'Східна ЛО': ['Дніпропетровська', 'Запорізька', 'Донецька', 'Луганська']
+import { regionalOffices } from './state-gis.js';
+
+// ===== Fallback constants (used when DB not available) =====
+export const FALLBACK_OFFICES = {
+    'Карпатська ЛО': { oblasts: ['Закарпатська', 'Івано-Франківська', 'Чернівецька', 'Львівська'], lat: 48.9, lng: 24.0 },
+    'Південна ЛО': { oblasts: ['Одеська', 'Миколаївська', 'Херсонська'], lat: 47.0, lng: 32.5 },
+    'Північна ЛО': { oblasts: ['Чернігівська'], lat: 51.5, lng: 31.3 },
+    'Подільська ЛО': { oblasts: ['Вінницька', 'Хмельницька', 'Тернопільська'], lat: 49.2, lng: 27.5 },
+    'Поліська ЛО': { oblasts: ['Волинська', 'Рівненська', 'Житомирська'], lat: 51.0, lng: 26.5 },
+    'Слобожанська ЛО': { oblasts: ['Харківська', 'Сумська'], lat: 50.5, lng: 35.5 },
+    'Столична ЛО': { oblasts: ['Київська'], lat: 50.4, lng: 30.5 },
+    'Центральна ЛО': { oblasts: ['Черкаська', 'Кіровоградська', 'Полтавська'], lat: 49.0, lng: 33.0 },
+    'Східна ЛО': { oblasts: ['Дніпропетровська', 'Запорізька', 'Донецька', 'Луганська'], lat: 48.0, lng: 36.0 }
 };
 
-export const OBLAST_TO_OFFICE = {};
-for (const [office, oblasts] of Object.entries(REGIONAL_OFFICES)) {
-    for (const o of oblasts) OBLAST_TO_OFFICE[o] = office;
+// ===== Dynamic getters (read from state, fallback to constants) =====
+
+/** Map of office name → [lat, lng] for label placement */
+export function getOfficeCenters() {
+    if (regionalOffices.length) {
+        const map = {};
+        for (const o of regionalOffices) {
+            if (o.center_lat && o.center_lng) map[o.name] = [o.center_lat, o.center_lng];
+        }
+        return map;
+    }
+    // Fallback
+    const map = {};
+    for (const [name, d] of Object.entries(FALLBACK_OFFICES)) map[name] = [d.lat, d.lng];
+    return map;
 }
 
-// Regional center coordinates (for labels and fallback)
-export const OFFICE_CENTERS = {
-    'Карпатська ЛО': [48.9, 24.0],
-    'Південна ЛО': [47.0, 32.5],
-    'Північна ЛО': [51.5, 31.3],
-    'Подільська ЛО': [49.2, 27.5],
-    'Поліська ЛО': [51.0, 26.5],
-    'Слобожанська ЛО': [50.5, 35.5],
-    'Столична ЛО': [50.4, 30.5],
-    'Центральна ЛО': [49.0, 33.0],
-    'Східна ЛО': [48.0, 36.0]
-};
+/** Map of oblast name → office name */
+export function getOblastToOffice() {
+    const map = {};
+    if (regionalOffices.length) {
+        for (const o of regionalOffices) {
+            for (const ob of (o.oblasts || [])) map[ob] = o.name;
+        }
+    } else {
+        for (const [name, d] of Object.entries(FALLBACK_OFFICES)) {
+            for (const ob of d.oblasts) map[ob] = name;
+        }
+    }
+    return map;
+}
 
-// Simplified GeoJSON — 9 regional office polygons
-// Each polygon approximates the combined boundary of oblasts in that office
+/** Map of branch name or alias → office name (for forest data matching) */
+export function getBranchToOffice() {
+    const map = {};
+    if (regionalOffices.length) {
+        for (const o of regionalOffices) {
+            map[o.name] = o.name;
+            for (const alias of (o.branch_aliases || [])) map[alias] = o.name;
+        }
+    } else {
+        for (const name of Object.keys(FALLBACK_OFFICES)) map[name] = name;
+    }
+    return map;
+}
+
+/** Fuzzy match: strip ОУЛ/ЛО suffixes and compare stems */
+export function fuzzyMatchBranch(branchName) {
+    if (!branchName) return null;
+    const branchMap = getBranchToOffice();
+    if (branchMap[branchName]) return branchMap[branchName];
+    const norm = branchName.replace(/\s*(ОУЛ|ЛО|обласне управління лісами)\s*$/i, '').trim().toLowerCase();
+    for (const [alias, office] of Object.entries(branchMap)) {
+        const normAlias = alias.replace(/\s*(ОУЛ|ЛО|обласне управління лісами)\s*$/i, '').trim().toLowerCase();
+        if (normAlias === norm) return office;
+        // Partial stem match (Поліськ → Поліська)
+        if (norm.length > 3 && normAlias.length > 3) {
+            const stem = norm.substring(0, Math.min(norm.length, normAlias.length) - 1);
+            if (normAlias.startsWith(stem) || norm.startsWith(normAlias.substring(0, normAlias.length - 1))) return office;
+        }
+    }
+    return null;
+}
+
+/** Get all oblasts for a given office name */
+export function getOfficeOblasts(officeName) {
+    if (regionalOffices.length) {
+        const o = regionalOffices.find(r => r.name === officeName);
+        return o ? (o.oblasts || []) : [];
+    }
+    return FALLBACK_OFFICES[officeName]?.oblasts || [];
+}
+
+// ===== Static GeoJSON — 9 regional office polygons =====
 export const OFFICES_GEOJSON = {
     type: 'FeatureCollection',
     features: [

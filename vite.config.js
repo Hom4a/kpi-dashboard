@@ -27,7 +27,11 @@ export default defineConfig({
           gis: [
             './js/gis/render-gis.js',
             './js/gis/gis-data.js',
-            './js/gis/gis-controls.js'
+            './js/gis/gis-controls.js',
+            './js/gis/gis-summary.js',
+            './js/gis/gis-admin.js',
+            './js/gis/state-gis.js',
+            './js/gis/db-gis.js'
           ]
         }
       }

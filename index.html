@@ -621,17 +621,69 @@
         <!-- GIS Map page -->
         <div class="page-section" id="pageGis">
             <div id="gisContent">
+                <!-- Header -->
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
                     <div>
                         <h3 style="color:var(--text1);font-size:16px;font-weight:700;margin:0">GIS Карта регіональних управлінь</h3>
-                        <p style="color:var(--text2);font-size:12px;margin:4px 0 0">Виконання плану заготівлі по обласних управліннях</p>
+                        <p style="color:var(--text2);font-size:12px;margin:4px 0 0">Зведені показники по обласних управліннях</p>
                     </div>
-                    <div id="gisLegend"></div>
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <div id="gisLegend"></div>
+                        <button id="btnGisAdmin" class="btn btn-sm" style="display:none" onclick="openGisAdmin()">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                            Управління ЛО
+                        </button>
+                    </div>
                 </div>
-                <div id="gisMap" style="width:100%;height:500px;border-radius:12px;overflow:hidden;border:1px solid var(--border)"></div>
+
+                <!-- Summary KPI cards -->
+                <div class="kpi-grid" id="gisSummaryKpis" style="margin-bottom:16px"></div>
+
+                <!-- Map + Sidebar layout -->
+                <div class="gis-map-layout">
+                    <div class="gis-map-col">
+                        <div id="gisMap" style="width:100%;height:500px;border-radius:12px;overflow:hidden;border:1px solid var(--border)"></div>
+                    </div>
+                    <div class="gis-sidebar-col" id="gisSidebar">
+                        <div class="glass" style="padding:14px">
+                            <div style="font-size:12px;font-weight:600;color:var(--primary);margin-bottom:8px">Потребують уваги</div>
+                            <div id="gisAlerts" style="display:flex;flex-direction:column;gap:6px"></div>
+                        </div>
+                        <div class="glass" style="padding:14px">
+                            <div style="font-size:12px;font-weight:600;color:var(--primary);margin-bottom:8px">Порівняння регіонів</div>
+                            <div class="chart-wrap" id="wrapGisComparison" style="height:260px"><canvas id="cGisComparison"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drill-down panel -->
                 <div class="glass chart-card" style="margin-top:20px">
                     <div class="chart-hdr"><div><h3>Деталі регіону</h3><small>Оберіть регіон на карті</small></div></div>
-                    <div id="gisRegionDetail" style="padding:16px;color:var(--text2);font-size:13px">
+                    <div id="gisRegionDetail" style="display:none">
+                        <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 16px">
+                            <div>
+                                <span id="gisDrillTitle" style="font-size:16px;font-weight:700;color:var(--text)"></span>
+                                <span id="gisDrillOblasts" style="font-size:11px;color:var(--text3);margin-left:8px"></span>
+                            </div>
+                            <button class="btn btn-sm" onclick="closeGisDrilldown()">Закрити</button>
+                        </div>
+                        <div class="kpi-grid" id="gisDrillKpis" style="padding:0 16px"></div>
+                        <div class="chart-row cols-2" style="margin-top:16px;padding:0 16px">
+                            <div class="glass chart-card">
+                                <div class="chart-hdr"><div><h3>Ціни по породах</h3><small>Середньозважені, грн/м³</small></div></div>
+                                <div class="chart-wrap" id="wrapGisDrillPrice" style="height:220px"><canvas id="cGisDrillPrice"></canvas></div>
+                            </div>
+                            <div class="glass chart-card">
+                                <div class="chart-hdr"><div><h3>Залишки по породах</h3><small>тис.м³</small></div></div>
+                                <div class="chart-wrap" id="wrapGisDrillInv" style="height:220px"><canvas id="cGisDrillInv"></canvas></div>
+                            </div>
+                        </div>
+                        <div class="glass chart-card" style="margin-top:16px;margin-left:16px;margin-right:16px">
+                            <div class="chart-hdr"><div><h3>Деталі по продукції</h3><small>Агрегація по продукції для обраного ЛО</small></div></div>
+                            <div class="tbl-wrap" id="gisDrillTable" style="padding:0 12px 12px"></div>
+                        </div>
+                    </div>
+                    <div id="gisRegionPlaceholder" style="padding:16px;color:var(--text2);font-size:13px">
                         Натисніть на регіон для перегляду деталей
                     </div>
                 </div>
@@ -714,6 +766,20 @@
         <h3>Управління користувачами</h3>
         <div id="viewerAccessList" style="display:flex;flex-direction:column;gap:2px"></div>
         <button class="btn" style="margin-top:16px" onclick="saveViewerAccess()">Зберегти всі зміни</button>
+    </div>
+</div>
+
+<!-- GIS Admin modal -->
+<div class="modal-overlay" id="gisAdminModal">
+    <div class="modal" style="max-width:750px;max-height:85vh;overflow-y:auto">
+        <button class="modal-close" onclick="closeGisAdmin()">&times;</button>
+        <h3>Управління регіональними управліннями</h3>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:16px">Налаштування ЛО, областей та аліасів філій для карти</p>
+        <div id="gisAdminList" style="display:flex;flex-direction:column;gap:12px"></div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="btn" onclick="saveGisAdmin()">Зберегти все</button>
+            <button class="btn btn-sm" onclick="addNewOffice()">+ Додати ЛО</button>
+        </div>
     </div>
 </div>
 
