@@ -155,13 +155,13 @@ async function loadMarketDataAndRender() {
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
-setAuthLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); });
+setAuthLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); });
 setHideButtonsCallback(hideButtons);
 setFileHandlerLoadAndRender(async () => { await loadAndRender(); showRoleButtons(); });
-setLoadForestCallback(async () => { await loadForestDataAndRender(); renderExecutiveDashboard(); });
-setLoadHarvestingCallback(async () => { await loadHarvestingDataAndRender(); renderExecutiveDashboard(); });
-setLoadMarketCallback(async () => { await loadMarketDataAndRender(); renderExecutiveDashboard(); });
-setAutoRefreshLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); renderExecutiveDashboard(); showRoleButtons(); });
+setLoadForestCallback(async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); });
+setLoadHarvestingCallback(async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); });
+setLoadMarketCallback(async () => { await loadMarketDataAndRender(); await renderExecutiveDashboard(); });
+setAutoRefreshLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); });
 setRenderForestCallback(renderForestDashboard);
 setRenderHarvestingCallback(renderHarvestingDashboard);
 setRenderMarketCallback(renderMarketDashboard);
@@ -172,7 +172,7 @@ setDataEntryReloadCallback(async (targetTable) => {
     else if (targetTable === 'forest_prices' || targetTable === 'forest_inventory') { await loadForestDataAndRender(); }
     else if (targetTable === 'harvesting_plan_fact' || targetTable === 'harvesting_zsu') { await loadHarvestingDataAndRender(); }
     else if (['market_prices', 'market_prices_ua', 'market_price_history', 'eur_rates'].includes(targetTable)) { await loadMarketDataAndRender(); }
-    renderExecutiveDashboard();
+    await renderExecutiveDashboard();
 });
 
 // ===== Expose global functions for onclick handlers in HTML =====
@@ -230,7 +230,7 @@ window.clearPrices = async () => {
     try {
         await clearPricesData();
         await loadForestDataAndRender();
-        renderExecutiveDashboard();
+        await renderExecutiveDashboard();
         toast('Дані цін очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
@@ -242,7 +242,7 @@ window.clearInventory = async () => {
     try {
         await clearInventoryData();
         await loadForestDataAndRender();
-        renderExecutiveDashboard();
+        await renderExecutiveDashboard();
         toast('Дані залишків очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
@@ -254,7 +254,7 @@ window.clearPlanFact = async () => {
     try {
         await clearPlanFactData();
         await loadHarvestingDataAndRender();
-        renderExecutiveDashboard();
+        await renderExecutiveDashboard();
         toast('Дані план-факт очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
@@ -266,7 +266,7 @@ window.clearZsu = async () => {
     try {
         await clearZsuData();
         await loadHarvestingDataAndRender();
-        renderExecutiveDashboard();
+        await renderExecutiveDashboard();
         toast('Дані ЗСУ очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
@@ -280,7 +280,7 @@ window.clearMarketData = async () => {
         await clearMarketDB();
         setMarketPrices([]); setMarketUaDetail([]); setMarketHistory([]); setEurRates([]);
         await loadMarketDataAndRender();
-        renderExecutiveDashboard();
+        await renderExecutiveDashboard();
         toast('Дані ринкових цін очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
@@ -292,7 +292,7 @@ window.undoLastMarketUpload = async () => {
     try {
         await undoMarketDB();
         await loadMarketDataAndRender();
-        renderExecutiveDashboard();
+        await renderExecutiveDashboard();
         toast('Останнє завантаження ринкових цін скасовано');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }

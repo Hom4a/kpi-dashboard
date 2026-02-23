@@ -1,16 +1,126 @@
 // ===== Executive Dashboard State =====
 // Aggregates data from all sources: KPI, Forest, Harvesting
+// Supports server-side RPC (get_executive_metrics) with client-side fallback
 
 import { allData, targets } from '../state.js';
 import { pricesData, inventoryData } from '../forest/state-forest.js';
 import { planFactData, zsuData } from '../harvesting/state-harvesting.js';
 import { marketPrices, marketMeta } from '../market/state-market.js';
+import { sb } from '../config.js';
 
 export let execCharts = {};
 export function setExecCharts(v) { execCharts = v; }
 
-/** Compute all executive metrics from existing data stores */
-export function computeExecMetrics() {
+/**
+ * Fetch executive metrics from server RPC (fast SQL aggregation).
+ * Returns null if RPC is not available (function not deployed).
+ */
+async function fetchFromRPC() {
+    try {
+        const { data, error } = await sb.rpc('get_executive_metrics');
+        if (error || !data) return null;
+        return data;
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * Transform RPC result into the format expected by render-executive.js.
+ * Market comparison and alerts are still computed client-side
+ * (market data is small and needs per-species breakdown).
+ */
+function transformRpcResult(rpc) {
+    const pf = rpc.pfSummary || {};
+    const zsu = rpc.zsuSummary || {};
+
+    const realizedTotal = rpc.realizedTotal || 0;
+    const harvestedTotal = rpc.harvestedTotal || 0;
+    const cashTotal = rpc.cashTotal || 0;
+    const avgPrice = rpc.avgPrice || 0;
+    const inventoryTotal = rpc.inventoryTotal || 0;
+    const pfTotal = { annualPlan: pf.annualPlan || 0, harvested: pf.harvested || 0, ninePlan: pf.ninePlan || 0 };
+    const pctAnnual = pfTotal.annualPlan > 0 ? (pfTotal.harvested / pfTotal.annualPlan) * 100 : 0;
+    const zsuTotalDeclared = zsu.totalDeclared || 0;
+    const zsuTotalShipped = zsu.totalShipped || 0;
+    const zsuPct = zsuTotalDeclared > 0 ? (zsuTotalShipped / zsuTotalDeclared) * 100 : 0;
+
+    // Coverage days from RPC data
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const daysInYear = Math.max(1, Math.floor((now - yearStart) / 86400000));
+    const avgDailyRealized = realizedTotal > 0 ? realizedTotal / daysInYear : 0;
+    const coverageDays = avgDailyRealized > 0 ? Math.round(inventoryTotal / avgDailyRealized) : 0;
+
+    // Scorecard from RPC
+    const scorecard = (rpc.scorecard || []).map(r => ({
+        name: r.name, planPct: r.plan_pct || 0, harvested: r.harvested || 0,
+        avgPrice: 0, inventory: 0, zsuPct: r.zsu_pct || 0
+    }));
+
+    // Market comparison — still client-side (small data)
+    const { marketAvgUa, marketAvgEu, marketDiff, eurRate, marketBySpecies } = computeMarketComparison();
+
+    // Alerts
+    const alerts = buildAlerts(scorecard, avgDailyRealized);
+
+    return {
+        realizedTotal, harvestedTotal, cashTotal, avgPrice, prevAvgPrice: 0,
+        inventoryTotal, coverageDays, zsuTotalShipped, zsuPct,
+        pctAnnual, pfTotal,
+        realizedSpark: rpc.realizedSpark || [],
+        harvestedSpark: rpc.harvestedSpark || [],
+        marketAvgUa, marketAvgEu, marketDiff, eurRate, marketBySpecies,
+        scorecard, monthlyCash: rpc.monthlyCash || [], alerts,
+        targets,
+        hasData: rpc.hasKpi || rpc.hasForest || rpc.hasHarvesting || rpc.hasMarket
+    };
+}
+
+/** Compute market comparison (always client-side — small dataset) */
+function computeMarketComparison() {
+    const countryRows = marketPrices.filter(r => r.row_type === 'country');
+    const avgRow = marketPrices.find(r => r.row_type === 'average');
+    const uaRow = countryRows.find(r => (r.country || '').toLowerCase().includes('україна'));
+    const avgBiz = (row) => {
+        if (!row) return 0;
+        const vals = [row.pine_business, row.spruce_business, row.alder_business, row.birch_business, row.oak_business].filter(v => v > 0);
+        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    };
+    const marketAvgUa = avgBiz(uaRow);
+    const marketAvgEu = avgBiz(avgRow);
+    const marketDiff = marketAvgEu > 0 ? ((marketAvgUa - marketAvgEu) / marketAvgEu) * 100 : 0;
+    const eurRate = marketMeta.eurRate || 0;
+    const speciesKeys = [
+        { key: 'pine_business', label: 'Сосна' },
+        { key: 'spruce_business', label: 'Ялина' },
+        { key: 'alder_business', label: 'Вільха' },
+        { key: 'birch_business', label: 'Береза' },
+        { key: 'oak_business', label: 'Дуб' }
+    ];
+    const marketBySpecies = speciesKeys.map(f => ({
+        label: f.label,
+        uaPrice: uaRow ? (uaRow[f.key] || 0) : 0,
+        euPrice: avgRow ? (avgRow[f.key] || 0) : 0
+    })).filter(d => d.uaPrice > 0 || d.euPrice > 0);
+    return { marketAvgUa, marketAvgEu, marketDiff, eurRate, marketBySpecies };
+}
+
+/**
+ * Compute executive metrics: tries server RPC first, falls back to client-side.
+ * @returns {Promise<object>} metrics object
+ */
+export async function computeExecMetrics() {
+    // Try RPC first (fast SQL aggregation ~10ms)
+    const rpc = await fetchFromRPC();
+    if (rpc) return transformRpcResult(rpc);
+
+    // Fallback: client-side aggregation
+    return computeExecMetricsLocal();
+}
+
+/** Client-side aggregation (original logic, used as fallback) */
+function computeExecMetricsLocal() {
     const now = new Date();
     const yearStart = new Date(now.getFullYear(), 0, 1);
 

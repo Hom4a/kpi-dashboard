@@ -4,8 +4,8 @@ import { MO } from '../state.js';
 import { kill, freshCanvas, makeGrad, drawSparkline } from '../charts-common.js';
 import { computeExecMetrics, execCharts, setExecCharts } from './state-executive.js';
 
-export function renderExecutiveDashboard() {
-    const m = computeExecMetrics();
+export async function renderExecutiveDashboard() {
+    const m = await computeExecMetrics();
 
     if (!m.hasData) {
         show('execEmptyState');
