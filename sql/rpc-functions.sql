@@ -526,7 +526,7 @@ AS $$
             FROM (
                 SELECT country, source_name, row_type,
                     pine_business, spruce_business, alder_business, birch_business, oak_business,
-                    pine_firewood, spruce_firewood, alder_firewood, birch_firewood, oak_firewood,
+                    pine_firewood, spruce_firewood, birch_firewood,
                     avg_price
                 FROM market_prices
                 WHERE (p_period IS NULL OR period = p_period)
