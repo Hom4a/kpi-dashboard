@@ -1,16 +1,18 @@
 // ===== GIS Map Renderer =====
-// Interactive Leaflet map showing all KPI metrics by regional office
+// Interactive Leaflet map showing oblast-level polygons colored by regional office
 import { fmt } from '../utils.js';
 import { pricesData, inventoryData } from '../forest/state-forest.js';
 import { planFactData, zsuData } from '../harvesting/state-harvesting.js';
-import { OFFICES_GEOJSON, getOfficeCenters, getBranchToOffice, fuzzyMatchBranch, getOfficeOblasts } from './gis-data.js';
+import { OFFICES_GEOJSON, getOblastsGeoJSON, getOfficeCenters, getBranchToOffice, fuzzyMatchBranch, getOfficeOblasts } from './gis-data.js';
 import { regionalOffices, setGisMetrics } from './state-gis.js';
 import { getRegionColor, renderLegend, renderRegionDetail } from './gis-controls.js';
 import { renderGisSummary } from './gis-summary.js';
 
 let _map = null;
-let _geoLayer = null;
+let _oblastLayer = null;
+let _loBordersLayer = null;
 let _labelMarkers = [];
+let _selectedOffice = null;
 
 export function renderGisMap() {
     const container = document.getElementById('gisMap');
@@ -42,61 +44,96 @@ export function renderGisMap() {
     }
 
     // Remove previous layers
-    if (_geoLayer) { _map.removeLayer(_geoLayer); _geoLayer = null; }
+    if (_oblastLayer) { _map.removeLayer(_oblastLayer); _oblastLayer = null; }
+    if (_loBordersLayer) { _map.removeLayer(_loBordersLayer); _loBordersLayer = null; }
     _labelMarkers.forEach(m => _map.removeLayer(m));
     _labelMarkers = [];
+    _selectedOffice = null;
 
-    // Add GeoJSON layer
-    _geoLayer = L.geoJSON(OFFICES_GEOJSON, {
+    // Layer 1: Oblast polygons (colored by parent ЛО)
+    const oblastsGeo = getOblastsGeoJSON();
+    _oblastLayer = L.geoJSON(oblastsGeo, {
         style: (feature) => {
-            const name = feature.properties.name;
-            const m = metrics[name];
+            const officeName = feature.properties.office;
+            const m = officeName ? metrics[officeName] : null;
             const pct = m ? m.planPct : 0;
             return {
-                fillColor: getRegionColor(pct),
-                fillOpacity: 0.45,
-                weight: 1.5,
-                color: 'rgba(255,255,255,0.4)',
+                fillColor: officeName ? getRegionColor(pct) : '#444',
+                fillOpacity: 0.4,
+                weight: 1,
+                color: 'rgba(255,255,255,0.2)',
                 dashArray: ''
             };
         },
         onEachFeature: (feature, layer) => {
-            const name = feature.properties.name;
-            const m = metrics[name];
+            const oblastName = feature.properties.name;
+            const officeName = feature.properties.office;
+            const m = officeName ? metrics[officeName] : null;
 
-            // Rich tooltip with all metrics
-            let tooltipHtml;
-            if (m) {
-                tooltipHtml = `<b>${name}</b>`;
-                if (m.annualPlan > 0) tooltipHtml += `<br>План: ${m.planPct.toFixed(1)}%`;
-                if (m.harvested > 0) tooltipHtml += `<br>Заготовлено: ${fmt(m.harvested / 1000, 1)} тис.м\u00B3`;
-                if (m.avgPrice > 0) tooltipHtml += `<br>Сер. ціна: ${fmt(m.avgPrice, 0)} грн/м\u00B3`;
-                if (m.inventory > 0) tooltipHtml += `<br>Залишки: ${fmt(m.inventory / 1000, 1)} тис.м\u00B3`;
-                if (m.zsuDeclared > 0) tooltipHtml += `<br>ЗСУ: ${m.zsuPct.toFixed(0)}%`;
+            // Tooltip: oblast name + ЛО + metrics
+            let tooltipHtml = `<b>${oblastName} обл.</b>`;
+            if (officeName) {
+                tooltipHtml += `<br><i style="color:var(--primary)">${officeName}</i>`;
+                if (m) {
+                    if (m.annualPlan > 0) tooltipHtml += `<br>План: ${m.planPct.toFixed(1)}%`;
+                    if (m.harvested > 0) tooltipHtml += `<br>Заготовлено: ${fmt(m.harvested / 1000, 1)} тис.м\u00B3`;
+                    if (m.avgPrice > 0) tooltipHtml += `<br>Сер. ціна: ${fmt(m.avgPrice, 0)} грн/м\u00B3`;
+                    if (m.inventory > 0) tooltipHtml += `<br>Залишки: ${fmt(m.inventory / 1000, 1)} тис.м\u00B3`;
+                    if (m.zsuDeclared > 0) tooltipHtml += `<br>ЗСУ: ${m.zsuPct.toFixed(0)}%`;
+                }
             } else {
-                tooltipHtml = `<b>${name}</b><br>Немає даних`;
+                tooltipHtml += `<br><i style="color:var(--text3)">Не призначено ЛО</i>`;
             }
 
             layer.bindTooltip(tooltipHtml, { sticky: true, className: 'gis-tooltip' });
 
-            // Click → drill-down
+            // Click → drill-down for parent ЛО
             layer.on('click', () => {
+                if (!officeName || !m) return;
+
+                _selectedOffice = officeName;
+
                 // Show detail
                 const placeholder = document.getElementById('gisRegionPlaceholder');
                 if (placeholder) placeholder.style.display = 'none';
                 renderRegionDetail('gisRegionDetail', m);
 
-                // Highlight
-                if (_geoLayer) _geoLayer.resetStyle();
-                layer.setStyle({ weight: 3, color: '#4A9D6F', fillOpacity: 0.7 });
+                // Highlight all oblasts of this ЛО
+                _oblastLayer.eachLayer(l => {
+                    if (l.feature.properties.office === officeName) {
+                        l.setStyle({ weight: 2, color: '#4A9D6F', fillOpacity: 0.65 });
+                    } else {
+                        _oblastLayer.resetStyle(l);
+                    }
+                });
             });
 
-            layer.on('mouseover', () => { layer.setStyle({ fillOpacity: 0.7, weight: 2 }); });
-            layer.on('mouseout', () => { if (_geoLayer) _geoLayer.resetStyle(layer); });
+            layer.on('mouseover', () => {
+                if (_selectedOffice !== officeName) {
+                    layer.setStyle({ fillOpacity: 0.6, weight: 1.5 });
+                }
+            });
+            layer.on('mouseout', () => {
+                if (_selectedOffice !== officeName) {
+                    _oblastLayer.resetStyle(layer);
+                }
+            });
         }
     }).addTo(_map);
 
-    // Add office labels
+    // Layer 2: ЛО borders overlay (thicker borders between regional offices)
+    _loBordersLayer = L.geoJSON(OFFICES_GEOJSON, {
+        style: {
+            fill: false,
+            weight: 2.5,
+            color: 'rgba(255,255,255,0.45)',
+            dashArray: '',
+            interactive: false
+        },
+        interactive: false
+    }).addTo(_map);
+
+    // Layer 3: Office labels
     const officeCenters = getOfficeCenters();
     for (const [name, center] of Object.entries(officeCenters)) {
         const m = metrics[name];
@@ -107,7 +144,8 @@ export function renderGisMap() {
                 html: `<div style="text-align:center;color:#fff;font-size:11px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.8)">${name.replace(' ЛО', '')}<br><span style="font-size:14px">${pct}</span></div>`,
                 iconSize: [100, 30],
                 iconAnchor: [50, 15]
-            })
+            }),
+            interactive: false
         }).addTo(_map);
         _labelMarkers.push(marker);
     }
@@ -191,7 +229,9 @@ export function resetGisMap() {
     if (_map) {
         _map.remove();
         _map = null;
-        _geoLayer = null;
+        _oblastLayer = null;
+        _loBordersLayer = null;
         _labelMarkers = [];
+        _selectedOffice = null;
     }
 }

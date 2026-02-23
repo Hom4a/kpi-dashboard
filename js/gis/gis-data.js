@@ -1,9 +1,10 @@
 // ===== GIS Data: Regional Office Boundaries & Dynamic Mapping =====
-// GeoJSON polygons are static (geographic boundaries).
+// Oblast-level GeoJSON for real administrative borders.
 // Office→oblast mapping is loaded from DB via state-gis.js.
 // Fallback constants are used when DB table is not yet created.
 
 import { regionalOffices } from './state-gis.js';
+import OBLASTS_RAW from '../../data/ukraine-oblasts.json';
 
 // ===== Fallback constants (used when DB not available) =====
 export const FALLBACK_OFFICES = {
@@ -91,7 +92,24 @@ export function getOfficeOblasts(officeName) {
     return FALLBACK_OFFICES[officeName]?.oblasts || [];
 }
 
-// ===== Static GeoJSON — 9 regional office polygons =====
+// ===== Oblast-level GeoJSON with office annotation =====
+
+/** Returns GeoJSON with each feature annotated with its parent office name */
+export function getOblastsGeoJSON() {
+    const oblastToOffice = getOblastToOffice();
+    return {
+        type: 'FeatureCollection',
+        features: OBLASTS_RAW.features.map(f => ({
+            ...f,
+            properties: {
+                ...f.properties,
+                office: oblastToOffice[f.properties.name] || null
+            }
+        }))
+    };
+}
+
+// ===== Static GeoJSON — 9 regional office polygons (used for ЛО border overlay) =====
 export const OFFICES_GEOJSON = {
     type: 'FeatureCollection',
     features: [
