@@ -4,6 +4,7 @@ import { $, show, hide, showKpiSkeletons, withTimeout, toast } from './utils.js'
 import { allData, filtered, charts, currentProfile, setAllData, setFiltered, setCharts, setCurrentProfile } from './state.js';
 import { setupChartDefaults } from './charts-common.js';
 import { startAutoRefresh, stopAutoRefresh } from './auto-refresh.js';
+import { stopRealtime } from './realtime.js';
 
 let _authInProgress = false;
 let _authCompleted = false;
@@ -24,6 +25,7 @@ const PAGE_ACCESS = {
     'data-entry':['admin', 'editor', 'accountant', 'hr', 'forester', 'operator'],
     builder:     ['admin', 'analyst'],
     'api-system':['admin', 'analyst'],
+    gis:         ['admin', 'director', 'analyst', 'editor', 'forester'],
 };
 
 // Roles that can upload files
@@ -100,6 +102,7 @@ export async function handleLogin() {
 
 export async function handleLogout() {
     stopAutoRefresh();
+    stopRealtime();
     _authCompleted = false;
     await sb.auth.signOut();
     setCurrentProfile(null); setAllData([]); setFiltered([]);

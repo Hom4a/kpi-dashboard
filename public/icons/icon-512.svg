@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#0F1419"/>
+  <g transform="translate(256,120)">
+    <polygon points="0,-90 -80,65 80,65" fill="#4A9D6F" opacity="0.9"/>
+    <polygon points="0,-55 -58,50 58,50" fill="#5BB880" opacity="0.8"/>
+    <rect x="-10" y="65" width="20" height="40" rx="4" fill="#3D7A54"/>
+  </g>
+  <text x="256" y="360" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="96" font-weight="700" fill="#4A9D6F">LU</text>
+  <text x="256" y="420" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="36" font-weight="500" fill="#8B9AAF">KPI Dashboard</text>
+</svg>

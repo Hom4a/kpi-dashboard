@@ -12,7 +12,8 @@ const pageMap = {
     executive: 'pageExecutive',
     'data-entry': 'pageDataEntry',
     builder: 'pageBuilder',
-    'api-system': 'pageApiSystem'
+    'api-system': 'pageApiSystem',
+    gis: 'pageGis'
 };
 
 const pageIdMap = {};
@@ -23,7 +24,7 @@ const filterBarMap = {
     volumes: 'filterBar', finance: 'filterBar',
     forest: 'forestFilterBar', harvesting: 'harvestingFilterBar',
     market: 'marketFilterBar',
-    executive: null, 'data-entry': null, builder: null, 'api-system': null
+    executive: null, 'data-entry': null, builder: null, 'api-system': null, gis: null
 };
 
 const ALL_FILTER_BARS = ['filterBar', 'forestFilterBar', 'harvestingFilterBar', 'marketFilterBar'];
@@ -55,6 +56,13 @@ export function switchPage(page) {
     requestAnimationFrame(() => {
         Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} });
     });
+
+    // Invalidate Leaflet map when GIS page becomes visible
+    if (page === 'gis') {
+        import('./gis/render-gis.js').then(m => {
+            setTimeout(() => m.renderGisMap(), 150);
+        });
+    }
 }
 
 export function updateMobileNav(page) {

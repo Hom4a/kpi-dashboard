@@ -1,6 +1,8 @@
 // ===== Auto-Refresh & Threshold Alerts =====
+// Polling fallback when Realtime is not available
 import { allData, targets, autoRefreshInterval, setAutoRefreshInterval } from './state.js';
 import { fmt, toast } from './utils.js';
+import { isRealtimeConnected } from './realtime.js';
 
 let _loadAndRenderFn = null;
 let _refreshInProgress = false;
@@ -10,7 +12,7 @@ export function isRefreshInProgress() { return _refreshInProgress; }
 export function startAutoRefresh() {
     stopAutoRefresh();
     const interval = setInterval(async () => {
-        if (_refreshInProgress) return;
+        if (_refreshInProgress || isRealtimeConnected()) return;
         _refreshInProgress = true;
         try { if (_loadAndRenderFn) await _loadAndRenderFn(); }
         catch (e) { console.error('Auto-refresh error:', e); }

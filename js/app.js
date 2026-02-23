@@ -38,6 +38,12 @@ import { initDataEntry, setDataEntryReloadCallback } from './data-entry/data-ent
 import { initDashboardList } from './builder/dashboard-list.js';
 // API System modules
 import { renderApiSystemPage } from './api-system/render-api.js';
+// PWA
+import { registerSW, initInstallPrompt } from './pwa.js';
+// Realtime
+import { startRealtime } from './realtime.js';
+// GIS
+import { renderGisMap } from './gis/render-gis.js';
 
 // ===== Show buttons based on role (called after ALL data loads) =====
 function showRoleButtons() {
@@ -157,11 +163,27 @@ async function loadMarketDataAndRender() {
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
-setAuthLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); renderApiSystemPage(); });
+setAuthLoadAndRender(async () => {
+    await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]);
+    await renderExecutiveDashboard();
+    showRoleButtons();
+    initDataEntry();
+    initDashboardList($('builderContent'));
+    renderApiSystemPage();
+    // Start Realtime subscriptions
+    startRealtime({
+        kpi_records: async () => { await loadAndRender(); showRoleButtons(); },
+        forest_prices: async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); },
+        forest_inventory: async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); },
+        harvesting_plan_fact: async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
+        harvesting_zsu: async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
+        market_prices: async () => { await loadMarketDataAndRender(); await renderExecutiveDashboard(); }
+    });
+});
 setHideButtonsCallback(hideButtons);
 setFileHandlerLoadAndRender(async () => { await loadAndRender(); showRoleButtons(); });
 setLoadForestCallback(async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); });
-setLoadHarvestingCallback(async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); });
+setLoadHarvestingCallback(async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); });
 setLoadMarketCallback(async () => { await loadMarketDataAndRender(); await renderExecutiveDashboard(); });
 setAutoRefreshLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); });
 setRenderForestCallback(renderForestDashboard);
@@ -201,6 +223,7 @@ window.openDataManage = openDataManage;
 window.closeDataManage = closeDataManage;
 window.openDashboardsPage = () => { switchPage('builder'); initDashboardList($('builderContent')); };
 window.openApiSystemPage = () => { switchPage('api-system'); renderApiSystemPage(); };
+window.openGisPage = () => { switchPage('gis'); renderGisMap(); };
 
 // ===== Data Management action handlers =====
 window.clearKpiData = async () => {
@@ -395,6 +418,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Mobile swipe
     initSwipeGestures();
+
+    // PWA
+    registerSW();
+    initInstallPrompt();
 
     // Auth listener
     initAuthListener();

@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ДП Ліси України — Панель KPI</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4A9D6F">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icons/icon-192.svg">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
@@ -12,6 +17,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack.min.css">
     <script src="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack-all.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     // CDN library check
     window._libCheck = { xlsx: typeof XLSX !== 'undefined', chart: typeof Chart !== 'undefined', supabase: typeof supabase !== 'undefined', gridstack: typeof GridStack !== 'undefined' };
@@ -27,6 +36,7 @@
     <link rel="stylesheet" href="css/data-entry.css">
     <link rel="stylesheet" href="css/builder.css">
     <link rel="stylesheet" href="css/api-system.css">
+    <link rel="stylesheet" href="css/gis.css">
 </head>
 <body>
 
@@ -88,6 +98,10 @@
         <div class="nav-item" data-page="api-system" onclick="switchPage('api-system')">
             <svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
             <span>API</span>
+        </div>
+        <div class="nav-item" data-page="gis" onclick="switchPage('gis')">
+            <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Карта</span>
         </div>
     </div>
     <div class="sidebar-bottom">
@@ -603,6 +617,26 @@
                 </div>
             </div>
         </div>
+
+        <!-- GIS Map page -->
+        <div class="page-section" id="pageGis">
+            <div id="gisContent">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h3 style="color:var(--text1);font-size:16px;font-weight:700;margin:0">GIS Карта регіональних управлінь</h3>
+                        <p style="color:var(--text2);font-size:12px;margin:4px 0 0">Виконання плану заготівлі по обласних управліннях</p>
+                    </div>
+                    <div id="gisLegend"></div>
+                </div>
+                <div id="gisMap" style="width:100%;height:500px;border-radius:12px;overflow:hidden;border:1px solid var(--border)"></div>
+                <div class="glass chart-card" style="margin-top:20px">
+                    <div class="chart-hdr"><div><h3>Деталі регіону</h3><small>Оберіть регіон на карті</small></div></div>
+                    <div id="gisRegionDetail" style="padding:16px;color:var(--text2);font-size:13px">
+                        Натисніть на регіон для перегляду деталей
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </main>
 
@@ -731,6 +765,10 @@
             <svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
             <span>API</span>
         </button>
+        <button class="mobile-nav-item" data-page="gis" onclick="switchPage('gis')">
+            <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Карта</span>
+        </button>
         <button class="mobile-nav-item" onclick="openMobileUpload()">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>Дані</span>
@@ -741,6 +779,13 @@
         </button>
     </div>
 </nav>
+
+<!-- PWA Install Banner -->
+<div class="pwa-install-banner" id="pwaInstallBanner" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--card-bg);border:1px solid var(--primary);border-radius:12px;padding:12px 20px;display:none;align-items:center;gap:12px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+    <span style="font-size:13px;color:var(--text1)">Встановити додаток на пристрій?</span>
+    <button class="btn btn-sm" id="pwaInstallBtn" style="background:var(--primary);color:#fff">Додати</button>
+    <button class="icon-btn" id="pwaInstallDismiss" style="font-size:18px">&times;</button>
+</div>
 
 </body>
 </html>

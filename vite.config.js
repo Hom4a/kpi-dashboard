@@ -23,6 +23,11 @@ export default defineConfig({
             './js/data-entry/form-renderer.js',
             './js/data-entry/form-utils.js',
             './js/data-entry/type-editor.js'
+          ],
+          gis: [
+            './js/gis/render-gis.js',
+            './js/gis/gis-data.js',
+            './js/gis/gis-controls.js'
           ]
         }
       }

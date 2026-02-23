@@ -1,0 +1,46 @@
+/* ===== GIS Map Styles ===== */
+#gisMap {
+    background: var(--card-bg);
+}
+
+.gis-tooltip {
+    background: rgba(15, 20, 25, 0.92) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border) !important;
+    color: #e8e8e8 !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    font-family: 'Inter', system-ui, sans-serif !important;
+    font-size: 12px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+    line-height: 1.5 !important;
+}
+
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+    display: none !important;
+}
+
+.gis-label {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    pointer-events: none;
+}
+
+/* Leaflet controls dark theme */
+.leaflet-control-zoom a {
+    background: rgba(15, 20, 25, 0.85) !important;
+    color: #ccc !important;
+    border-color: var(--border) !important;
+}
+.leaflet-control-zoom a:hover {
+    background: rgba(30, 40, 50, 0.95) !important;
+    color: #fff !important;
+}
+
+@media (max-width: 768px) {
+    #gisMap { height: 350px !important; }
+}
