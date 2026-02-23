@@ -3,13 +3,18 @@ import { allData, targets, autoRefreshInterval, setAutoRefreshInterval } from '.
 import { fmt, toast } from './utils.js';
 
 let _loadAndRenderFn = null;
+let _refreshInProgress = false;
 export function setLoadAndRenderCallback(fn) { _loadAndRenderFn = fn; }
+export function isRefreshInProgress() { return _refreshInProgress; }
 
 export function startAutoRefresh() {
     stopAutoRefresh();
     const interval = setInterval(async () => {
+        if (_refreshInProgress) return;
+        _refreshInProgress = true;
         try { if (_loadAndRenderFn) await _loadAndRenderFn(); }
         catch (e) { console.error('Auto-refresh error:', e); }
+        finally { _refreshInProgress = false; }
     }, 5 * 60 * 1000);
     setAutoRefreshInterval(interval);
 }

@@ -155,13 +155,13 @@ async function loadMarketDataAndRender() {
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
-setAuthLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); await loadMarketDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); });
+setAuthLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); renderExecutiveDashboard(); showRoleButtons(); initDataEntry(); initDashboardList($('builderContent')); });
 setHideButtonsCallback(hideButtons);
 setFileHandlerLoadAndRender(async () => { await loadAndRender(); showRoleButtons(); });
 setLoadForestCallback(async () => { await loadForestDataAndRender(); renderExecutiveDashboard(); });
 setLoadHarvestingCallback(async () => { await loadHarvestingDataAndRender(); renderExecutiveDashboard(); });
 setLoadMarketCallback(async () => { await loadMarketDataAndRender(); renderExecutiveDashboard(); });
-setAutoRefreshLoadAndRender(async () => { await loadAndRender(); await loadForestDataAndRender(); await loadHarvestingDataAndRender(); await loadMarketDataAndRender(); renderExecutiveDashboard(); showRoleButtons(); });
+setAutoRefreshLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); renderExecutiveDashboard(); showRoleButtons(); });
 setRenderForestCallback(renderForestDashboard);
 setRenderHarvestingCallback(renderHarvestingDashboard);
 setRenderMarketCallback(renderMarketDashboard);

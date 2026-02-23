@@ -10,7 +10,7 @@ export function renderKPIs() {
     const sumR = real.reduce((s, r) => s + r.value, 0);
     const sumH = harv.reduce((s, r) => s + r.value, 0);
     const avgR = real.length ? sumR / real.length : 0;
-    const maxR = real.length ? Math.max(...real.map(r => r.value)) : 0;
+    const maxR = real.length ? real.reduce((m, r) => r.value > m ? r.value : m, -Infinity) : 0;
     const maxRDate = real.length ? real.reduce((a, b) => b.value > a.value ? b : a, real[0]).date : '';
     const now = filtered.length ? filtered[filtered.length - 1]._date : new Date();
     const cm = now.getMonth(), cy = now.getFullYear();
@@ -192,7 +192,7 @@ export function renderWdChart() {
     const avg = sums.map((s, i) => cnt[i] ? s / cnt[i] : 0);
     const ord = [1, 2, 3, 4, 5, 6, 0];
     const vals = ord.map(i => avg[i]), labels = ord.map(i => WD[i]);
-    const mx = Math.max(...vals);
+    const mx = vals.reduce((a, b) => a > b ? a : b, 0);
     const pc = themeColor('--primary'), rc = themeColor('--rose');
     const colors = vals.map(v => v === mx ? pc + 'B3' : v < mx * 0.15 ? rc + '66' : pc + '40');
     charts['wd'] = new Chart(ctx, {

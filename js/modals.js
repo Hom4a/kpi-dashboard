@@ -130,18 +130,31 @@ function generatePassword() {
     const digits = '23456789';
     const special = '!@#$%&*';
     const all = upper + lower + digits + special;
+    const rnd = new Uint8Array(14);
+    crypto.getRandomValues(rnd);
     let pwd = [
-        upper[Math.floor(Math.random() * upper.length)],
-        lower[Math.floor(Math.random() * lower.length)],
-        digits[Math.floor(Math.random() * digits.length)],
-        special[Math.floor(Math.random() * special.length)]
+        upper[rnd[0] % upper.length],
+        lower[rnd[1] % lower.length],
+        digits[rnd[2] % digits.length],
+        special[rnd[3] % special.length]
     ];
-    for (let i = 4; i < 12; i++) pwd.push(all[Math.floor(Math.random() * all.length)]);
+    for (let i = 4; i < 14; i++) pwd.push(all[rnd[i] % all.length]);
+    // Fisher-Yates shuffle with crypto randomness
+    const shuffleBytes = new Uint8Array(pwd.length);
+    crypto.getRandomValues(shuffleBytes);
     for (let i = pwd.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = shuffleBytes[i] % (i + 1);
         [pwd[i], pwd[j]] = [pwd[j], pwd[i]];
     }
     return pwd.join('');
+}
+
+/** Escape HTML to prevent XSS when inserting user data into innerHTML */
+function esc(text) {
+    if (!text) return '';
+    const d = document.createElement('div');
+    d.textContent = String(text);
+    return d.innerHTML;
 }
 
 function mapSignUpError(msg) {
@@ -267,7 +280,7 @@ export async function openViewerAccess() {
                 const isViewer = u.role === 'viewer';
                 return `<div class="glass" style="padding:14px;margin-bottom:8px" data-user-id="${u.id}">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                        <div style="font-size:13px;font-weight:600;color:var(--text);flex:1">${u.full_name || u.id.slice(0, 8)}</div>
+                        <div style="font-size:13px;font-weight:600;color:var(--text);flex:1">${esc(u.full_name || u.id.slice(0, 8))}</div>
                         ${roleBadge}
                     </div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
@@ -403,6 +416,8 @@ export async function createUser() {
     if (!email || !fullName || !password) { toast('Заповніть всі обов\'язкові поля', true); return; }
     if (password.length < 6) { toast('Пароль має бути мін. 6 символів', true); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Невірний формат email', true); return; }
+    if (fullName.length > 100) { toast('Ім\'я занадто довге (макс. 100 символів)', true); return; }
+    if (!/^[\p{L}\s''\-\.]+$/u.test(fullName)) { toast('Ім\'я може містити лише букви, пробіли та дефіс', true); return; }
 
     let allowedPages = null;
     if (role === 'viewer') {
@@ -440,14 +455,14 @@ export async function createUser() {
         }
 
         // Step 3: Success
-        toast(`Користувач ${fullName} (${email}) створений як ${ROLE_LABELS[role]}`);
+        toast(`Користувач ${esc(fullName)} (${esc(email)}) створений як ${ROLE_LABELS[role]}`);
 
         // Show credentials for copying
         if (statusEl) {
             statusEl.innerHTML = `<div class="glass" style="padding:10px;background:var(--bg2);border-left:3px solid var(--green)">
                 <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px">Користувач створений!</div>
-                <div style="font-size:12px;color:var(--text)">Email: <b>${email}</b></div>
-                <div style="font-size:12px;color:var(--text)">Пароль: <b>${password}</b></div>
+                <div style="font-size:12px;color:var(--text)">Email: <b>${esc(email)}</b></div>
+                <div style="font-size:12px;color:var(--text)">Пароль: <b>${esc(password)}</b></div>
                 <div style="font-size:10px;color:var(--text3);margin-top:4px">Збережіть або передайте ці дані користувачу</div>
             </div>`;
         }

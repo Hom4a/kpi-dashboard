@@ -36,17 +36,16 @@ export async function saveMarketData(parsedResult, fileName) {
         await sb.from('market_prices_ua').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     }
 
-    // History: delete matching entity+month combos to avoid duplicates
-    // (time series may overlap between files — same months reported in both)
+    // History: batch-delete matching months to avoid duplicates
     const historyMonths = [...new Set(parsedResult.history.map(r => r.month_date))];
-    for (const month of historyMonths) {
-        await sb.from('market_price_history').delete().eq('month_date', month);
+    if (historyMonths.length) {
+        await sb.from('market_price_history').delete().in('month_date', historyMonths);
     }
 
-    // EUR rates: delete matching dates
+    // EUR rates: batch-delete matching dates
     const rateDates = [...new Set(parsedResult.eurRates.map(r => r.rate_date))];
-    for (const d of rateDates) {
-        await sb.from('eur_rates').delete().eq('rate_date', d);
+    if (rateDates.length) {
+        await sb.from('eur_rates').delete().in('rate_date', rateDates);
     }
 
     let total = 0;

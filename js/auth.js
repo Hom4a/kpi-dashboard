@@ -62,7 +62,7 @@ export async function getCurrentProfile() {
     if (!user) return null;
     const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
     if (error) {
-        console.warn('Profile fetch error:', error.message, 'for user:', user.id, user.email);
+        console.warn('Profile fetch error:', error.message);
         return null;
     }
     return data;
@@ -150,7 +150,7 @@ export async function showAppForUser(user) {
 
         // Nav visibility — role-based page access
         const allowedPages = getVisiblePages(role, p);
-        console.log('Auth profile:', p ? `${p.email} role=${p.role}` : 'NULL', 'Pages:', allowedPages);
+        console.log('Auth: role=' + role, 'pages=' + allowedPages.length);
         document.querySelectorAll('.nav-item[data-page]').forEach(n => {
             n.style.display = allowedPages.includes(n.dataset.page) ? '' : 'none';
         });

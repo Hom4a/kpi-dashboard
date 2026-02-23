@@ -50,7 +50,8 @@ export function drawSparkline(canvas, data, color) {
     const ctx = canvas.getContext('2d');
     const w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    const max = Math.max(...data), min = Math.min(...data);
+    let max = -Infinity, min = Infinity;
+    for (let i = 0; i < data.length; i++) { if (data[i] > max) max = data[i]; if (data[i] < min) min = data[i]; }
     const range = max - min || 1;
     ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
     data.forEach((v, i) => {
