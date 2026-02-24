@@ -17,7 +17,9 @@ export async function loadDashboards() {
 }
 
 export async function saveDashboard(dashboard) {
-    const { data: { user } } = await sb.auth.getUser();
+    // Use getSession() (local) instead of getUser() (network) to avoid failures
+    const { data: { session } } = await sb.auth.getSession();
+    const userId = session?.user?.id;
 
     if (dashboard.id) {
         const { data, error } = await sb.from('dashboard_configs')
@@ -35,6 +37,7 @@ export async function saveDashboard(dashboard) {
         if (error) throw new Error(error.message);
         return data;
     } else {
+        if (!userId) throw new Error('Сесія не знайдена. Оновіть сторінку.');
         const { data, error } = await sb.from('dashboard_configs')
             .insert({
                 name: dashboard.name,
@@ -42,7 +45,7 @@ export async function saveDashboard(dashboard) {
                 config: dashboard.config,
                 is_public: dashboard.is_public || false,
                 is_template: dashboard.is_template || false,
-                created_by: user ? user.id : null
+                created_by: userId
             })
             .select()
             .single();
@@ -57,7 +60,9 @@ export async function deleteDashboard(id) {
 }
 
 export async function cloneDashboard(dashboard) {
-    const { data: { user } } = await sb.auth.getUser();
+    const { data: { session } } = await sb.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) throw new Error('Сесія не знайдена. Оновіть сторінку.');
     const { data, error } = await sb.from('dashboard_configs')
         .insert({
             name: dashboard.name + ' (копія)',
@@ -65,7 +70,7 @@ export async function cloneDashboard(dashboard) {
             config: dashboard.config,
             is_public: false,
             is_template: false,
-            created_by: user ? user.id : null
+            created_by: userId
         })
         .select()
         .single();
