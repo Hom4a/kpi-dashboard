@@ -1,7 +1,7 @@
 // ===== Authentication =====
 import { sb } from './config.js';
 import { $, show, hide, showKpiSkeletons, withTimeout, toast } from './utils.js';
-import { allData, filtered, charts, currentProfile, setAllData, setFiltered, setCharts, setCurrentProfile } from './state.js';
+import { allData, filtered, charts, currentProfile, setAllData, setFiltered, setCharts, setCurrentProfile, getCachedProfile } from './state.js';
 import { setupChartDefaults } from './charts-common.js';
 import { startAutoRefresh, stopAutoRefresh } from './auto-refresh.js';
 import { stopRealtime } from './realtime.js';
@@ -23,7 +23,7 @@ const PAGE_ACCESS = {
     market:      ['admin', 'director', 'analyst', 'editor', 'forester'],
     executive:   ['admin', 'director', 'analyst'],
     'data-entry':['admin', 'editor', 'accountant', 'hr', 'forester', 'operator'],
-    builder:     ['admin', 'analyst'],
+    builder:     ['admin', 'analyst', 'editor'],
     'api-system':['admin', 'analyst'],
     gis:         ['admin', 'director', 'analyst', 'editor', 'forester'],
 };
@@ -61,9 +61,9 @@ export function getVisiblePages(role, profile) {
 export { PAGE_ACCESS, UPLOAD_ROLES, DATA_MANAGE_ROLES, TARGET_ROLES, ROLE_LABELS };
 
 export async function getCurrentProfile() {
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) return null;
-    const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.user) return null;
+    const { data, error } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
     if (error) {
         console.warn('Profile fetch error:', error.message);
         return null;
@@ -125,14 +125,21 @@ export async function showAppForUser(user) {
     showAuthLoading(true);
     try {
         showKpiSkeletons('kpiGrid', 6);
-        const profile = await withTimeout(getCurrentProfile(), 8000, null);
-        if (!profile) {
-            // Retry once if first attempt failed/timed out
+
+        // Use cached profile immediately so UI doesn't flash as 'viewer'
+        const cached = getCachedProfile();
+        if (cached) setCurrentProfile(cached);
+
+        // Fetch fresh profile from DB
+        const freshProfile = await withTimeout(getCurrentProfile(), 8000, null);
+        if (freshProfile) {
+            setCurrentProfile(freshProfile);
+        } else if (!cached) {
+            // No cache and first fetch failed — retry once
             const retry = await withTimeout(getCurrentProfile(), 10000, null);
             setCurrentProfile(retry);
-        } else {
-            setCurrentProfile(profile);
         }
+
         const p = currentProfile;
         const role = p ? p.role : 'viewer';
         const displayName = p && p.full_name ? p.full_name : user.email;
@@ -154,7 +161,7 @@ export async function showAppForUser(user) {
 
         // Nav visibility — role-based page access
         const allowedPages = getVisiblePages(role, p);
-        console.log('Auth: role=' + role, 'pages=' + allowedPages.length);
+        console.log('Auth: role=' + role, 'source=' + (freshProfile ? 'fresh' : cached ? 'cache' : 'fallback'), 'pages=' + allowedPages.length);
         document.querySelectorAll('.nav-item[data-page]').forEach(n => {
             n.style.display = allowedPages.includes(n.dataset.page) ? '' : 'none';
         });

@@ -72,7 +72,7 @@ function showRoleButtons() {
         if (vaBtn) vaBtn.style.display = '';
     }
     // Dashboards button (admin + analyst)
-    if (['admin', 'analyst'].includes(role)) {
+    if (['admin', 'analyst', 'editor'].includes(role)) {
         const dbBtn = $('btnDashboards');
         if (dbBtn) dbBtn.style.display = '';
     }
