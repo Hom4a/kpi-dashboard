@@ -16,7 +16,8 @@ export async function fetchForestSummary(branch = null, product = null, species 
 
 // DELETE ALL + batch INSERT (full replacement strategy)
 export async function savePricesData(records, fileName) {
-    const { data: { user } } = await sb.auth.getUser();
+    const { data: { session } } = await sb.auth.getSession();
+    const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
 
     // Delete existing data
@@ -29,7 +30,7 @@ export async function savePricesData(records, fileName) {
         branch: r.branch, region: r.region, warehouse: r.warehouse,
         product: r.product, species: r.species, quality_class: r.quality_class,
         volume_m3: r.volume_m3, weighted_price_uah: r.weighted_price_uah, total_value_uah: r.total_value_uah,
-        uploaded_by: user ? user.id : null
+        uploaded_by: userId
     }));
 
     for (let i = 0; i < rows.length; i += 500) {
@@ -41,14 +42,15 @@ export async function savePricesData(records, fileName) {
     await sb.from('forest_upload_history').insert({
         data_type: 'prices', batch_id: batchId,
         file_name: fileName, row_count: records.length,
-        uploaded_by: user ? user.id : null
+        uploaded_by: userId
     });
 
     return { count: records.length };
 }
 
 export async function saveInventoryData(records, fileName) {
-    const { data: { user } } = await sb.auth.getUser();
+    const { data: { session } } = await sb.auth.getSession();
+    const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
 
     // Delete existing data
@@ -62,7 +64,7 @@ export async function saveInventoryData(records, fileName) {
         forestry_div: r.forestry_div, warehouse: r.warehouse,
         product: r.product, product_name: r.product_name, wood_group: r.wood_group,
         species: r.species, quality_class: r.quality_class, remaining_volume_m3: r.remaining_volume_m3,
-        uploaded_by: user ? user.id : null
+        uploaded_by: userId
     }));
 
     for (let i = 0; i < rows.length; i += 500) {
@@ -74,7 +76,7 @@ export async function saveInventoryData(records, fileName) {
     await sb.from('forest_upload_history').insert({
         data_type: 'inventory', batch_id: batchId,
         file_name: fileName, row_count: records.length,
-        uploaded_by: user ? user.id : null
+        uploaded_by: userId
     });
 
     return { count: records.length };

@@ -81,6 +81,11 @@ function showRoleButtons() {
         const gisBtn = $('btnGisAdmin');
         if (gisBtn) gisBtn.style.display = '';
     }
+    // Per-page upload buttons
+    const canUpload = UPLOAD_ROLES.includes(role);
+    document.querySelectorAll('.page-upload-btn, .page-upload-compact').forEach(el => {
+        el.style.display = canUpload ? '' : 'none';
+    });
 }
 
 // ===== Load & Render KPI =====
@@ -370,6 +375,17 @@ document.addEventListener('DOMContentLoaded', () => {
     ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag-over'); }));
     ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag-over'); }));
     dz.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+    // Per-page upload buttons (with file type validation)
+    document.querySelectorAll('.page-upload').forEach(input => {
+        input.addEventListener('change', e => {
+            if (e.target.files[0]) {
+                const expected = e.target.dataset.expected || null;
+                handleFile(e.target.files[0], expected);
+            }
+            e.target.value = '';
+        });
+    });
 
     // KPI Filters
     initFilterEvents();

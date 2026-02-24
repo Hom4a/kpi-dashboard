@@ -169,6 +169,7 @@
             <span class="filter-sep">—</span>
             <input type="date" class="filter-date" id="filterTo" title="До">
             <button class="filter-reset" id="filterReset" title="Скинути">✕</button>
+            <label class="btn btn-sm page-upload-compact" title="Оновити дані обсягів"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Оновити<input type="file" class="page-upload" data-expected="kpi" accept=".xlsx,.xls"></label>
         </div>
 
         <div class="stats-bar" id="statsBar"></div>
@@ -244,6 +245,7 @@
         <div class="filter-bar" id="harvestingFilterBar" style="display:none">
             <select class="filter-select" id="hOffice"><option value="">Обласне управління</option></select>
             <button class="filter-reset" id="harvestingFilterReset" title="Скинути">✕</button>
+            <label class="btn btn-sm page-upload-compact" title="Оновити дані заготівлі"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Оновити<input type="file" class="page-upload" data-expected="harvesting_plan_fact,harvesting_zsu" accept=".xlsx,.xls"></label>
         </div>
 
         <!-- Market filter bar (hidden by default) -->
@@ -256,6 +258,7 @@
                 <button data-w="firewood">Дрова</button>
             </div>
             <button class="filter-reset" id="marketFilterReset" title="Скинути">✕</button>
+            <label class="btn btn-sm page-upload-compact" title="Оновити ринкові ціни"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Оновити<input type="file" class="page-upload" data-expected="market_prices" accept=".xlsx,.xls"></label>
         </div>
 
         <!-- Forest filter bar (hidden by default) -->
@@ -267,6 +270,7 @@
             <select class="filter-select" id="fWarehouse"><option value="">Склад</option></select>
             <select class="filter-select" id="fQuality"><option value="">Клас якості</option></select>
             <button class="filter-reset" id="forestFilterReset" title="Скинути">✕</button>
+            <label class="btn btn-sm page-upload-compact" title="Оновити дані продукції"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Оновити<input type="file" class="page-upload" data-expected="prices,inventory" accept=".xlsx,.xls"></label>
         </div>
 
         <!-- Forest page -->
@@ -274,6 +278,7 @@
             <div id="forestEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
                 <p style="font-size:15px;margin-bottom:8px">Дані лісопродукції відсутні</p>
                 <p style="font-size:12px">Завантажте Excel з середньозваженими цінами або залишками</p>
+                <label class="btn btn-primary page-upload-btn" style="margin-top:16px"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Завантажити ціни або залишки<input type="file" class="page-upload" data-expected="prices,inventory" accept=".xlsx,.xls"></label>
             </div>
 
             <div id="forestContent" style="display:none">
@@ -387,6 +392,7 @@
             <div id="harvestingEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
                 <p style="font-size:15px;margin-bottom:8px">Дані заготівлі відсутні</p>
                 <p style="font-size:12px">Завантажте Excel з планом-фактом або довідкою ЗСУ</p>
+                <label class="btn btn-primary page-upload-btn" style="margin-top:16px"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Завантажити план-факт або ЗСУ<input type="file" class="page-upload" data-expected="harvesting_plan_fact,harvesting_zsu" accept=".xlsx,.xls"></label>
             </div>
 
             <div id="harvestingContent" style="display:none">
@@ -456,6 +462,7 @@
             <div id="marketEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
                 <p style="font-size:15px;margin-bottom:8px">Дані міжнародних цін відсутні</p>
                 <p style="font-size:12px">Завантажте Excel з порівнянням цін на деревину</p>
+                <label class="btn btn-primary page-upload-btn" style="margin-top:16px"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Завантажити ринкові ціни<input type="file" class="page-upload" data-expected="market_prices" accept=".xlsx,.xls"></label>
             </div>
             <div id="marketContent" style="display:none">
                 <div class="section-title" style="font-size:14px;font-weight:700;margin:20px 0 12px;color:var(--text)">Міжнародне порівняння цін на деревину</div>

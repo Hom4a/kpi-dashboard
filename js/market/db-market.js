@@ -32,8 +32,8 @@ async function batchInsert(table, records, batchId, userId) {
 }
 
 export async function saveMarketData(parsedResult, fileName) {
-    const { data: { user } } = await sb.auth.getUser();
-    const userId = user ? user.id : null;
+    const { data: { session } } = await sb.auth.getSession();
+    const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
     const period = (parsedResult.meta.period || '').trim();
 

@@ -48,7 +48,12 @@ export function detectFileType(wb, fileName) {
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
-export async function handleFile(file) {
+const FILE_TYPE_LABELS = {
+    kpi: 'KPI обсяги/фінанси', prices: 'середньозважені ціни', inventory: 'залишки лісопродукції',
+    harvesting_plan_fact: 'план-факт заготівлі', harvesting_zsu: 'дані ЗСУ', market_prices: 'ринкові ціни'
+};
+
+export async function handleFile(file, expectedType = null) {
     const role = currentProfile ? currentProfile.role : 'viewer';
     if (!UPLOAD_ROLES.includes(role)) { toast('У вас немає прав для завантаження даних', true); return; }
     if (file.size > MAX_FILE_SIZE) { toast(`Файл занадто великий (${(file.size / 1024 / 1024).toFixed(1)} MB). Максимум: 50 MB`, true); return; }
@@ -57,6 +62,18 @@ export async function handleFile(file) {
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
         const fileType = detectFileType(wb, file.name);
+
+        // Validate file type if uploaded from a specific page
+        if (expectedType) {
+            const allowedTypes = expectedType.split(',');
+            if (!allowedTypes.includes(fileType)) {
+                const detected = FILE_TYPE_LABELS[fileType] || fileType;
+                const expected = allowedTypes.map(t => FILE_TYPE_LABELS[t] || t).join(' або ');
+                toast(`Цей файл визначено як "${detected}", а очікується "${expected}". Використайте головну кнопку або перейдіть на відповідну сторінку.`, true);
+                showLoader(false);
+                return;
+            }
+        }
 
         if (fileType === 'market_prices') {
             const parsed = parseMarketPricesFile(wb);

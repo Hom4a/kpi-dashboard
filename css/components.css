@@ -124,3 +124,12 @@ table.tbl{width:100%;border-collapse:collapse;font-size:12px}
 
 /* ===== SECTION TITLE ===== */
 .section-title{font-size:14px;font-weight:600;margin-bottom:12px;margin-top:24px}
+
+/* ===== PER-PAGE UPLOAD BUTTONS ===== */
+.page-upload-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;cursor:pointer;position:relative;overflow:hidden}
+.page-upload-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.page-upload-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn-primary{background:linear-gradient(135deg,rgba(74,157,111,.25),rgba(74,157,111,.15));border-color:rgba(74,157,111,.4);color:var(--primary);font-weight:600}
+.btn-primary:hover{background:linear-gradient(135deg,rgba(74,157,111,.35),rgba(74,157,111,.25));box-shadow:0 0 24px rgba(74,157,111,.2)}
+.page-upload-compact{margin-left:auto;white-space:nowrap;display:none}
+.page-upload-compact input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
