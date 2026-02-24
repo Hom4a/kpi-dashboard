@@ -14,38 +14,52 @@ export async function savePlanFactData(records, fileName) {
     const { data: { session } } = await sb.auth.getSession();
     const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
-    const { error: delErr } = await sb.from('harvesting_plan_fact').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (delErr) throw new Error(delErr.message);
+
+    // Fetch existing composite keys (regional_office)
+    const { data: existing } = await sb.from('harvesting_plan_fact').select('regional_office');
+    const existingKeys = new Set((existing || []).map(r => r.regional_office));
+
     const rows = records.map(r => ({ upload_batch_id: batchId, ...r, uploaded_by: userId }));
-    for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from('harvesting_plan_fact').insert(rows.slice(i, i + 500));
+    const newRows = rows.filter(r => !existingKeys.has(r.regional_office));
+    const skipped = rows.length - newRows.length;
+
+    if (newRows.length === 0) return { added: 0, skipped };
+
+    for (let i = 0; i < newRows.length; i += 500) {
+        const { error } = await sb.from('harvesting_plan_fact').insert(newRows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
     await sb.from('forest_upload_history').insert({
         data_type: 'harvesting_plan_fact', batch_id: batchId,
-        file_name: fileName, row_count: records.length,
-        uploaded_by: userId
+        file_name: fileName, row_count: newRows.length, uploaded_by: userId
     });
-    return { count: records.length };
+    return { added: newRows.length, skipped };
 }
 
 export async function saveZsuData(records, fileName) {
     const { data: { session } } = await sb.auth.getSession();
     const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
-    const { error: delErr } = await sb.from('harvesting_zsu').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (delErr) throw new Error(delErr.message);
+
+    // Fetch existing composite keys (regional_office)
+    const { data: existing } = await sb.from('harvesting_zsu').select('regional_office');
+    const existingKeys = new Set((existing || []).map(r => r.regional_office));
+
     const rows = records.map(r => ({ upload_batch_id: batchId, ...r, uploaded_by: userId }));
-    for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from('harvesting_zsu').insert(rows.slice(i, i + 500));
+    const newRows = rows.filter(r => !existingKeys.has(r.regional_office));
+    const skipped = rows.length - newRows.length;
+
+    if (newRows.length === 0) return { added: 0, skipped };
+
+    for (let i = 0; i < newRows.length; i += 500) {
+        const { error } = await sb.from('harvesting_zsu').insert(newRows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
     await sb.from('forest_upload_history').insert({
         data_type: 'harvesting_zsu', batch_id: batchId,
-        file_name: fileName, row_count: records.length,
-        uploaded_by: userId
+        file_name: fileName, row_count: newRows.length, uploaded_by: userId
     });
-    return { count: records.length };
+    return { added: newRows.length, skipped };
 }
 
 export async function loadPlanFactData() {

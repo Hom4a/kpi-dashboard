@@ -80,7 +80,11 @@ export async function handleFile(file, expectedType = null) {
             const total = parsed.prices.length + parsed.uaDetail.length + parsed.history.length + parsed.eurRates.length;
             if (!total) { toast('Файл не містить числових даних для імпорту.'); showLoader(false); return; }
             const result = await saveMarketData(parsed, file.name);
-            toast(`Ринкові ціни завантажено: ${result.count} записів`);
+            if (result.count === 0 && result.skipped > 0) {
+                toast(`Ці дані вже завантажено (${result.skipped} записів). Змін не внесено.`);
+            } else {
+                toast(`Ринкові ціни: завантажено ${result.count} записів`);
+            }
             if (_loadMarketFn) await _loadMarketFn();
             showLoader(false);
             return;
@@ -90,7 +94,11 @@ export async function handleFile(file, expectedType = null) {
             const records = parsePricesFile(wb);
             if (!records.length) { toast('Файл не містить даних про ціни. Перевірте формат.', true); showLoader(false); return; }
             const result = await savePricesData(records, file.name);
-            toast(`Ціни завантажено: ${result.count} записів`);
+            if (result.added === 0) {
+                toast(`Ці дані вже завантажено (${result.skipped} записів). Нових записів не додано.`);
+            } else {
+                toast(`Ціни: завантажено ${result.added + result.skipped} рядків, додано ${result.added} нових`);
+            }
             if (_loadForestFn) await _loadForestFn();
             showLoader(false);
             return;
@@ -100,7 +108,11 @@ export async function handleFile(file, expectedType = null) {
             const records = parseInventoryFile(wb);
             if (!records.length) { toast('Файл не містить даних про залишки. Перевірте формат.', true); showLoader(false); return; }
             const result = await saveInventoryData(records, file.name);
-            toast(`Залишки завантажено: ${result.count} записів`);
+            if (result.added === 0) {
+                toast(`Ці дані вже завантажено (${result.skipped} записів). Нових записів не додано.`);
+            } else {
+                toast(`Залишки: завантажено ${result.added + result.skipped} рядків, додано ${result.added} нових`);
+            }
             if (_loadForestFn) await _loadForestFn();
             showLoader(false);
             return;
@@ -110,7 +122,11 @@ export async function handleFile(file, expectedType = null) {
             const records = parsePlanFactFile(wb);
             if (!records.length) { toast('Файл не містить даних план-факт. Перевірте формат.', true); showLoader(false); return; }
             const result = await savePlanFactData(records, file.name);
-            toast(`План-факт завантажено: ${result.count} записів`);
+            if (result.added === 0) {
+                toast(`Ці дані вже завантажено (${result.skipped} записів). Нових записів не додано.`);
+            } else {
+                toast(`План-факт: завантажено ${result.added + result.skipped} рядків, додано ${result.added} нових`);
+            }
             if (_loadHarvestingFn) await _loadHarvestingFn();
             showLoader(false);
             return;
@@ -120,7 +136,11 @@ export async function handleFile(file, expectedType = null) {
             const records = parseZsuFile(wb);
             if (!records.length) { toast('Файл не містить даних ЗСУ. Перевірте формат.', true); showLoader(false); return; }
             const result = await saveZsuData(records, file.name);
-            toast(`Дані ЗСУ завантажено: ${result.count} записів`);
+            if (result.added === 0) {
+                toast(`Ці дані вже завантажено (${result.skipped} записів). Нових записів не додано.`);
+            } else {
+                toast(`Дані ЗСУ: завантажено ${result.added + result.skipped} рядків, додано ${result.added} нових`);
+            }
             if (_loadHarvestingFn) await _loadHarvestingFn();
             showLoader(false);
             return;
@@ -132,9 +152,9 @@ export async function handleFile(file, expectedType = null) {
 
         const result = await saveRecords(records, file.name);
         if (result.added === 0) {
-            toast(`Нових даних не знайдено. ${result.skipped} записів вже існують в базі.`);
+            toast(`Ці дані вже завантажено (${result.skipped} записів). Нових записів не додано.`);
         } else {
-            toast(`Додано ${result.added} нових записів, ${result.skipped} вже існують`);
+            toast(`KPI: завантажено ${result.added + result.skipped} рядків, додано ${result.added} нових`);
         }
         if (_loadAndRenderFn) await _loadAndRenderFn();
     } catch (err) { toast('Помилка: ' + err.message, true); console.error(err); }

@@ -14,7 +14,8 @@ export async function fetchKpiSummary(dateFrom = null, dateTo = null) {
 }
 
 export async function saveRecords(records, fileName) {
-    const { data: { user } } = await sb.auth.getUser();
+    const { data: { session } } = await sb.auth.getSession();
+    const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
 
     // Smart merge: fetch existing IDs, insert only new records
@@ -33,7 +34,7 @@ export async function saveRecords(records, fileName) {
         id: r.date + '|' + r.indicator, date: r.date, indicator: r.indicator,
         type: r.type, value: r.value, unit: r.unit || '',
         upload_batch_id: batchId,
-        uploaded_by: user ? user.id : null, updated_at: new Date().toISOString()
+        uploaded_by: userId, updated_at: new Date().toISOString()
     }));
 
     const newRows = rows.filter(r => !existingIds.has(r.id));
@@ -53,7 +54,7 @@ export async function saveRecords(records, fileName) {
         data_type: 'kpi', batch_id: batchId,
         file_name: fileName || 'KPI upload',
         row_count: newRows.length,
-        uploaded_by: user ? user.id : null
+        uploaded_by: userId
     });
 
     return { added: newRows.length, skipped: skippedCount };

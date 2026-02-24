@@ -36,6 +36,29 @@ export async function saveMarketData(parsedResult, fileName) {
     const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
     const period = (parsedResult.meta.period || '').trim();
+    const incomingTotal = parsedResult.prices.length + parsedResult.uaDetail.length +
+        parsedResult.history.length + parsedResult.eurRates.length;
+
+    // Check if same data already exists (deduplication)
+    if (period) {
+        const { count: c1 } = await sb.from('market_prices').select('*', { count: 'exact', head: true }).eq('period', period);
+        const { count: c2 } = await sb.from('market_prices_ua').select('*', { count: 'exact', head: true }).eq('period', period);
+        const existingPeriodCount = (c1 || 0) + (c2 || 0);
+        const incomingPeriodCount = parsedResult.prices.length + parsedResult.uaDetail.length;
+
+        if (existingPeriodCount > 0 && existingPeriodCount === incomingPeriodCount) {
+            // Quick key comparison for market_prices
+            const { data: ep } = await sb.from('market_prices')
+                .select('country,row_type,source_name').eq('period', period);
+            const existingKeys = new Set((ep || []).map(r => `${r.country}|${r.row_type}|${r.source_name || ''}`));
+            const allPricesExist = parsedResult.prices.every(r =>
+                existingKeys.has(`${r.country}|${r.row_type}|${r.source_name || ''}`)
+            );
+            if (allPricesExist) {
+                return { count: 0, skipped: incomingTotal, meta: parsedResult.meta };
+            }
+        }
+    }
 
     // Delete only data for the same period (keep other periods)
     if (period) {
@@ -74,7 +97,7 @@ export async function saveMarketData(parsedResult, fileName) {
         uploaded_by: userId
     });
 
-    return { count: total, meta: parsedResult.meta };
+    return { count: total, skipped: 0, meta: parsedResult.meta };
 }
 
 export async function loadMarketPrices() {

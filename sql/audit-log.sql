@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     table_name text NOT NULL,
     action text NOT NULL,  -- INSERT, UPDATE, DELETE
-    record_id uuid,
+    record_id text,
     old_data jsonb,
     new_data jsonb,
     user_id uuid,
@@ -41,8 +41,8 @@ BEGIN
         TG_TABLE_NAME,
         TG_OP,
         CASE TG_OP
-            WHEN 'DELETE' THEN OLD.id
-            ELSE NEW.id
+            WHEN 'DELETE' THEN OLD.id::text
+            ELSE NEW.id::text
         END,
         CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD) ELSE NULL END,
         CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW) ELSE NULL END,

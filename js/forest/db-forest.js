@@ -14,17 +14,26 @@ export async function fetchForestSummary(branch = null, product = null, species 
     } catch { return null; }
 }
 
-// DELETE ALL + batch INSERT (full replacement strategy)
+// Smart merge: fetch existing keys, insert only new records
 export async function savePricesData(records, fileName) {
     const { data: { session } } = await sb.auth.getSession();
     const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
 
-    // Delete existing data
-    const { error: delErr } = await sb.from('forest_prices').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (delErr) throw new Error(delErr.message);
+    // Fetch existing composite keys
+    const existingKeys = new Set();
+    let from = 0;
+    while (true) {
+        const { data, error } = await sb.from('forest_prices')
+            .select('branch,warehouse,product,species,quality_class')
+            .range(from, from + 4999);
+        if (error) throw new Error(error.message);
+        if (!data || !data.length) break;
+        data.forEach(r => existingKeys.add(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
+        if (data.length < 5000) break;
+        from += 5000;
+    }
 
-    // Batch insert
     const rows = records.map(r => ({
         upload_batch_id: batchId,
         branch: r.branch, region: r.region, warehouse: r.warehouse,
@@ -33,19 +42,22 @@ export async function savePricesData(records, fileName) {
         uploaded_by: userId
     }));
 
-    for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from('forest_prices').insert(rows.slice(i, i + 500));
+    const newRows = rows.filter(r => !existingKeys.has(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
+    const skipped = rows.length - newRows.length;
+
+    if (newRows.length === 0) return { added: 0, skipped };
+
+    for (let i = 0; i < newRows.length; i += 500) {
+        const { error } = await sb.from('forest_prices').insert(newRows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
 
-    // Record upload history
     await sb.from('forest_upload_history').insert({
         data_type: 'prices', batch_id: batchId,
-        file_name: fileName, row_count: records.length,
-        uploaded_by: userId
+        file_name: fileName, row_count: newRows.length, uploaded_by: userId
     });
 
-    return { count: records.length };
+    return { added: newRows.length, skipped };
 }
 
 export async function saveInventoryData(records, fileName) {
@@ -53,11 +65,22 @@ export async function saveInventoryData(records, fileName) {
     const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
 
-    // Delete existing data
-    const { error: delErr } = await sb.from('forest_inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (delErr) throw new Error(delErr.message);
+    // Fetch existing composite keys
+    const existingKeys = new Set();
+    let from = 0;
+    while (true) {
+        const { data, error } = await sb.from('forest_inventory')
+            .select('branch,forest_unit,forestry_div,warehouse,product,species,quality_class')
+            .range(from, from + 4999);
+        if (error) throw new Error(error.message);
+        if (!data || !data.length) break;
+        data.forEach(r => existingKeys.add(
+            `${r.branch}|${r.forest_unit}|${r.forestry_div}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`
+        ));
+        if (data.length < 5000) break;
+        from += 5000;
+    }
 
-    // Batch insert
     const rows = records.map(r => ({
         upload_batch_id: batchId,
         branch: r.branch, region: r.region, forest_unit: r.forest_unit,
@@ -67,19 +90,24 @@ export async function saveInventoryData(records, fileName) {
         uploaded_by: userId
     }));
 
-    for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from('forest_inventory').insert(rows.slice(i, i + 500));
+    const newRows = rows.filter(r => !existingKeys.has(
+        `${r.branch}|${r.forest_unit}|${r.forestry_div}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`
+    ));
+    const skipped = rows.length - newRows.length;
+
+    if (newRows.length === 0) return { added: 0, skipped };
+
+    for (let i = 0; i < newRows.length; i += 500) {
+        const { error } = await sb.from('forest_inventory').insert(newRows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
 
-    // Record upload history
     await sb.from('forest_upload_history').insert({
         data_type: 'inventory', batch_id: batchId,
-        file_name: fileName, row_count: records.length,
-        uploaded_by: userId
+        file_name: fileName, row_count: newRows.length, uploaded_by: userId
     });
 
-    return { count: records.length };
+    return { added: newRows.length, skipped };
 }
 
 export async function loadPricesData() {
