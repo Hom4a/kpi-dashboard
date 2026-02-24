@@ -149,8 +149,14 @@ export async function showAppForUser(user) {
             // Fresh fetch failed but cache exists — use cache, warn user
             console.warn('Profile: using cached profile (fresh fetch failed)');
         } else {
-            // No cache, no fresh profile — show error
-            toast('Не вдалося завантажити профіль. Оновіть сторінку.', true);
+            // Last resort: use role from user_metadata (set during signup)
+            const metaRole = user.user_metadata?.role;
+            if (metaRole) {
+                console.warn('Profile: using role from user_metadata:', metaRole);
+                setCurrentProfile({ id: user.id, role: metaRole, full_name: user.user_metadata?.full_name || '' });
+            } else {
+                toast('Не вдалося завантажити профіль. Оновіть сторінку.', true);
+            }
         }
 
         const p = currentProfile;
