@@ -1,6 +1,7 @@
 // ===== File Handling & Auto-Detection =====
 import { $, showLoader, toast } from './utils.js';
 import { currentProfile } from './state.js';
+import { UPLOAD_ROLES } from './auth.js';
 import { parseKpiFile } from './parse-kpi.js';
 import { saveRecords } from './db-kpi.js';
 import { parsePricesFile } from './forest/parse-prices.js';
@@ -49,7 +50,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 export async function handleFile(file) {
     const role = currentProfile ? currentProfile.role : 'viewer';
-    if (role !== 'admin' && role !== 'editor') { toast('У вас немає прав для завантаження даних', true); return; }
+    if (!UPLOAD_ROLES.includes(role)) { toast('У вас немає прав для завантаження даних', true); return; }
     if (file.size > MAX_FILE_SIZE) { toast(`Файл занадто великий (${(file.size / 1024 / 1024).toFixed(1)} MB). Максимум: 50 MB`, true); return; }
     showLoader(true);
     try {

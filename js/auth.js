@@ -60,15 +60,26 @@ export function getVisiblePages(role, profile) {
 
 export { PAGE_ACCESS, UPLOAD_ROLES, DATA_MANAGE_ROLES, TARGET_ROLES, ROLE_LABELS };
 
-export async function getCurrentProfile() {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session?.user) return null;
-    const { data, error } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
-    if (error) {
-        console.warn('Profile fetch error:', error.message);
-        return null;
+export async function getCurrentProfile(userId) {
+    let id = userId;
+    if (!id) {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session?.user) return null;
+        id = session.user.id;
     }
-    return data;
+    // Retry up to 3 times with increasing delays
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            const { data, error } = await sb.from('profiles').select('*').eq('id', id).single();
+            if (data) return data;
+            console.warn(`Profile fetch attempt ${attempt}/3:`, error?.message || 'no data');
+            if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1500));
+        } catch (e) {
+            console.warn(`Profile fetch attempt ${attempt}/3 exception:`, e.message);
+            if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1500));
+        }
+    }
+    return null;
 }
 
 export function showAuthScreen() {
@@ -130,14 +141,16 @@ export async function showAppForUser(user) {
         const cached = getCachedProfile();
         if (cached) setCurrentProfile(cached);
 
-        // Fetch fresh profile from DB
-        const freshProfile = await withTimeout(getCurrentProfile(), 8000, null);
+        // Fetch fresh profile from DB (pass user.id directly, retries built-in)
+        const freshProfile = await withTimeout(getCurrentProfile(user.id), 15000, null);
         if (freshProfile) {
             setCurrentProfile(freshProfile);
-        } else if (!cached) {
-            // No cache and first fetch failed — retry once
-            const retry = await withTimeout(getCurrentProfile(), 10000, null);
-            setCurrentProfile(retry);
+        } else if (cached) {
+            // Fresh fetch failed but cache exists — use cache, warn user
+            console.warn('Profile: using cached profile (fresh fetch failed)');
+        } else {
+            // No cache, no fresh profile — show error
+            toast('Не вдалося завантажити профіль. Оновіть сторінку.', true);
         }
 
         const p = currentProfile;
