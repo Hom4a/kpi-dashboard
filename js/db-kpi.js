@@ -37,15 +37,11 @@ export async function saveRecords(records, fileName) {
         uploaded_by: userId, updated_at: new Date().toISOString()
     }));
 
-    const newRows = rows.filter(r => !existingIds.has(r.id));
-    const skippedCount = rows.length - newRows.length;
+    const newCount = rows.filter(r => !existingIds.has(r.id)).length;
+    const updatedCount = rows.length - newCount;
 
-    if (newRows.length === 0) {
-        return { added: 0, skipped: skippedCount };
-    }
-
-    for (let i = 0; i < newRows.length; i += 500) {
-        const { error } = await sb.from('kpi_records').insert(newRows.slice(i, i + 500));
+    for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await sb.from('kpi_records').upsert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
 
@@ -53,11 +49,11 @@ export async function saveRecords(records, fileName) {
     await sb.from('forest_upload_history').insert({
         data_type: 'kpi', batch_id: batchId,
         file_name: fileName || 'KPI upload',
-        row_count: newRows.length,
+        row_count: rows.length,
         uploaded_by: userId
     });
 
-    return { added: newRows.length, skipped: skippedCount };
+    return { added: newCount, updated: updatedCount };
 }
 
 export async function loadAllRecords() {

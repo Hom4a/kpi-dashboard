@@ -42,22 +42,20 @@ export async function savePricesData(records, fileName) {
         uploaded_by: userId
     }));
 
-    const newRows = rows.filter(r => !existingKeys.has(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
-    const skipped = rows.length - newRows.length;
+    const newCount = rows.filter(r => !existingKeys.has(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`)).length;
+    const updatedCount = rows.length - newCount;
 
-    if (newRows.length === 0) return { added: 0, skipped };
-
-    for (let i = 0; i < newRows.length; i += 500) {
-        const { error } = await sb.from('forest_prices').insert(newRows.slice(i, i + 500));
+    for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await sb.from('forest_prices').upsert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
 
     await sb.from('forest_upload_history').insert({
         data_type: 'prices', batch_id: batchId,
-        file_name: fileName, row_count: newRows.length, uploaded_by: userId
+        file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
 
-    return { added: newRows.length, skipped };
+    return { added: newCount, updated: updatedCount };
 }
 
 export async function saveInventoryData(records, fileName) {
@@ -90,24 +88,22 @@ export async function saveInventoryData(records, fileName) {
         uploaded_by: userId
     }));
 
-    const newRows = rows.filter(r => !existingKeys.has(
+    const newCount = rows.filter(r => !existingKeys.has(
         `${r.branch}|${r.forest_unit}|${r.forestry_div}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`
-    ));
-    const skipped = rows.length - newRows.length;
+    )).length;
+    const updatedCount = rows.length - newCount;
 
-    if (newRows.length === 0) return { added: 0, skipped };
-
-    for (let i = 0; i < newRows.length; i += 500) {
-        const { error } = await sb.from('forest_inventory').insert(newRows.slice(i, i + 500));
+    for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await sb.from('forest_inventory').upsert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
 
     await sb.from('forest_upload_history').insert({
         data_type: 'inventory', batch_id: batchId,
-        file_name: fileName, row_count: newRows.length, uploaded_by: userId
+        file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
 
-    return { added: newRows.length, skipped };
+    return { added: newCount, updated: updatedCount };
 }
 
 export async function loadPricesData() {

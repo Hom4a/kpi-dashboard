@@ -20,20 +20,18 @@ export async function savePlanFactData(records, fileName) {
     const existingKeys = new Set((existing || []).map(r => r.regional_office));
 
     const rows = records.map(r => ({ upload_batch_id: batchId, ...r, uploaded_by: userId }));
-    const newRows = rows.filter(r => !existingKeys.has(r.regional_office));
-    const skipped = rows.length - newRows.length;
+    const newCount = rows.filter(r => !existingKeys.has(r.regional_office)).length;
+    const updatedCount = rows.length - newCount;
 
-    if (newRows.length === 0) return { added: 0, skipped };
-
-    for (let i = 0; i < newRows.length; i += 500) {
-        const { error } = await sb.from('harvesting_plan_fact').insert(newRows.slice(i, i + 500));
+    for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await sb.from('harvesting_plan_fact').upsert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
     await sb.from('forest_upload_history').insert({
         data_type: 'harvesting_plan_fact', batch_id: batchId,
-        file_name: fileName, row_count: newRows.length, uploaded_by: userId
+        file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
-    return { added: newRows.length, skipped };
+    return { added: newCount, updated: updatedCount };
 }
 
 export async function saveZsuData(records, fileName) {
@@ -46,20 +44,18 @@ export async function saveZsuData(records, fileName) {
     const existingKeys = new Set((existing || []).map(r => r.regional_office));
 
     const rows = records.map(r => ({ upload_batch_id: batchId, ...r, uploaded_by: userId }));
-    const newRows = rows.filter(r => !existingKeys.has(r.regional_office));
-    const skipped = rows.length - newRows.length;
+    const newCount = rows.filter(r => !existingKeys.has(r.regional_office)).length;
+    const updatedCount = rows.length - newCount;
 
-    if (newRows.length === 0) return { added: 0, skipped };
-
-    for (let i = 0; i < newRows.length; i += 500) {
-        const { error } = await sb.from('harvesting_zsu').insert(newRows.slice(i, i + 500));
+    for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await sb.from('harvesting_zsu').upsert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
     await sb.from('forest_upload_history').insert({
         data_type: 'harvesting_zsu', batch_id: batchId,
-        file_name: fileName, row_count: newRows.length, uploaded_by: userId
+        file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
-    return { added: newRows.length, skipped };
+    return { added: newCount, updated: updatedCount };
 }
 
 export async function loadPlanFactData() {

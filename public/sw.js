@@ -1,7 +1,7 @@
 // ===== KPI Dashboard — Service Worker =====
 // Cache-First for static assets, Network-First for API data
 
-const CACHE_NAME = 'kpi-dashboard-v1';
+const CACHE_NAME = 'kpi-dashboard-v2';
 const API_CACHE = 'kpi-api-v1';
 
 // Static assets to pre-cache on install
@@ -73,9 +73,15 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Strategy 3: Cache-First for same-origin static assets
+    // Strategy 3: same-origin assets
     if (url.origin === self.location.origin) {
-        event.respondWith(cacheFirst(event.request, CACHE_NAME));
+        // JS and HTML: Network-First (always get latest code after deployments)
+        if (url.pathname.endsWith('.js') || url.pathname === '/' || url.pathname.endsWith('.html')) {
+            event.respondWith(networkFirst(event.request, CACHE_NAME));
+        } else {
+            // CSS, images, fonts: Cache-First
+            event.respondWith(cacheFirst(event.request, CACHE_NAME));
+        }
         return;
     }
 });
