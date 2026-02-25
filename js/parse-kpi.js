@@ -23,7 +23,8 @@ export function parseKpiFile(file) {
                     const r = rows[i]; if (!r || !r[0]) continue;
                     let date = typeof r[0] === 'string' ? new Date(r[0]) : r[0] instanceof Date ? r[0] : null;
                     if (!date || isNaN(date.getTime())) continue;
-                    const dateStr = date.toISOString().slice(0, 10);
+                    const pad = n => String(n).padStart(2, '0');
+                    const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
                     const indicator = (r[1] || '').toString().trim();
                     const rawVal = r[2], unit = (r[3] || '').toString().trim();
                     let value;

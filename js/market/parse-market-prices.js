@@ -19,7 +19,10 @@ function cleanNum(v) {
 }
 
 function dateToISO(val) {
-    if (val instanceof Date) return val.toISOString().slice(0, 10);
+    if (val instanceof Date) {
+        const pad = n => String(n).padStart(2, '0');
+        return `${val.getFullYear()}-${pad(val.getMonth() + 1)}-${pad(val.getDate())}`;
+    }
     if (typeof val === 'number' && val > 1000)
         return new Date((val - 25569) * 86400 * 1000).toISOString().slice(0, 10);
     return null;
