@@ -37,7 +37,10 @@ export function parseInventoryFile(wb) {
         }
     }
 
-    if (headerIdx < 0) return [];
+    if (headerIdx < 0) {
+        console.warn('parse-inventory: заголовок "Філія"/"Надлісництво" не знайдено в перших 15 рядках');
+        return [];
+    }
 
     const records = [];
     for (let i = headerIdx + 1; i < rows.length; i++) {
@@ -48,8 +51,9 @@ export function parseInventoryFile(wb) {
         // Skip summary/total rows
         if (branch.toLowerCase().includes('всього') || branch.toLowerCase().includes('разом') || branch.toLowerCase().includes('підсумок')) continue;
 
-        const vol = cleanNumber(r[colMap.remaining_volume_m3]);
-        if (vol <= 0) continue; // Skip zero-volume rows
+        const rawVol = r[colMap.remaining_volume_m3];
+        if (rawVol == null || rawVol === '') continue; // Skip rows with no volume data
+        const vol = cleanNumber(rawVol);
 
         records.push({
             branch,

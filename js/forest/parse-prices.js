@@ -31,7 +31,10 @@ export function parsePricesFile(wb) {
         }
     }
 
-    if (headerIdx < 0) return [];
+    if (headerIdx < 0) {
+        console.warn('parse-prices: заголовок "Філія" не знайдено в перших 15 рядках');
+        return [];
+    }
 
     const records = [];
     for (let i = headerIdx + 1; i < rows.length; i++) {

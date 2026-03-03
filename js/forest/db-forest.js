@@ -42,11 +42,19 @@ export async function savePricesData(records, fileName) {
         uploaded_by: userId
     }));
 
-    const newCount = rows.filter(r => !existingKeys.has(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`)).length;
-    const updatedCount = rows.length - newCount;
+    const newRows = rows.filter(r => !existingKeys.has(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
+    const replacedRows = rows.filter(r => existingKeys.has(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
 
+    // Delete existing records that will be replaced
+    for (const r of replacedRows) {
+        await sb.from('forest_prices').delete()
+            .eq('branch', r.branch).eq('warehouse', r.warehouse)
+            .eq('product', r.product).eq('species', r.species).eq('quality_class', r.quality_class);
+    }
+
+    // Insert all records (new + replacements)
     for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from('forest_prices').upsert(rows.slice(i, i + 500));
+        const { error } = await sb.from('forest_prices').insert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
 
@@ -55,7 +63,7 @@ export async function savePricesData(records, fileName) {
         file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
 
-    return { added: newCount, updated: updatedCount };
+    return { added: newRows.length, replaced: replacedRows.length };
 }
 
 export async function saveInventoryData(records, fileName) {
@@ -88,13 +96,20 @@ export async function saveInventoryData(records, fileName) {
         uploaded_by: userId
     }));
 
-    const newCount = rows.filter(r => !existingKeys.has(
-        `${r.branch}|${r.forest_unit}|${r.forestry_div}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`
-    )).length;
-    const updatedCount = rows.length - newCount;
+    const makeKey = r => `${r.branch}|${r.forest_unit}|${r.forestry_div}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`;
+    const newRows = rows.filter(r => !existingKeys.has(makeKey(r)));
+    const replacedRows = rows.filter(r => existingKeys.has(makeKey(r)));
 
+    // Delete existing records that will be replaced
+    for (const r of replacedRows) {
+        await sb.from('forest_inventory').delete()
+            .eq('branch', r.branch).eq('forest_unit', r.forest_unit).eq('forestry_div', r.forestry_div)
+            .eq('warehouse', r.warehouse).eq('product', r.product).eq('species', r.species).eq('quality_class', r.quality_class);
+    }
+
+    // Insert all records (new + replacements)
     for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from('forest_inventory').upsert(rows.slice(i, i + 500));
+        const { error } = await sb.from('forest_inventory').insert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
 
@@ -103,7 +118,7 @@ export async function saveInventoryData(records, fileName) {
         file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
 
-    return { added: newCount, updated: updatedCount };
+    return { added: newRows.length, replaced: replacedRows.length };
 }
 
 export async function loadPricesData() {

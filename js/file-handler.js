@@ -94,12 +94,12 @@ export async function handleFile(file, expectedType = null) {
             const records = parsePricesFile(wb);
             if (!records.length) { toast('Файл не містить даних про ціни. Перевірте формат.', true); showLoader(false); return; }
             const result = await savePricesData(records, file.name);
-            if (result.added === 0 && result.updated === 0) {
+            if (result.added === 0 && result.replaced === 0) {
                 toast('Файл не містить нових даних.');
             } else if (result.added === 0) {
-                toast(`Ціни: оновлено ${result.updated} існуючих записів`);
+                toast(`Ціни: замінено ${result.replaced} існуючих записів`);
             } else {
-                toast(`Ціни: додано ${result.added} нових, оновлено ${result.updated} існуючих`);
+                toast(`Ціни: додано ${result.added} нових, замінено ${result.replaced} існуючих`);
             }
             if (_loadForestFn) await _loadForestFn();
             showLoader(false);
@@ -110,12 +110,12 @@ export async function handleFile(file, expectedType = null) {
             const records = parseInventoryFile(wb);
             if (!records.length) { toast('Файл не містить даних про залишки. Перевірте формат.', true); showLoader(false); return; }
             const result = await saveInventoryData(records, file.name);
-            if (result.added === 0 && result.updated === 0) {
+            if (result.added === 0 && result.replaced === 0) {
                 toast('Файл не містить нових даних.');
             } else if (result.added === 0) {
-                toast(`Залишки: оновлено ${result.updated} існуючих записів`);
+                toast(`Залишки: замінено ${result.replaced} існуючих записів`);
             } else {
-                toast(`Залишки: додано ${result.added} нових, оновлено ${result.updated} існуючих`);
+                toast(`Залишки: додано ${result.added} нових, замінено ${result.replaced} існуючих`);
             }
             if (_loadForestFn) await _loadForestFn();
             showLoader(false);
@@ -126,12 +126,12 @@ export async function handleFile(file, expectedType = null) {
             const records = parsePlanFactFile(wb);
             if (!records.length) { toast('Файл не містить даних план-факт. Перевірте формат.', true); showLoader(false); return; }
             const result = await savePlanFactData(records, file.name);
-            if (result.added === 0 && result.updated === 0) {
+            if (result.added === 0 && result.replaced === 0) {
                 toast('Файл не містить нових даних.');
             } else if (result.added === 0) {
-                toast(`План-факт: оновлено ${result.updated} існуючих записів`);
+                toast(`План-факт: замінено ${result.replaced} існуючих записів`);
             } else {
-                toast(`План-факт: додано ${result.added} нових, оновлено ${result.updated} існуючих`);
+                toast(`План-факт: додано ${result.added} нових, замінено ${result.replaced} існуючих`);
             }
             if (_loadHarvestingFn) await _loadHarvestingFn();
             showLoader(false);
@@ -142,12 +142,12 @@ export async function handleFile(file, expectedType = null) {
             const records = parseZsuFile(wb);
             if (!records.length) { toast('Файл не містить даних ЗСУ. Перевірте формат.', true); showLoader(false); return; }
             const result = await saveZsuData(records, file.name);
-            if (result.added === 0 && result.updated === 0) {
+            if (result.added === 0 && result.replaced === 0) {
                 toast('Файл не містить нових даних.');
             } else if (result.added === 0) {
-                toast(`Дані ЗСУ: оновлено ${result.updated} існуючих записів`);
+                toast(`Дані ЗСУ: замінено ${result.replaced} існуючих записів`);
             } else {
-                toast(`Дані ЗСУ: додано ${result.added} нових, оновлено ${result.updated} існуючих`);
+                toast(`Дані ЗСУ: додано ${result.added} нових, замінено ${result.replaced} існуючих`);
             }
             if (_loadHarvestingFn) await _loadHarvestingFn();
             showLoader(false);
@@ -155,8 +155,16 @@ export async function handleFile(file, expectedType = null) {
         }
 
         // KPI file
-        const records = await parseKpiFile(file);
+        const parsed = await parseKpiFile(file);
+        const records = parsed.records;
         if (!records.length) { toast('Файл не містить даних. Перевірте формат.', true); showLoader(false); return; }
+        if (parsed.skippedIndicators.length) {
+            console.warn('Невідомі індикатори пропущені:', parsed.skippedIndicators);
+            toast(`Увага: пропущено невідомі індикатори: ${parsed.skippedIndicators.join(', ')}`);
+        }
+        if (parsed.skippedValues > 0) {
+            console.warn('Пропущено рядків з невалідними значеннями:', parsed.skippedValues);
+        }
 
         const result = await saveRecords(records, file.name);
         if (result.added === 0 && result.updated === 0) {

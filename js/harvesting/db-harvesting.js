@@ -20,18 +20,24 @@ export async function savePlanFactData(records, fileName) {
     const existingKeys = new Set((existing || []).map(r => r.regional_office));
 
     const rows = records.map(r => ({ upload_batch_id: batchId, ...r, uploaded_by: userId }));
-    const newCount = rows.filter(r => !existingKeys.has(r.regional_office)).length;
-    const updatedCount = rows.length - newCount;
+    const newRows = rows.filter(r => !existingKeys.has(r.regional_office));
+    const replacedKeys = rows.filter(r => existingKeys.has(r.regional_office)).map(r => r.regional_office);
 
+    // Delete existing records that will be replaced
+    if (replacedKeys.length) {
+        await sb.from('harvesting_plan_fact').delete().in('regional_office', replacedKeys);
+    }
+
+    // Insert all records (new + replacements)
     for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from('harvesting_plan_fact').upsert(rows.slice(i, i + 500));
+        const { error } = await sb.from('harvesting_plan_fact').insert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
     await sb.from('forest_upload_history').insert({
         data_type: 'harvesting_plan_fact', batch_id: batchId,
         file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
-    return { added: newCount, updated: updatedCount };
+    return { added: newRows.length, replaced: replacedKeys.length };
 }
 
 export async function saveZsuData(records, fileName) {
@@ -44,18 +50,24 @@ export async function saveZsuData(records, fileName) {
     const existingKeys = new Set((existing || []).map(r => r.regional_office));
 
     const rows = records.map(r => ({ upload_batch_id: batchId, ...r, uploaded_by: userId }));
-    const newCount = rows.filter(r => !existingKeys.has(r.regional_office)).length;
-    const updatedCount = rows.length - newCount;
+    const newRows = rows.filter(r => !existingKeys.has(r.regional_office));
+    const replacedKeys = rows.filter(r => existingKeys.has(r.regional_office)).map(r => r.regional_office);
 
+    // Delete existing records that will be replaced
+    if (replacedKeys.length) {
+        await sb.from('harvesting_zsu').delete().in('regional_office', replacedKeys);
+    }
+
+    // Insert all records (new + replacements)
     for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from('harvesting_zsu').upsert(rows.slice(i, i + 500));
+        const { error } = await sb.from('harvesting_zsu').insert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
     }
     await sb.from('forest_upload_history').insert({
         data_type: 'harvesting_zsu', batch_id: batchId,
         file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
-    return { added: newCount, updated: updatedCount };
+    return { added: newRows.length, replaced: replacedKeys.length };
 }
 
 export async function loadPlanFactData() {

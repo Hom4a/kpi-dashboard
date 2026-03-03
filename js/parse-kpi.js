@@ -19,6 +19,8 @@ export function parseKpiFile(file) {
                 const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true });
                 const out = [];
+                const skippedIndicators = new Set();
+                let skippedValues = 0;
                 for (let i = 1; i < rows.length; i++) {
                     const r = rows[i]; if (!r || !r[0]) continue;
                     let date = typeof r[0] === 'string' ? new Date(r[0]) : r[0] instanceof Date ? r[0] : null;
@@ -35,14 +37,19 @@ export function parseKpiFile(file) {
                         value = Math.round((rawVal.getTime() - XL.getTime()) / 864e5);
                     } else if (typeof rawVal === 'string') {
                         const cleaned = rawVal.replace(/[\s\u00A0]/g, '').replace(',', '.');
-                        value = parseFloat(cleaned) || 0;
+                        value = cleaned === '' ? null : (isNaN(parseFloat(cleaned)) ? null : parseFloat(cleaned));
                     } else {
-                        value = 0;
+                        value = null;
                     }
+                    if (value == null) { skippedValues++; continue; }
                     const type = classifyIndicator(indicator);
-                    if (type !== 'unknown') out.push({ date: dateStr, indicator, type, value, unit });
+                    if (type !== 'unknown') {
+                        out.push({ date: dateStr, indicator, type, value, unit });
+                    } else {
+                        skippedIndicators.add(indicator);
+                    }
                 }
-                resolve(out);
+                resolve({ records: out, skippedIndicators: [...skippedIndicators], skippedValues });
             } catch (err) { reject(err); }
         };
         reader.readAsArrayBuffer(file);

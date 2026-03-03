@@ -42,7 +42,10 @@ export function parsePlanFactFile(wb) {
             break;
         }
     }
-    if (dataStartIdx < 0) return [];
+    if (dataStartIdx < 0) {
+        console.warn('parse-plan-fact: не знайдено рядок з назвою управління в перших 20 рядках');
+        return [];
+    }
 
     // Build column map from merged headers (rows 0..dataStartIdx-1)
     // The file has complex multi-level headers. We map by position relative to office column.

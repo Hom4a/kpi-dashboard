@@ -12,12 +12,15 @@ export function renderKPIs() {
     const avgR = real.length ? sumR / real.length : 0;
     const maxR = real.length ? real.reduce((m, r) => r.value > m ? r.value : m, -Infinity) : 0;
     const maxRDate = real.length ? real.reduce((a, b) => b.value > a.value ? b : a, real[0]).date : '';
-    const now = filtered.length ? filtered[filtered.length - 1]._date : new Date();
-    const cm = now.getMonth(), cy = now.getFullYear();
+    const lastData = filtered.length ? filtered[filtered.length - 1]._date : new Date();
+    const cm = lastData.getMonth(), cy = lastData.getFullYear();
     const pm = cm === 0 ? 11 : cm - 1, py = cm === 0 ? cy - 1 : cy;
-    const curM = real.filter(r => r._date.getMonth() === cm && r._date.getFullYear() === cy).reduce((s, r) => s + r.value, 0);
+    const curMDays = real.filter(r => r._date.getMonth() === cm && r._date.getFullYear() === cy);
+    const curM = curMDays.reduce((s, r) => s + r.value, 0);
     const prevM = real.filter(r => r._date.getMonth() === pm && r._date.getFullYear() === py).reduce((s, r) => s + r.value, 0);
     const mom = prevM > 0 ? ((curM - prevM) / prevM * 100) : 0;
+    const today = new Date();
+    const isPartialMonth = (cy === today.getFullYear() && cm === today.getMonth() && today.getDate() < 28);
     const work = real.filter(r => r.value > 1000).length;
     const last30 = real.slice(-30).map(r => r.value);
     const last30h = harv.slice(-30).map(r => r.value);
@@ -27,7 +30,7 @@ export function renderKPIs() {
         { label: 'Заготівля', val: fmt(sumH / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-secondary', sub: 'За обраний період', spark: last30h, sparkColor: themeColor('--secondary') },
         { label: 'Середнє/день', val: fmt(avgR, 0), unit: 'м\u00B3', cls: 'neon-accent', sub: 'Реалізація' },
         { label: 'Макс за день', val: fmt(maxR, 0), unit: 'м\u00B3', cls: 'neon-amber', sub: maxRDate ? fmtDate(maxRDate) : '' },
-        { label: MO[cm] + ' ' + cy, val: fmt(curM / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-green', change: mom, sub: `vs ${MO[pm]}: ${fmt(prevM / 1000, 1)} тис.м\u00B3` },
+        { label: MO[cm] + ' ' + cy + (isPartialMonth ? ` (${curMDays.length} дн)` : ''), val: fmt(curM / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-green', change: isPartialMonth ? null : mom, sub: isPartialMonth ? `Неповний місяць (${curMDays.length} днів з даними)` : `vs ${MO[pm]}: ${fmt(prevM / 1000, 1)} тис.м\u00B3` },
         { label: 'Робочі дні', val: fmt(work), unit: 'днів', cls: 'neon-rose', sub: `${fmt(real.length - work)} вихідних` },
     ];
     $('kpiGrid').innerHTML = kpis.map(k => `
@@ -56,14 +59,19 @@ export function renderInsights() {
     const real = filtered.filter(r => r.type === 'realized');
     if (!real.length) { $('insightsBar').innerHTML = ''; return; }
     const insights = [];
-    const now = filtered[filtered.length - 1]._date;
-    const cm = now.getMonth(), cy = now.getFullYear();
-    const pm = cm === 0 ? 11 : cm - 1, py = cm === 0 ? cy - 1 : cy;
-    const curM = real.filter(r => r._date.getMonth() === cm && r._date.getFullYear() === cy).reduce((s, r) => s + r.value, 0);
-    const prevM = real.filter(r => r._date.getMonth() === pm && r._date.getFullYear() === py).reduce((s, r) => s + r.value, 0);
-    if (prevM > 0) {
-        const ch = ((curM - prevM) / prevM * 100).toFixed(1);
+    const lastD = filtered[filtered.length - 1]._date;
+    const cm2 = lastD.getMonth(), cy2 = lastD.getFullYear();
+    const pm2 = cm2 === 0 ? 11 : cm2 - 1, py2 = cm2 === 0 ? cy2 - 1 : cy2;
+    const curMDays2 = real.filter(r => r._date.getMonth() === cm2 && r._date.getFullYear() === cy2);
+    const curM2 = curMDays2.reduce((s, r) => s + r.value, 0);
+    const prevM2 = real.filter(r => r._date.getMonth() === pm2 && r._date.getFullYear() === py2).reduce((s, r) => s + r.value, 0);
+    const td = new Date();
+    const partial = (cy2 === td.getFullYear() && cm2 === td.getMonth() && td.getDate() < 28);
+    if (prevM2 > 0 && !partial) {
+        const ch = ((curM2 - prevM2) / prevM2 * 100).toFixed(1);
         insights.push(`Реалізація ${ch >= 0 ? 'зросла' : 'знизилась'} на ${Math.abs(ch)}% порівняно з минулим місяцем`);
+    } else if (partial) {
+        insights.push(`${MO[cm2]}: дані за ${curMDays2.length} днів (місяць ще не завершено)`);
     }
     const maxR = real.reduce((a, b) => b.value > a.value ? b : a, real[0]);
     insights.push(`Максимум за день: ${fmt(maxR.value)} м\u00B3 (${fmtDate(maxR.date)})`);
