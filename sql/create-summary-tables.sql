@@ -75,6 +75,22 @@ ALTER TABLE summary_weekly ENABLE ROW LEVEL SECURITY;
 ALTER TABLE summary_weekly_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE summary_upload_history ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies first (idempotent)
+DROP POLICY IF EXISTS "Auth read summary_indicators" ON summary_indicators;
+DROP POLICY IF EXISTS "Auth insert summary_indicators" ON summary_indicators;
+DROP POLICY IF EXISTS "Auth update summary_indicators" ON summary_indicators;
+DROP POLICY IF EXISTS "Auth delete summary_indicators" ON summary_indicators;
+DROP POLICY IF EXISTS "Auth read summary_weekly" ON summary_weekly;
+DROP POLICY IF EXISTS "Auth insert summary_weekly" ON summary_weekly;
+DROP POLICY IF EXISTS "Auth update summary_weekly" ON summary_weekly;
+DROP POLICY IF EXISTS "Auth delete summary_weekly" ON summary_weekly;
+DROP POLICY IF EXISTS "Auth read summary_weekly_notes" ON summary_weekly_notes;
+DROP POLICY IF EXISTS "Auth insert summary_weekly_notes" ON summary_weekly_notes;
+DROP POLICY IF EXISTS "Auth update summary_weekly_notes" ON summary_weekly_notes;
+DROP POLICY IF EXISTS "Auth delete summary_weekly_notes" ON summary_weekly_notes;
+DROP POLICY IF EXISTS "Auth read summary_upload_history" ON summary_upload_history;
+DROP POLICY IF EXISTS "Auth insert summary_upload_history" ON summary_upload_history;
+
 -- summary_indicators policies
 CREATE POLICY "Auth read summary_indicators" ON summary_indicators FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Auth insert summary_indicators" ON summary_indicators FOR INSERT TO authenticated WITH CHECK (true);
