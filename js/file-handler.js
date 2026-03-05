@@ -13,7 +13,8 @@ import { savePlanFactData, saveZsuData } from './harvesting/db-harvesting.js';
 import { parseMarketPricesFile } from './market/parse-market-prices.js';
 import { saveMarketData } from './market/db-market.js';
 import { parseSummaryXlsx } from './summary/parse-summary-xlsx.js';
-import { saveSummaryIndicators } from './summary/db-summary.js';
+import { parseSummaryDocx } from './summary/parse-summary-docx.js';
+import { saveSummaryIndicators, saveSummaryWeekly } from './summary/db-summary.js';
 
 let _loadAndRenderFn = null;
 let _loadForestFn = null;
@@ -70,6 +71,14 @@ export async function handleFile(file, expectedType = null) {
     showLoader(true);
     try {
         const buffer = await file.arrayBuffer();
+
+        // Handle .docx files (weekly briefing) — before XLSX.read which would fail on docx
+        if (file.name.toLowerCase().endsWith('.docx')) {
+            await handleDocxFile(buffer, file.name);
+            showLoader(false);
+            return;
+        }
+
         const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
         const fileType = detectFileType(wb, file.name);
 
@@ -201,4 +210,28 @@ export async function handleFile(file, expectedType = null) {
         if (_loadAndRenderFn) await _loadAndRenderFn();
     } catch (err) { toast('Помилка: ' + err.message, true); console.error(err); }
     showLoader(false);
+}
+
+async function handleDocxFile(buffer, fileName) {
+    try {
+        const parsed = await parseSummaryDocx(buffer);
+        if (!parsed.records.length && !parsed.notes.length) {
+            toast('Файл .docx не містить даних тижневої довідки. Перевірте формат.', true);
+            return;
+        }
+
+        // Try to get date from document content, then filename, then today
+        let reportDate = parsed.reportDate;
+        if (!reportDate) {
+            const fm = (fileName || '').match(/(\d{2})\.(\d{2})\.(20\d{2})/);
+            reportDate = fm ? `${fm[3]}-${fm[2]}-${fm[1]}` : new Date().toISOString().slice(0, 10);
+        }
+        const result = await saveSummaryWeekly(parsed.records, parsed.notes, reportDate, fileName);
+        toast(`Тижнева довідка: ${result.count} показників, ${result.notes} нотаток (${reportDate})`);
+
+        if (_loadSummaryFn) await _loadSummaryFn();
+    } catch (err) {
+        toast('Помилка обробки .docx: ' + err.message, true);
+        console.error(err);
+    }
 }
