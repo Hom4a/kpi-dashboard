@@ -74,9 +74,14 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
     await sb.from('summary_weekly').delete().eq('report_date', reportDate);
     await sb.from('summary_weekly_notes').delete().eq('report_date', reportDate);
 
-    // Insert indicator records
+    // Deduplicate records (keep last occurrence for same section+indicator)
     if (records.length) {
-        const rows = records.map(r => ({
+        const dedup = new Map();
+        for (const r of records) {
+            dedup.set(`${r.section}|${r.indicator_name}`, r);
+        }
+        const unique = [...dedup.values()];
+        const rows = unique.map(r => ({
             upload_batch_id: batchId,
             report_date: reportDate,
             section: r.section,
@@ -90,7 +95,8 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
             uploaded_by: userId
         }));
         for (let i = 0; i < rows.length; i += BATCH) {
-            const { error } = await sb.from('summary_weekly').insert(rows.slice(i, i + BATCH));
+            const { error } = await sb.from('summary_weekly')
+                .upsert(rows.slice(i, i + BATCH), { onConflict: 'report_date,section,indicator_name' });
             if (error) throw new Error(error.message);
         }
     }
@@ -106,7 +112,8 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
                 uploaded_by: userId
             }));
         if (noteRows.length) {
-            const { error } = await sb.from('summary_weekly_notes').insert(noteRows);
+            const { error } = await sb.from('summary_weekly_notes')
+                .upsert(noteRows, { onConflict: 'report_date,note_type' });
             if (error) throw new Error(error.message);
         }
     }
