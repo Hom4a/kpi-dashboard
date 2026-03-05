@@ -29,6 +29,11 @@ export function setLoadSummaryCallback(fn) { _loadSummaryFn = fn; }
 const MARKET_COUNTRIES = ['україна', 'фінляндія', 'німеччина', 'польща', 'латвія', 'литва', 'швеція', 'норвегія', 'естонія', 'австрія'];
 
 export function detectFileType(wb, fileName) {
+    // Summary indicators: check FIRST — these files contain "залишок" which would misdetect as inventory
+    const sheetYears = wb.SheetNames.filter(n => /^20\d{2}$/.test(n.trim()));
+    if (sheetYears.length >= 2) return 'summary_indicators';
+    if ((fileName || '').toLowerCase().includes('основні показники')) return 'summary_indicators';
+
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, raw: true });
     let countryHits = 0;
@@ -47,10 +52,6 @@ export function detectFileType(wb, fileName) {
     // Check sheet names or file name for market price indicators
     const namePool = [...wb.SheetNames, fileName || ''].map(n => n.toLowerCase()).join(' ');
     if (/ціни|ціна|prices/i.test(namePool)) return 'market_prices';
-    // Summary indicators: sheets named as years (2022-2026) or filename "Основні показники"
-    const sheetYears = wb.SheetNames.filter(n => /^20\d{2}$/.test(n.trim()));
-    if (sheetYears.length >= 2) return 'summary_indicators';
-    if ((fileName || '').toLowerCase().includes('основні показники')) return 'summary_indicators';
     return 'kpi';
 }
 
