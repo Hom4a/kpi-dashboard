@@ -74,7 +74,10 @@ export async function handleFile(file, expectedType = null) {
         const buffer = await file.arrayBuffer();
 
         // Handle .docx files (weekly briefing) — before XLSX.read which would fail on docx
-        if (file.name.toLowerCase().endsWith('.docx')) {
+        const isDocx = file.name.toLowerCase().endsWith('.docx')
+            || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            || /\.docx$/i.test(file.name);
+        if (isDocx) {
             if (expectedType && !expectedType.split(',').includes('summary_weekly')) {
                 toast('Файл .docx — тижнева довідка. Використайте сторінку "Зведення".', true);
                 showLoader(false);
