@@ -22,7 +22,7 @@ export function exportSummaryExcel() {
                 const row = [label];
                 for (let m = 1; m <= 12; m++) {
                     const rec = data.find(r => r.indicator_name === name && r.sub_type === subType && r.month === m);
-                    row.push(rec?.value_text || rec?.value_numeric ?? '');
+                    row.push(rec?.value_text || (rec?.value_numeric ?? ''));
                 }
                 // Annual
                 const annual = summaryIndicators.find(r =>

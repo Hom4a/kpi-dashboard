@@ -1,7 +1,7 @@
 // ===== KPI Dashboard — Service Worker =====
 // Cache-First for static assets, Network-First for API data
 
-const CACHE_NAME = 'kpi-dashboard-v3';
+const CACHE_NAME = 'kpi-dashboard-v4';
 const API_CACHE = 'kpi-api-v1';
 
 // Static assets to pre-cache on install
@@ -17,7 +17,8 @@ const STATIC_ASSETS = [
     '/css/data-entry.css',
     '/css/builder.css',
     '/css/api-system.css',
-    '/css/gis.css'
+    '/css/gis.css',
+    '/css/summary.css'
 ];
 
 // CDN resources to cache on first use
