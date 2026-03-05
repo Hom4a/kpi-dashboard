@@ -12,15 +12,19 @@ import { parseZsuFile } from './harvesting/parse-zsu.js';
 import { savePlanFactData, saveZsuData } from './harvesting/db-harvesting.js';
 import { parseMarketPricesFile } from './market/parse-market-prices.js';
 import { saveMarketData } from './market/db-market.js';
+import { parseSummaryXlsx } from './summary/parse-summary-xlsx.js';
+import { saveSummaryIndicators } from './summary/db-summary.js';
 
 let _loadAndRenderFn = null;
 let _loadForestFn = null;
 let _loadHarvestingFn = null;
 let _loadMarketFn = null;
+let _loadSummaryFn = null;
 export function setLoadAndRenderCallback(fn) { _loadAndRenderFn = fn; }
 export function setLoadForestCallback(fn) { _loadForestFn = fn; }
 export function setLoadHarvestingCallback(fn) { _loadHarvestingFn = fn; }
 export function setLoadMarketCallback(fn) { _loadMarketFn = fn; }
+export function setLoadSummaryCallback(fn) { _loadSummaryFn = fn; }
 
 const MARKET_COUNTRIES = ['україна', 'фінляндія', 'німеччина', 'польща', 'латвія', 'литва', 'швеція', 'норвегія', 'естонія', 'австрія'];
 
@@ -43,6 +47,10 @@ export function detectFileType(wb, fileName) {
     // Check sheet names or file name for market price indicators
     const namePool = [...wb.SheetNames, fileName || ''].map(n => n.toLowerCase()).join(' ');
     if (/ціни|ціна|prices/i.test(namePool)) return 'market_prices';
+    // Summary indicators: sheets named as years (2022-2026) or filename "Основні показники"
+    const sheetYears = wb.SheetNames.filter(n => /^20\d{2}$/.test(n.trim()));
+    if (sheetYears.length >= 2) return 'summary_indicators';
+    if ((fileName || '').toLowerCase().includes('основні показники')) return 'summary_indicators';
     return 'kpi';
 }
 
@@ -50,7 +58,8 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 const FILE_TYPE_LABELS = {
     kpi: 'KPI обсяги/фінанси', prices: 'середньозважені ціни', inventory: 'залишки лісопродукції',
-    harvesting_plan_fact: 'план-факт заготівлі', harvesting_zsu: 'дані ЗСУ', market_prices: 'ринкові ціни'
+    harvesting_plan_fact: 'план-факт заготівлі', harvesting_zsu: 'дані ЗСУ', market_prices: 'ринкові ціни',
+    summary_indicators: 'основні показники діяльності'
 };
 
 export async function handleFile(file, expectedType = null) {
@@ -150,6 +159,20 @@ export async function handleFile(file, expectedType = null) {
                 toast(`Дані ЗСУ: додано ${result.added} нових, замінено ${result.replaced} існуючих`);
             }
             if (_loadHarvestingFn) await _loadHarvestingFn();
+            showLoader(false);
+            return;
+        }
+
+        if (fileType === 'summary_indicators') {
+            const parsed = parseSummaryXlsx(wb);
+            if (!parsed.records.length) { toast('Файл не містить даних "Основні показники". Перевірте формат.', true); showLoader(false); return; }
+            const result = await saveSummaryIndicators(parsed.records, file.name);
+            if (result.added === 0 && result.updated === 0) {
+                toast('Зведення: дані вже актуальні, змін не внесено.');
+            } else {
+                toast(`Зведення: завантажено ${result.total} показників (додано ${result.added}, оновлено ${result.updated}) за ${parsed.years.join(', ')} рр.`);
+            }
+            if (_loadSummaryFn) await _loadSummaryFn();
             showLoader(false);
             return;
         }

@@ -16,7 +16,9 @@ const MONITORED_TABLES = [
     'forest_inventory',
     'harvesting_plan_fact',
     'harvesting_zsu',
-    'market_prices'
+    'market_prices',
+    'summary_indicators',
+    'summary_weekly'
 ];
 
 const TABLE_EVENT_MAP = {
@@ -25,7 +27,9 @@ const TABLE_EVENT_MAP = {
     forest_inventory: 'data:forest-loaded',
     harvesting_plan_fact: 'data:harvesting-loaded',
     harvesting_zsu: 'data:harvesting-loaded',
-    market_prices: 'data:market-loaded'
+    market_prices: 'data:market-loaded',
+    summary_indicators: 'data:summary-loaded',
+    summary_weekly: 'data:summary-loaded'
 };
 
 export function startRealtime(reloadCallbacks) {

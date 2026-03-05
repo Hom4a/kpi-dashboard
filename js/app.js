@@ -11,7 +11,7 @@ import { renderAll } from './render-all.js';
 import { setMainMode, renderTable } from './render-volumes.js';
 import { exportExcel } from './export.js';
 import { loadAllRecords, clearDB, undoLastKpiUpload } from './db-kpi.js';
-import { handleFile, setLoadAndRenderCallback as setFileHandlerLoadAndRender, setLoadForestCallback, setLoadHarvestingCallback } from './file-handler.js';
+import { handleFile, setLoadAndRenderCallback as setFileHandlerLoadAndRender, setLoadForestCallback, setLoadHarvestingCallback, setLoadMarketCallback, setLoadSummaryCallback } from './file-handler.js';
 import { startAutoRefresh, stopAutoRefresh, checkThresholds, setLoadAndRenderCallback as setAutoRefreshLoadAndRender } from './auto-refresh.js';
 // Forest modules
 import { setPricesData, setInventoryData, setFilteredPrices, setFilteredInventory } from './forest/state-forest.js';
@@ -31,7 +31,12 @@ import { setMarketPrices, setMarketUaDetail, setMarketHistory, setEurRates, setM
 import { loadMarketPrices, loadMarketUaDetail, loadMarketHistory, loadEurRates, clearMarketData as clearMarketDB, undoLastMarketUpload as undoMarketDB } from './market/db-market.js';
 import { populateMarketFilters, applyMarketFilter, initMarketFilterEvents, setRenderMarketCallback } from './market/filters-market.js';
 import { renderMarketDashboard } from './market/render-market.js';
-import { setLoadMarketCallback } from './file-handler.js';
+// Summary modules
+import { setSummaryIndicators, setSummaryWeekly, setSummaryWeeklyNotes } from './summary/state-summary.js';
+import { loadSummaryIndicators, loadSummaryWeekly, loadSummaryWeeklyNotes, clearSummaryIndicators, clearSummaryWeekly } from './summary/db-summary.js';
+import { renderSummaryDashboard } from './summary/render-summary.js';
+import { initWeeklyEntry } from './summary/weekly-entry.js';
+import { exportSummaryExcel } from './summary/export-summary.js';
 // Data Entry modules
 import { initDataEntry, setDataEntryReloadCallback } from './data-entry/data-entry.js';
 // Builder modules
@@ -173,6 +178,24 @@ async function loadMarketDataAndRender() {
     } catch(e) { console.error('loadMarketDataAndRender error:', e); }
 }
 
+// ===== Load & Render Summary =====
+async function loadSummaryDataAndRender() {
+    try {
+        const [indicators, weekly, notes] = await Promise.all([
+            loadSummaryIndicators(), loadSummaryWeekly(), loadSummaryWeeklyNotes()
+        ]);
+        console.log('Summary loaded:', indicators.length, 'indicators,', weekly.length, 'weekly,', notes.length, 'notes');
+        setSummaryIndicators(indicators);
+        setSummaryWeekly(weekly);
+        setSummaryWeeklyNotes(notes);
+        if (indicators.length || weekly.length) {
+            hide('empty'); $('dash').style.display = 'block';
+        }
+        renderSummaryDashboard();
+        initWeeklyEntry();
+    } catch(e) { console.error('loadSummaryDataAndRender error:', e); }
+}
+
 // ===== Wire callbacks =====
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
@@ -180,7 +203,7 @@ setModalsRenderAll(renderAll);
 setAuthLoadAndRender(async () => {
     // Load regional offices in parallel with data
     const officesPromise = loadRegionalOffices().then(o => setRegionalOffices(o)).catch(e => console.warn('Regional offices not loaded (table may not exist):', e.message));
-    await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender(), officesPromise]);
+    await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender(), loadSummaryDataAndRender(), officesPromise]);
     await renderExecutiveDashboard();
     showRoleButtons();
     initDataEntry();
@@ -193,7 +216,9 @@ setAuthLoadAndRender(async () => {
         forest_inventory: async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
         harvesting_plan_fact: async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
         harvesting_zsu: async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
-        market_prices: async () => { await loadMarketDataAndRender(); await renderExecutiveDashboard(); }
+        market_prices: async () => { await loadMarketDataAndRender(); await renderExecutiveDashboard(); },
+        summary_indicators: async () => { await loadSummaryDataAndRender(); await renderExecutiveDashboard(); },
+        summary_weekly: async () => { await loadSummaryDataAndRender(); }
     });
 });
 setHideButtonsCallback(hideButtons);
@@ -201,7 +226,8 @@ setFileHandlerLoadAndRender(async () => { await loadAndRender(); showRoleButtons
 setLoadForestCallback(async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); });
 setLoadHarvestingCallback(async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); });
 setLoadMarketCallback(async () => { await loadMarketDataAndRender(); await renderExecutiveDashboard(); });
-setAutoRefreshLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); });
+setLoadSummaryCallback(async () => { await loadSummaryDataAndRender(); await renderExecutiveDashboard(); });
+setAutoRefreshLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender(), loadSummaryDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); });
 setRenderForestCallback(renderForestDashboard);
 setRenderHarvestingCallback(renderHarvestingDashboard);
 setRenderMarketCallback(renderMarketDashboard);
@@ -212,6 +238,7 @@ setDataEntryReloadCallback(async (targetTable) => {
     else if (targetTable === 'forest_prices' || targetTable === 'forest_inventory') { await loadForestDataAndRender(); }
     else if (targetTable === 'harvesting_plan_fact' || targetTable === 'harvesting_zsu') { await loadHarvestingDataAndRender(); }
     else if (['market_prices', 'market_prices_ua', 'market_price_history', 'eur_rates'].includes(targetTable)) { await loadMarketDataAndRender(); }
+    else if (targetTable === 'summary_indicators' || targetTable === 'summary_weekly') { await loadSummaryDataAndRender(); }
     await renderExecutiveDashboard();
 });
 
@@ -240,6 +267,7 @@ window.closeDataManage = closeDataManage;
 window.openDashboardsPage = () => { switchPage('builder'); initDashboardList($('builderContent')); };
 window.openApiSystemPage = () => { switchPage('api-system'); renderApiSystemPage(); };
 window.openGisPage = () => { switchPage('gis'); renderGisMap(); };
+window.exportSummaryExcel = exportSummaryExcel;
 window.openGisAdmin = openGisAdmin;
 window.closeGisAdmin = closeGisAdmin;
 window.saveGisAdmin = saveGisAdmin;
@@ -341,6 +369,32 @@ window.undoLastMarketUpload = async () => {
         await loadMarketDataAndRender();
         await renderExecutiveDashboard();
         toast('Останнє завантаження ринкових цін скасовано');
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
+
+window.clearSummaryIndicators = async () => {
+    if (!confirm('Очистити дані зведених показників?')) return;
+    showLoader(true);
+    try {
+        await clearSummaryIndicators();
+        setSummaryIndicators([]);
+        await loadSummaryDataAndRender();
+        await renderExecutiveDashboard();
+        toast('Дані зведених показників очищено');
+        openDataManage();
+    } catch (err) { toast('Помилка: ' + err.message, true); }
+    showLoader(false);
+};
+window.clearSummaryWeekly = async () => {
+    if (!confirm('Очистити дані щотижневих довідок?')) return;
+    showLoader(true);
+    try {
+        await clearSummaryWeekly();
+        setSummaryWeekly([]); setSummaryWeeklyNotes([]);
+        await loadSummaryDataAndRender();
+        toast('Дані щотижневих довідок очищено');
         openDataManage();
     } catch (err) { toast('Помилка: ' + err.message, true); }
     showLoader(false);

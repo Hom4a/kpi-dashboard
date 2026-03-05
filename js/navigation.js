@@ -10,6 +10,7 @@ const pageMap = {
     harvesting: 'pageHarvesting',
     market: 'pageMarket',
     executive: 'pageExecutive',
+    summary: 'pageSummary',
     'data-entry': 'pageDataEntry',
     builder: 'pageBuilder',
     'api-system': 'pageApiSystem',
@@ -24,7 +25,7 @@ const filterBarMap = {
     volumes: 'filterBar', finance: 'filterBar',
     forest: 'forestFilterBar', harvesting: 'harvestingFilterBar',
     market: 'marketFilterBar',
-    executive: null, 'data-entry': null, builder: null, 'api-system': null, gis: null
+    executive: null, summary: null, 'data-entry': null, builder: null, 'api-system': null, gis: null
 };
 
 const ALL_FILTER_BARS = ['filterBar', 'forestFilterBar', 'harvestingFilterBar', 'marketFilterBar'];

@@ -37,6 +37,7 @@
     <link rel="stylesheet" href="css/builder.css">
     <link rel="stylesheet" href="css/api-system.css">
     <link rel="stylesheet" href="css/gis.css">
+    <link rel="stylesheet" href="css/summary.css">
 </head>
 <body>
 
@@ -90,6 +91,10 @@
         <div class="nav-item" data-page="executive" onclick="switchPage('executive')">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             <span>Керівний</span>
+        </div>
+        <div class="nav-item" data-page="summary" onclick="switchPage('summary')">
+            <svg viewBox="0 0 24 24"><path d="M9 5H2v7h7V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M22 5h-7v7h7V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 16H2v7h7v-7z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M22 16h-7v3h7v-3z" fill="none" stroke="currentColor" stroke-width="2"/><line x1="17" y1="22" x2="19" y2="22" stroke="currentColor" stroke-width="2"/></svg>
+            <span>Зведення</span>
         </div>
         <div class="nav-item" data-page="data-entry" onclick="switchPage('data-entry')">
             <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -596,6 +601,88 @@
             </div>
         </div>
 
+        <!-- Summary page -->
+        <div class="page-section" id="pageSummary">
+            <div id="summaryEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
+                <p style="font-size:15px;margin-bottom:8px">Завантажте файл "Основні показники" для перегляду зведення</p>
+                <p style="font-size:12px">Щомісячні та щотижневі показники діяльності підприємства</p>
+            </div>
+            <div id="summaryContent" style="display:none">
+                <!-- KPI cards -->
+                <div class="kpi-grid" id="kpiGridSummary"></div>
+
+                <!-- Weekly briefing -->
+                <div class="glass chart-card" style="margin-bottom:20px" id="summaryWeeklyCard">
+                    <div class="chart-hdr">
+                        <div><h3>Щотижнева довідка</h3><small id="summaryWeeklyDate">Оперативні показники</small></div>
+                        <div style="display:flex;gap:8px">
+                            <button class="btn btn-sm" id="btnWeeklyEntry" style="display:none">+ Внести дані</button>
+                            <button class="btn btn-sm" id="btnSummaryExport" style="display:none" onclick="exportSummaryExcel()">Excel</button>
+                        </div>
+                    </div>
+                    <div id="summaryNotesBlock" style="margin-bottom:12px;display:none"></div>
+                    <div class="tbl-wrap"><table class="tbl" id="summaryWeeklyTable">
+                        <thead><tr><th>Показник</th><th>За тиждень</th><th>Попер. тиждень</th><th>З початку року</th><th>Зміна</th></tr></thead>
+                        <tbody id="tblBodyWeekly"></tbody>
+                    </table></div>
+                    <div id="summaryWeeklySections" style="margin-top:16px;display:none"></div>
+                    <div id="weeklyEntryPanel" style="display:none"></div>
+                </div>
+
+                <!-- Indicator group tabs -->
+                <div class="toggle-bar" id="tglSummaryGroup" style="margin-bottom:16px">
+                    <button class="active" data-g="all">Всі</button>
+                    <button data-g="finance">Фінанси</button>
+                    <button data-g="revenue">Доходи</button>
+                    <button data-g="production">Продукція</button>
+                    <button data-g="forestry">Лісогосп.</button>
+                </div>
+
+                <!-- Monthly indicators pivot table -->
+                <div class="glass chart-card" style="margin-bottom:20px" id="summaryIndicatorsCard">
+                    <div class="chart-hdr">
+                        <div><h3>Основні показники</h3><small>Щомісячна динаміка</small></div>
+                        <select id="summaryYearSelect" class="filter-select" style="width:auto;min-width:80px"></select>
+                    </div>
+                    <div class="tbl-wrap"><table class="tbl" id="summaryIndicatorsTable">
+                        <thead id="summaryIndicatorsHead"></thead>
+                        <tbody id="tblBodyIndicators"></tbody>
+                    </table></div>
+                </div>
+
+                <!-- Charts -->
+                <div class="chart-row cols-2">
+                    <div class="glass chart-card">
+                        <div class="chart-hdr"><div><h3>Динаміка доходів</h3><small>Помісячно, млн грн</small></div></div>
+                        <div class="chart-wrap medium" id="wrapSummaryRevenue"><canvas id="cSummaryRevenue"></canvas></div>
+                    </div>
+                    <div class="glass chart-card">
+                        <div class="chart-hdr"><div><h3>ФОП та чисельність</h3><small>Помісячна динаміка</small></div></div>
+                        <div class="chart-wrap medium" id="wrapSummaryPayroll"><canvas id="cSummaryPayroll"></canvas></div>
+                    </div>
+                </div>
+                <div class="chart-row cols-2">
+                    <div class="glass chart-card">
+                        <div class="chart-hdr"><div><h3>Лісопродукція по породах</h3><small>Обсяги, тис. м³</small></div></div>
+                        <div class="chart-wrap medium" id="wrapSummaryProduction"><canvas id="cSummaryProduction"></canvas></div>
+                    </div>
+                    <div class="glass chart-card">
+                        <div class="chart-hdr"><div><h3>Ціни реалізації по породах</h3><small>грн/м³</small></div></div>
+                        <div class="chart-wrap medium" id="wrapSummaryYoy"><canvas id="cSummaryYoy"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Yearly summary table -->
+                <div class="glass chart-card" style="margin-bottom:20px">
+                    <div class="chart-hdr"><div><h3>Річне зведення</h3><small>Основні показники по роках</small></div></div>
+                    <div class="tbl-wrap"><table class="tbl" id="summaryYearlyTable">
+                        <thead id="summaryYearlyHead"></thead>
+                        <tbody id="tblBodyYearly"></tbody>
+                    </table></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Data Entry page -->
         <div class="page-section" id="pageDataEntry">
             <div id="dataEntryContent">
@@ -829,6 +916,10 @@
         <button class="mobile-nav-item" data-page="executive" onclick="switchPage('executive')">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             <span>Керівний</span>
+        </button>
+        <button class="mobile-nav-item" data-page="summary" onclick="switchPage('summary')">
+            <svg viewBox="0 0 24 24"><path d="M9 5H2v7h7V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M22 5h-7v7h7V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 16H2v7h7v-7z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M22 16h-7v3h7v-3z" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            <span>Зведення</span>
         </button>
         <button class="mobile-nav-item" data-page="data-entry" onclick="switchPage('data-entry')">
             <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>

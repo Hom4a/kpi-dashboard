@@ -7,6 +7,7 @@ import { getRecordCount, getUploadHistory } from './db-kpi.js';
 import { getPricesCount, getInventoryCount } from './forest/db-forest.js';
 import { getPlanFactCount, getZsuCount } from './harvesting/db-harvesting.js';
 import { getMarketPricesCount } from './market/db-market.js';
+import { getSummaryIndicatorCount, getSummaryWeeklyCount } from './summary/db-summary.js';
 
 let _renderAllFn = null;
 export function setRenderAllCallback(fn) { _renderAllFn = fn; }
@@ -517,9 +518,10 @@ export async function openDataManage() {
     const content = $('dataManageContent');
     content.innerHTML = '<p style="color:var(--text3);font-size:12px">Завантаження статистики...</p>';
     try {
-        const [kpiCount, pricesCount, inventoryCount, pfCount, zsuCount, marketCount, kpiHistory] = await Promise.all([
+        const [kpiCount, pricesCount, inventoryCount, pfCount, zsuCount, marketCount, summaryIndCount, summaryWeekCount, kpiHistory] = await Promise.all([
             getRecordCount(), getPricesCount(), getInventoryCount(),
-            getPlanFactCount(), getZsuCount(), getMarketPricesCount(), getUploadHistory('kpi')
+            getPlanFactCount(), getZsuCount(), getMarketPricesCount(),
+            getSummaryIndicatorCount(), getSummaryWeeklyCount(), getUploadHistory('kpi')
         ]);
         const [pricesHistory, inventoryHistory, pfHistory, zsuHistory, marketHistory] = await Promise.all([
             getUploadHistory('prices'), getUploadHistory('inventory'),
@@ -533,6 +535,8 @@ export async function openDataManage() {
             ${dataSection('Ринкові ціни (міжнародні)', marketCount, marketHistory[0] || null, 'clearMarketData()', 'undoLastMarketUpload()')}
             ${dataSection('План-факт заготівлі', pfCount, pfHistory[0] || null, 'clearPlanFact()')}
             ${dataSection('Довідка ЗСУ', zsuCount, zsuHistory[0] || null, 'clearZsu()')}
+            ${dataSection('Зведені показники (xlsx)', summaryIndCount, null, 'clearSummaryIndicators()')}
+            ${dataSection('Щотижневі довідки', summaryWeekCount, null, 'clearSummaryWeekly()')}
         </div>`;
     } catch(e) {
         content.innerHTML = `<p style="color:var(--rose);font-size:12px">Помилка: ${e.message}</p>`;

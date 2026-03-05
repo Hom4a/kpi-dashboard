@@ -1,0 +1,180 @@
+// ===== Summary Database Operations =====
+import { sb } from '../config.js';
+
+const BATCH = 500;
+
+// ===== Monthly Indicators (from xlsx) =====
+
+export async function saveSummaryIndicators(records, fileName) {
+    const { data: { session } } = await sb.auth.getSession();
+    const userId = session?.user?.id || null;
+    const batchId = crypto.randomUUID();
+
+    const rows = records.map(r => ({
+        upload_batch_id: batchId,
+        year: r.year,
+        month: r.month,
+        indicator_group: r.indicator_group,
+        indicator_name: r.indicator_name,
+        sub_type: r.sub_type || 'value',
+        value_numeric: r.value_numeric,
+        value_text: r.value_text || null,
+        unit: r.unit || null,
+        uploaded_by: userId
+    }));
+
+    // Count existing before upsert to determine added vs updated
+    const { count: before } = await sb.from('summary_indicators')
+        .select('*', { count: 'exact', head: true });
+
+    // Upsert works correctly because we have UNIQUE INDEX on (year, month, indicator_name, sub_type)
+    for (let i = 0; i < rows.length; i += BATCH) {
+        const { error } = await sb.from('summary_indicators')
+            .upsert(rows.slice(i, i + BATCH), { onConflict: 'year,month,indicator_name,sub_type' });
+        if (error) throw new Error(error.message);
+    }
+
+    const { count: after } = await sb.from('summary_indicators')
+        .select('*', { count: 'exact', head: true });
+
+    const added = (after || 0) - (before || 0);
+    const updated = rows.length - added;
+
+    await sb.from('summary_upload_history').insert({
+        data_type: 'monthly_indicators', batch_id: batchId,
+        file_name: fileName, row_count: rows.length, uploaded_by: userId
+    });
+
+    return { added, updated, total: rows.length };
+}
+
+export async function loadSummaryIndicators(year = null) {
+    const all = []; let from = 0;
+    while (true) {
+        let q = sb.from('summary_indicators').select('*').range(from, from + 999);
+        if (year) q = q.eq('year', year);
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        if (!data || !data.length) break;
+        all.push(...data);
+        if (data.length < 1000) break;
+        from += 1000;
+    }
+    return all;
+}
+
+// ===== Weekly Briefing =====
+
+export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
+    const { data: { session } } = await sb.auth.getSession();
+    const userId = session?.user?.id || null;
+    const batchId = crypto.randomUUID();
+
+    // Delete existing records for this report_date
+    await sb.from('summary_weekly').delete().eq('report_date', reportDate);
+    await sb.from('summary_weekly_notes').delete().eq('report_date', reportDate);
+
+    // Insert indicator records
+    if (records.length) {
+        const rows = records.map(r => ({
+            upload_batch_id: batchId,
+            report_date: reportDate,
+            section: r.section,
+            indicator_name: r.indicator_name,
+            value_current: r.value_current,
+            value_previous: r.value_previous,
+            value_ytd: r.value_ytd,
+            value_delta: r.value_delta,
+            value_text: r.value_text || null,
+            unit: r.unit || null,
+            uploaded_by: userId
+        }));
+        for (let i = 0; i < rows.length; i += BATCH) {
+            const { error } = await sb.from('summary_weekly').insert(rows.slice(i, i + BATCH));
+            if (error) throw new Error(error.message);
+        }
+    }
+
+    // Insert text notes
+    if (notes && notes.length) {
+        const noteRows = notes
+            .filter(n => n.content && n.content.trim())
+            .map(n => ({
+                report_date: reportDate,
+                note_type: n.note_type,
+                content: n.content.trim(),
+                uploaded_by: userId
+            }));
+        if (noteRows.length) {
+            const { error } = await sb.from('summary_weekly_notes').insert(noteRows);
+            if (error) throw new Error(error.message);
+        }
+    }
+
+    await sb.from('summary_upload_history').insert({
+        data_type: 'weekly_briefing', batch_id: batchId,
+        file_name: fileName || `weekly_${reportDate}`, row_count: records.length, uploaded_by: userId
+    });
+
+    return { count: records.length, notes: (notes || []).filter(n => n.content && n.content.trim()).length };
+}
+
+export async function loadSummaryWeekly(limit = 4) {
+    // Load the latest N weeks of data
+    const { data: dates, error: dErr } = await sb.from('summary_weekly')
+        .select('report_date')
+        .order('report_date', { ascending: false });
+    if (dErr) throw new Error(dErr.message);
+    const uniqueDates = [...new Set((dates || []).map(d => d.report_date))].slice(0, limit);
+    if (!uniqueDates.length) return [];
+
+    const all = [];
+    for (const rd of uniqueDates) {
+        const { data, error } = await sb.from('summary_weekly')
+            .select('*').eq('report_date', rd);
+        if (error) throw new Error(error.message);
+        if (data) all.push(...data);
+    }
+    return all;
+}
+
+export async function loadSummaryWeeklyNotes(reportDate = null) {
+    let q = sb.from('summary_weekly_notes').select('*');
+    if (reportDate) {
+        q = q.eq('report_date', reportDate);
+    } else {
+        q = q.order('report_date', { ascending: false }).limit(20);
+    }
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data || [];
+}
+
+// ===== Counts =====
+
+export async function getSummaryIndicatorCount() {
+    const { count, error } = await sb.from('summary_indicators').select('*', { count: 'exact', head: true });
+    if (error) throw new Error(error.message);
+    return count || 0;
+}
+
+export async function getSummaryWeeklyCount() {
+    const { count, error } = await sb.from('summary_weekly').select('*', { count: 'exact', head: true });
+    if (error) throw new Error(error.message);
+    return count || 0;
+}
+
+// ===== Clear =====
+
+export async function clearSummaryIndicators() {
+    const { error } = await sb.from('summary_indicators').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw new Error(error.message);
+    await sb.from('summary_upload_history').delete().eq('data_type', 'monthly_indicators');
+}
+
+export async function clearSummaryWeekly() {
+    const { error } = await sb.from('summary_weekly').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw new Error(error.message);
+    await sb.from('summary_weekly_notes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await sb.from('summary_upload_history').delete().eq('data_type', 'weekly_briefing');
+}

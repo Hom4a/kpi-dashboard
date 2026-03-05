@@ -1,0 +1,85 @@
+/* ===== Summary Page Styles ===== */
+
+/* Volume/Price cells */
+.volprice-cell { white-space: nowrap; font-size: 12px; }
+.vp-vol { color: var(--primary); font-weight: 600; }
+.vp-sep { opacity: .4; margin: 0 2px; }
+.vp-price { color: var(--text2); font-size: 11px; }
+
+/* Cell coloring vs previous year */
+.cell-up { background: rgba(76, 175, 80, .1); color: #2e7d32; }
+.cell-down { background: rgba(244, 67, 54, .08); color: #c62828; }
+.cell-text { color: var(--text3); font-style: italic; font-size: 12px; }
+.cell-empty { color: var(--text3); opacity: .5; }
+.cell-year { background: var(--glass); font-size: 13px; }
+
+/* Delta coloring */
+.delta-up { color: #2e7d32; font-weight: 600; }
+.delta-down { color: #c62828; font-weight: 600; }
+
+/* Indicator name column */
+.ind-name { white-space: nowrap; font-size: 13px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Group stripes */
+.group-finance td:first-child { border-left: 3px solid #2196f3; }
+.group-revenue td:first-child { border-left: 3px solid #4caf50; }
+.group-production td:first-child { border-left: 3px solid #ff9800; }
+.group-forestry td:first-child { border-left: 3px solid #9c27b0; }
+
+/* Pivot table compact */
+#summaryIndicatorsTable { font-size: 13px; }
+#summaryIndicatorsTable th { font-size: 12px; padding: 6px 8px; white-space: nowrap; }
+#summaryIndicatorsTable td { padding: 5px 8px; }
+
+/* Weekly notes */
+.weekly-note { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; background: var(--glass); }
+.weekly-note.note-positive { border-left: 3px solid #4caf50; }
+.weekly-note.note-negative { border-left: 3px solid #f44336; }
+.weekly-note.note-warning { border-left: 3px solid #ff9800; }
+.note-label { font-weight: 600; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+.note-text { font-size: 14px; line-height: 1.5; }
+
+/* Weekly sections */
+#summaryWeeklySections .toggle-bar { margin-bottom: 12px; }
+
+/* Entry form */
+.entry-form { padding: 16px; }
+.entry-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.entry-note { margin-bottom: 10px; }
+.entry-note label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--text2); }
+.entry-textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--bg); color: var(--text1);
+    font-size: 14px; resize: vertical; font-family: inherit;
+}
+.entry-textarea:focus { border-color: var(--primary); outline: none; }
+.entry-tbl { width: 100%; }
+.entry-tbl td { padding: 4px 6px; }
+.entry-input {
+    width: 90px; padding: 5px 8px; border: 1px solid var(--border);
+    border-radius: 4px; background: var(--bg); color: var(--text1);
+    font-size: 13px; text-align: right;
+}
+.entry-input:focus { border-color: var(--primary); outline: none; }
+
+/* Yearly summary */
+#summaryYearlyTable { font-size: 13px; }
+
+/* Print styles */
+@media print {
+    #pageSummary .btn, #pageSummary button, #weeklyEntryPanel,
+    .toggle-bar, .filter-select { display: none !important; }
+    .glass { background: white !important; box-shadow: none !important; border: 1px solid #ddd; }
+    .kpi-card { page-break-inside: avoid; }
+    .chart-row { page-break-inside: avoid; }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .ind-name { max-width: 140px; font-size: 12px; }
+    .volprice-cell { font-size: 11px; }
+    #summaryIndicatorsTable { font-size: 11px; }
+    #summaryIndicatorsTable th, #summaryIndicatorsTable td { padding: 4px 5px; }
+    .entry-input { width: 70px; font-size: 12px; }
+    .entry-row { flex-direction: column; }
+}
