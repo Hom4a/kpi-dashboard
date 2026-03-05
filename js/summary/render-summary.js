@@ -212,7 +212,7 @@ function renderWeeklySectionTabs(data, date) {
         land_self_forested: 'Самозалісені', land_reforestation: 'Лісорозведення',
         land_reserves: 'Запас', harvesting: 'Заготівля', contracts: 'Договори',
         sales: 'Реалізація', finance: 'Фінанси', personnel: 'Персонал',
-        legal: 'Правові', procurement: 'Закупівлі', zsu: 'ЗСУ'
+        legal: 'Правові питання', procurement: 'Закупівлі', zsu: 'ЗСУ'
     };
 
     const tabBar = container.querySelector('.toggle-bar') || document.createElement('div');
@@ -475,7 +475,7 @@ function renderRevenueChart(year) {
         data: {
             labels,
             datasets: [
-                { label: `${year}`, data: cur, backgroundColor: makeGrad(ctx, themeColor('--primary'), 0.7), borderRadius: 4, order: 1 },
+                { label: `${year}`, data: cur, backgroundColor: makeGrad(ctx, 74, 157, 111), borderRadius: 4, order: 1 },
                 { label: `${year - 1}`, data: prev, backgroundColor: 'rgba(150,150,150,0.25)', borderRadius: 4, order: 2 }
             ]
         },
