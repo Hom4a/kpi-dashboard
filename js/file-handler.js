@@ -61,7 +61,8 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const FILE_TYPE_LABELS = {
     kpi: 'KPI обсяги/фінанси', prices: 'середньозважені ціни', inventory: 'залишки лісопродукції',
     harvesting_plan_fact: 'план-факт заготівлі', harvesting_zsu: 'дані ЗСУ', market_prices: 'ринкові ціни',
-    summary_indicators: 'основні показники діяльності'
+    summary_indicators: 'основні показники діяльності',
+    summary_weekly: 'тижнева довідка (.docx)'
 };
 
 export async function handleFile(file, expectedType = null) {
@@ -74,6 +75,11 @@ export async function handleFile(file, expectedType = null) {
 
         // Handle .docx files (weekly briefing) — before XLSX.read which would fail on docx
         if (file.name.toLowerCase().endsWith('.docx')) {
+            if (expectedType && !expectedType.split(',').includes('summary_weekly')) {
+                toast('Файл .docx — тижнева довідка. Використайте сторінку "Зведення".', true);
+                showLoader(false);
+                return;
+            }
             await handleDocxFile(buffer, file.name);
             showLoader(false);
             return;

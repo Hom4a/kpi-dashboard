@@ -22,7 +22,7 @@ const PAGE_ACCESS = {
     harvesting:  ['admin', 'director', 'analyst', 'editor', 'forester'],
     market:      ['admin', 'director', 'analyst', 'editor', 'forester'],
     executive:   ['admin', 'director', 'analyst'],
-    summary:     ['admin', 'director', 'analyst', 'editor'],
+    summary:     ['admin', 'director', 'analyst', 'editor', 'viewer', 'accountant', 'hr', 'forester', 'operator'],
     'data-entry':['admin', 'editor', 'accountant', 'hr', 'forester', 'operator'],
     builder:     ['admin', 'analyst', 'editor'],
     'api-system':['admin', 'analyst'],

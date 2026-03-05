@@ -134,7 +134,7 @@
         <div id="liveInfo" style="display:none"><span class="live-dot"></span><span style="font-size:11px;color:var(--text2)" id="liveLbl">Live</span></div>
         <button class="btn btn-sm" id="btnExport" style="display:none" onclick="exportExcel()" title="Експорт Excel"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Excel</button>
         <button class="btn btn-sm" id="btnPrint" style="display:none" onclick="window.print()" title="Друк/PDF"><svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Друк</button>
-        <label class="btn btn-sm" id="btnUpload" style="display:none"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Завантажити<input type="file" id="fileHdr" accept=".xlsx,.xls"></label>
+        <label class="btn btn-sm" id="btnUpload" style="display:none"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Завантажити<input type="file" id="fileHdr" accept=".xlsx,.xls,.docx"></label>
         <button class="icon-btn" id="btnFormatHelp" style="display:none" onclick="openFormatHelp()" title="Формати файлів"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
         <button class="icon-btn" id="btnTargets" style="display:none" onclick="openTargetModal()" title="Налаштувати цілі"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></button>
         <button class="btn btn-sm" id="btnDashboards" style="display:none" onclick="openDashboardsPage()" title="Конструктор дашбордів"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Дашборди</button>
@@ -149,11 +149,11 @@
 <main class="main">
     <div class="empty-state" id="empty">
         <div class="drop-zone" id="dropZone">
-            <input type="file" id="fileDrop" accept=".xlsx,.xls">
+            <input type="file" id="fileDrop" accept=".xlsx,.xls,.docx">
             <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg></div>
             <h2>Завантажте файл з даними</h2>
             <p>Перетягніть Excel або натисніть для вибору.<br>Нові дані додаються до існуючих.</p>
-            <span class="ft">.xlsx .xls</span>
+            <span class="ft">.xlsx .xls .docx</span>
         </div>
     </div>
 
@@ -604,8 +604,9 @@
         <!-- Summary page -->
         <div class="page-section" id="pageSummary">
             <div id="summaryEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
-                <p style="font-size:15px;margin-bottom:8px">Завантажте файл "Основні показники" для перегляду зведення</p>
+                <p style="font-size:15px;margin-bottom:8px">Завантажте файл "Основні показники" (.xlsx) або тижневу довідку (.docx)</p>
                 <p style="font-size:12px">Щомісячні та щотижневі показники діяльності підприємства</p>
+                <label class="btn" style="margin-top:12px">Завантажити<input type="file" class="page-upload" accept=".xlsx,.xls,.docx" data-expected="summary_indicators,summary_weekly"></label>
             </div>
             <div id="summaryContent" style="display:none">
                 <!-- KPI cards -->
@@ -616,6 +617,7 @@
                     <div class="chart-hdr">
                         <div><h3>Щотижнева довідка</h3><small id="summaryWeeklyDate">Оперативні показники</small></div>
                         <div style="display:flex;gap:8px">
+                            <label class="btn btn-sm">Завантажити<input type="file" class="page-upload" accept=".xlsx,.xls,.docx" data-expected="summary_indicators,summary_weekly"></label>
                             <button class="btn btn-sm" id="btnWeeklyEntry" style="display:none">+ Внести дані</button>
                             <button class="btn btn-sm" id="btnSummaryExport" style="display:none" onclick="exportSummaryExcel()">Excel</button>
                         </div>
