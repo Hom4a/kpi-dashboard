@@ -1,21 +1,27 @@
 // ===== ProZorro Public Procurement API Client =====
 // Fetches tenders/contracts for a specific organization by EDRPOU code
 // API: https://public-api.prozorro.gov.ua/api/2.5
+//
+// Strategy: The public API is a feed (no EDRPOU filter). We scan pages
+// descending by date, filter client-side by procuringEntity.identifier.id,
+// then fetch full details for each match (feed doesn't include value/title).
 
 const API_BASE = 'https://public-api.prozorro.gov.ua/api/2.5';
 const DEFAULT_EDRPOU = '44768034';
-const MAX_PAGES = 20; // Max pages to scan (20 × 1000 = 20,000 tenders)
+const MAX_PAGES = 200; // 200 × 1000 = 200K tenders (~2.8 days at 72K/day)
 const PAGE_SIZE = 1000;
+const CONCURRENT_DETAILS = 5; // Parallel detail fetches
 
 /**
  * Search ProZorro for tenders by procuring entity EDRPOU.
- * Scans recent tenders (newest first) and returns matching ones.
+ * Phase 1: Scan feed to find matching tender IDs.
+ * Phase 2: Fetch full details for each match (title, value, etc.).
  * @param {object} [opts]
  * @param {string} [opts.edrpou] - EDRPOU code to search for
- * @param {string} [opts.since] - ISO date string to limit search depth (e.g., '2026-01-01')
+ * @param {string} [opts.since] - ISO date string to limit search depth
  * @param {number} [opts.maxPages] - Max API pages to scan
  * @param {function} [opts.onProgress] - Callback(scanned, found) for progress updates
- * @returns {Promise<Array<object>>} - Array of matching tender summaries
+ * @returns {Promise<Array<object>>} - Array of matching tender summaries with full details
  */
 export async function searchTenders(opts = {}) {
     const edrpou = opts.edrpou || DEFAULT_EDRPOU;
@@ -23,16 +29,17 @@ export async function searchTenders(opts = {}) {
     const maxPages = opts.maxPages || MAX_PAGES;
     const onProgress = opts.onProgress || (() => {});
 
-    const found = [];
-    let nextUrl = `${API_BASE}/tenders?descending=1&limit=${PAGE_SIZE}&opt_fields=procuringEntity,status,tenderID,value,title,dateCreated`;
+    // Phase 1: Scan feed for matching tender IDs
+    const matchedIds = [];
+    let nextUrl = `${API_BASE}/tenders?descending=1&limit=${PAGE_SIZE}&opt_fields=procuringEntity`;
     let scanned = 0;
+    let consecutiveEmpty = 0;
 
     for (let page = 0; page < maxPages; page++) {
         try {
-            const resp = await fetch(nextUrl, { signal: AbortSignal.timeout(10000) });
+            const resp = await fetch(nextUrl, { signal: AbortSignal.timeout(15000) });
             if (!resp.ok) {
                 if (resp.status === 429) {
-                    // Rate limited — wait and retry
                     await new Promise(r => setTimeout(r, 2000));
                     continue;
                 }
@@ -43,26 +50,37 @@ export async function searchTenders(opts = {}) {
             if (!items.length) break;
 
             // Check date cutoff
-            const oldestDate = new Date(items[items.length - 1].dateModified || items[items.length - 1].dateCreated);
+            const oldestDate = new Date(items[items.length - 1].dateModified);
             if (oldestDate < sinceDate) {
-                // Filter this batch and stop
+                // Scan this batch for matches, then stop
                 for (const t of items) {
-                    const tDate = new Date(t.dateModified || t.dateCreated);
-                    if (tDate < sinceDate) continue;
-                    if (matchesEdrpou(t, edrpou)) found.push(extractTender(t));
+                    if (new Date(t.dateModified) < sinceDate) continue;
+                    if (matchesEdrpou(t, edrpou)) matchedIds.push(t.id);
                 }
                 scanned += items.length;
-                onProgress(scanned, found.length);
+                onProgress(scanned, matchedIds.length);
                 break;
             }
 
             // Filter matching tenders
+            let pageMatches = 0;
             for (const t of items) {
-                if (matchesEdrpou(t, edrpou)) found.push(extractTender(t));
+                if (matchesEdrpou(t, edrpou)) {
+                    matchedIds.push(t.id);
+                    pageMatches++;
+                }
             }
 
             scanned += items.length;
-            onProgress(scanned, found.length);
+            onProgress(scanned, matchedIds.length);
+
+            // Early termination: if we've scanned 50+ pages with no matches, stop
+            if (pageMatches === 0) {
+                consecutiveEmpty++;
+                if (consecutiveEmpty >= 50 && matchedIds.length > 0) break;
+            } else {
+                consecutiveEmpty = 0;
+            }
 
             // Get next page URL
             if (json.next_page && json.next_page.uri) {
@@ -71,23 +89,45 @@ export async function searchTenders(opts = {}) {
                 break;
             }
         } catch (e) {
-            console.warn('ProZorro API error:', e.message);
+            console.warn('ProZorro feed scan error:', e.message);
             break;
         }
     }
 
-    return found;
+    if (!matchedIds.length) return [];
+
+    // Phase 2: Fetch full details for each match (parallel, batched)
+    console.log(`ProZorro: fetching details for ${matchedIds.length} tenders...`);
+    const results = [];
+    for (let i = 0; i < matchedIds.length; i += CONCURRENT_DETAILS) {
+        const batch = matchedIds.slice(i, i + CONCURRENT_DETAILS);
+        const details = await Promise.all(batch.map(id => fetchTenderDetail(id)));
+        for (const d of details) {
+            if (d) results.push(extractTender(d));
+        }
+    }
+
+    return results;
 }
 
 /**
  * Fetch full details for a specific tender
- * @param {string} tenderId
+ * @param {string} tenderId - ProZorro internal UUID
  * @returns {Promise<object|null>}
  */
 export async function fetchTenderDetail(tenderId) {
     try {
         const resp = await fetch(`${API_BASE}/tenders/${tenderId}`, { signal: AbortSignal.timeout(10000) });
-        if (!resp.ok) return null;
+        if (!resp.ok) {
+            if (resp.status === 429) {
+                await new Promise(r => setTimeout(r, 1000));
+                const retry = await fetch(`${API_BASE}/tenders/${tenderId}`, { signal: AbortSignal.timeout(10000) });
+                if (!retry.ok) return null;
+                const json = await retry.json();
+                return json.data || null;
+            }
+            return null;
+        }
         const json = await resp.json();
         return json.data || null;
     } catch {
@@ -98,7 +138,7 @@ export async function fetchTenderDetail(tenderId) {
 /**
  * Get aggregated procurement KPIs from fetched tenders
  * @param {Array} tenders - Array from searchTenders()
- * @returns {object} - { proceduresCount, totalAmount, contractsCount, contractsAmount }
+ * @returns {object}
  */
 export function aggregateProcurementKPIs(tenders) {
     const proceduresCount = tenders.length;
@@ -124,13 +164,14 @@ function extractTender(t) {
     return {
         id: t.id,
         tenderID: t.tenderID || '',
-        title: t.title || pe.name || '',
+        title: t.title || '',
         status: t.status || '',
         amount: t.value ? (t.value.amount || 0) : 0,
         currency: t.value ? (t.value.currency || 'UAH') : 'UAH',
         dateCreated: t.dateCreated || t.dateModified || '',
         dateModified: t.dateModified || '',
-        procuringEntity: pe.name || ''
+        procuringEntity: pe.name || '',
+        procurementMethodType: t.procurementMethodType || ''
     };
 }
 

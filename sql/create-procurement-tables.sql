@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS prozorro_tenders (
     date_created TIMESTAMPTZ,
     date_modified TIMESTAMPTZ,
     procuring_entity TEXT DEFAULT '',
+    procurement_method TEXT DEFAULT '',
     edrpou TEXT NOT NULL,
     fetched_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(tender_id)

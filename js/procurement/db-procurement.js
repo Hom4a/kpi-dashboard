@@ -20,6 +20,7 @@ export async function saveTendersCache(tenders, edrpou) {
         date_created: t.dateCreated || null,
         date_modified: t.dateModified || null,
         procuring_entity: t.procuringEntity,
+        procurement_method: t.procurementMethodType || '',
         edrpou,
         fetched_at: new Date().toISOString()
     }));
