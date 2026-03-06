@@ -12,13 +12,28 @@ const MAX_PAGES = 200; // 200 × 1000 = 200K tenders (~2.8 days at 72K/day)
 const PAGE_SIZE = 1000;
 const CONCURRENT_DETAILS = 5; // Parallel detail fetches
 
+// CORS proxy — ProZorro API doesn't send Access-Control-Allow-Origin headers
+const CORS_PROXIES = [
+    'https://corsproxy.io/?',
+    'https://api.allorigins.win/raw?url='
+];
+let activeProxy = 0;
+
 /**
- * Cross-browser fetch with timeout (AbortSignal.timeout() not supported everywhere)
+ * Wrap URL with CORS proxy
+ */
+function proxyUrl(url) {
+    return CORS_PROXIES[activeProxy] + encodeURIComponent(url);
+}
+
+/**
+ * Cross-browser fetch with timeout and CORS proxy
  */
 function fetchWithTimeout(url, ms = 15000) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), ms);
-    return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
+    const proxied = proxyUrl(url);
+    return fetch(proxied, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -96,9 +111,14 @@ export async function searchTenders(opts = {}) {
         } catch (e) {
             console.warn('ProZorro feed scan error:', e.message, '(page', page, ')');
             if (e.name === 'AbortError') {
-                // Timeout — retry once
                 retryCount++;
                 if (retryCount <= 3) continue;
+            }
+            // Try fallback CORS proxy
+            if (activeProxy < CORS_PROXIES.length - 1) {
+                activeProxy++;
+                console.log('ProZorro: switching to fallback CORS proxy');
+                continue;
             }
             break;
         }
@@ -191,6 +211,7 @@ function extractTender(t) {
 export async function diagnoseProzorro(edrpou = DEFAULT_EDRPOU) {
     console.log('=== ProZorro Diagnostics ===');
     console.log('Target EDRPOU:', edrpou);
+    console.log('Using CORS proxy:', CORS_PROXIES[activeProxy]);
 
     // Step 1: Fetch a small page to inspect structure
     const url1 = `${API_BASE}/tenders?descending=1&limit=3&opt_fields=procuringEntity`;
