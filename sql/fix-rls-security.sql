@@ -128,6 +128,11 @@ CREATE POLICY "manage_roles_delete_eur_rates" ON eur_rates
     FOR DELETE TO authenticated
     USING (public.user_has_role(ARRAY['admin','editor']));
 
+CREATE POLICY "upload_roles_update_eur_rates" ON eur_rates
+    FOR UPDATE TO authenticated
+    USING (public.user_has_role(ARRAY['admin','editor','forester']))
+    WITH CHECK (public.user_has_role(ARRAY['admin','editor','forester']));
+
 -- ===== kpi_records (if RLS enabled) =====
 -- Check if policies exist and replace them
 DO $$

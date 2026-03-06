@@ -8,12 +8,15 @@ let sb = null;
 try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }
 catch(e) { console.error('Supabase init failed:', e); }
 
-// Ephemeral client for admin signUp — does NOT persist session, won't log out admin
+// Ephemeral client for admin signUp — lazy init to avoid "Multiple GoTrueClient" warning
 let sbSignup = null;
-try {
-    sbSignup = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-    });
-} catch(e) { console.error('Supabase signup client init failed:', e); }
+export function getSignupClient() {
+    if (!sbSignup) {
+        sbSignup = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+        });
+    }
+    return sbSignup;
+}
 
-export { sb, sbSignup };
+export { sb };

@@ -2,7 +2,7 @@
 import { $, fmt, toast, themeColor } from './utils.js';
 import { allData, charts, targets, MO, setTargets } from './state.js';
 import { kill, freshCanvas, getTargetAnnotation } from './charts-common.js';
-import { sb, sbSignup } from './config.js';
+import { sb, getSignupClient } from './config.js';
 import { getRecordCount, getUploadHistory } from './db-kpi.js';
 import { getPricesCount, getInventoryCount } from './forest/db-forest.js';
 import { getPlanFactCount, getZsuCount } from './harvesting/db-harvesting.js';
@@ -432,7 +432,7 @@ export async function createUser() {
 
     try {
         // Step 1: Create auth user via ephemeral client (won't affect admin session)
-        const { data: signUpData, error: signUpError } = await sbSignup.auth.signUp({
+        const { data: signUpData, error: signUpError } = await getSignupClient().auth.signUp({
             email, password,
             options: { data: { full_name: fullName, role: role } }
         });
