@@ -6,7 +6,7 @@ let _deferredPrompt = null;
 export function registerSW() {
     if (!('serviceWorker' in navigator)) return;
 
-    navigator.serviceWorker.register('/sw.js')
+    navigator.serviceWorker.register('./sw.js')
         .then(reg => {
             console.log('SW registered:', reg.scope);
             // Check for updates periodically
