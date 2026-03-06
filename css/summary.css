@@ -1,12 +1,87 @@
 /* ===== Summary Page Styles ===== */
 
-/* Volume/Price cells */
+/* ===== Section Dividers ===== */
+.summary-section-divider {
+    display: flex; align-items: center; gap: 10px;
+    margin: 28px 0 16px; padding: 0;
+}
+.summary-section-divider svg { color: var(--primary); opacity: .7; flex-shrink: 0; }
+.summary-section-divider h4 {
+    font-size: 13px; font-weight: 600; color: var(--text2);
+    text-transform: uppercase; letter-spacing: .06em; margin: 0; white-space: nowrap;
+}
+.summary-section-divider::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+}
+
+/* ===== KPI Cards — Summary Enhancements ===== */
+.kpi-card-summary { transition: transform .15s, box-shadow .15s; }
+.kpi-card-summary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.kpi-icon { display: inline-flex; vertical-align: middle; margin-right: 4px; opacity: .7; }
+.kpi-icon svg { width: 12px; height: 12px; }
+
+/* ===== Weekly Notes Grid ===== */
+.note-general {
+    background: linear-gradient(135deg, rgba(74,157,111,.08), rgba(156,175,136,.04));
+    border-left: 3px solid var(--primary);
+}
+.notes-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.weekly-note { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; background: var(--glass); }
+.weekly-note.note-positive { border-left: 3px solid #4caf50; }
+.weekly-note.note-negative { border-left: 3px solid #f44336; }
+.weekly-note.note-warning { border-left: 3px solid #ff9800; }
+.note-label {
+    font-weight: 600; font-size: 12px; color: var(--text2); margin-bottom: 4px;
+    display: flex; align-items: center; gap: 5px;
+}
+.note-label svg { opacity: .7; flex-shrink: 0; }
+.note-text { font-size: 14px; line-height: 1.5; }
+
+/* ===== Two-Level Weekly Section Tabs ===== */
+.ws-category-bar {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 10px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+.ws-cat-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
+    background: transparent; color: var(--text2);
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: all .2s; font-family: inherit; white-space: nowrap;
+}
+.ws-cat-pill:hover { border-color: var(--primary); color: var(--text1); }
+.ws-cat-pill.active {
+    background: linear-gradient(135deg, rgba(74,157,111,.15), rgba(156,175,136,.08));
+    border-color: var(--primary); color: var(--primary); font-weight: 600;
+}
+.ws-cat-pill svg { opacity: .7; }
+.ws-cat-pill.active svg { opacity: 1; }
+
+.ws-section-bar {
+    display: flex; gap: 4px; flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.ws-sec-tab {
+    padding: 4px 12px; border: none; border-radius: 4px;
+    background: transparent; color: var(--text2);
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: all .15s; font-family: inherit; white-space: nowrap;
+}
+.ws-sec-tab:hover { background: var(--glass); color: var(--text1); }
+.ws-sec-tab.active {
+    background: var(--glass); color: var(--primary);
+    font-weight: 600; box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+/* ===== Volume/Price Cells ===== */
 .volprice-cell { white-space: nowrap; font-size: 12px; }
 .vp-vol { color: var(--primary); font-weight: 600; }
 .vp-sep { opacity: .4; margin: 0 2px; }
 .vp-price { color: var(--text2); font-size: 11px; }
 
-/* Cell coloring vs previous year */
+/* ===== Cell Coloring ===== */
 .cell-up { background: rgba(76, 175, 80, .1); color: #2e7d32; }
 .cell-down { background: rgba(244, 67, 54, .08); color: #c62828; }
 .cell-text { color: var(--text3); font-style: italic; font-size: 12px; }
@@ -17,32 +92,36 @@
 .delta-up { color: #2e7d32; font-weight: 600; }
 .delta-down { color: #c62828; font-weight: 600; }
 
-/* Indicator name column */
-.ind-name { white-space: nowrap; font-size: 13px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
-
+/* ===== Pivot Table ===== */
+.ind-name {
+    white-space: nowrap; font-size: 13px; max-width: 280px;
+    overflow: hidden; text-overflow: ellipsis;
+    position: sticky; left: 0; background: var(--bg); z-index: 1;
+}
 /* Group stripes */
 .group-finance td:first-child { border-left: 3px solid #2196f3; }
 .group-revenue td:first-child { border-left: 3px solid #4caf50; }
 .group-production td:first-child { border-left: 3px solid #ff9800; }
 .group-forestry td:first-child { border-left: 3px solid #9c27b0; }
 
-/* Pivot table compact */
 #summaryIndicatorsTable { font-size: 13px; }
 #summaryIndicatorsTable th { font-size: 12px; padding: 6px 8px; white-space: nowrap; }
 #summaryIndicatorsTable td { padding: 5px 8px; }
+/* Zebra stripes */
+#summaryIndicatorsTable tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+/* Hover row */
+#summaryIndicatorsTable tbody tr:hover { background: rgba(74,157,111,.06); }
+/* Current month highlight */
+#summaryIndicatorsTable th.month-current {
+    background: rgba(74,157,111,.1); color: var(--primary); font-weight: 700;
+}
 
-/* Weekly notes */
-.weekly-note { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; background: var(--glass); }
-.weekly-note.note-positive { border-left: 3px solid #4caf50; }
-.weekly-note.note-negative { border-left: 3px solid #f44336; }
-.weekly-note.note-warning { border-left: 3px solid #ff9800; }
-.note-label { font-weight: 600; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
-.note-text { font-size: 14px; line-height: 1.5; }
+/* Yearly summary */
+#summaryYearlyTable { font-size: 13px; }
+#summaryYearlyTable tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+#summaryYearlyTable tbody tr:hover { background: rgba(74,157,111,.06); }
 
-/* Weekly sections */
-#summaryWeeklySections .toggle-bar { margin-bottom: 12px; }
-
-/* Entry form */
+/* ===== Entry Form ===== */
 .entry-form { padding: 16px; }
 .entry-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .entry-note { margin-bottom: 10px; }
@@ -62,19 +141,17 @@
 }
 .entry-input:focus { border-color: var(--primary); outline: none; }
 
-/* Yearly summary */
-#summaryYearlyTable { font-size: 13px; }
-
-/* Print styles */
+/* ===== Print ===== */
 @media print {
     #pageSummary .btn, #pageSummary button, #weeklyEntryPanel,
-    .toggle-bar, .filter-select { display: none !important; }
+    .toggle-bar, .filter-select, .ws-category-bar, .ws-section-bar { display: none !important; }
     .glass { background: white !important; box-shadow: none !important; border: 1px solid #ddd; }
     .kpi-card { page-break-inside: avoid; }
     .chart-row { page-break-inside: avoid; }
+    .summary-section-divider::after { background: #ddd; }
 }
 
-/* Mobile */
+/* ===== Mobile ===== */
 @media (max-width: 768px) {
     .ind-name { max-width: 140px; font-size: 12px; }
     .volprice-cell { font-size: 11px; }
@@ -82,4 +159,9 @@
     #summaryIndicatorsTable th, #summaryIndicatorsTable td { padding: 4px 5px; }
     .entry-input { width: 70px; font-size: 12px; }
     .entry-row { flex-direction: column; }
+    .notes-grid { grid-template-columns: 1fr; }
+    .ws-cat-pill { padding: 5px 10px; font-size: 11px; }
+    .ws-cat-pill span { display: none; }
+    .summary-section-divider { margin: 20px 0 12px; }
+    .summary-section-divider h4 { font-size: 11px; }
 }

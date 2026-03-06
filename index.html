@@ -609,10 +609,12 @@
                 <label class="btn" style="margin-top:12px">Завантажити<input type="file" class="page-upload" accept=".xlsx,.xls,.docx" data-expected="summary_indicators,summary_weekly"></label>
             </div>
             <div id="summaryContent" style="display:none">
-                <!-- KPI cards -->
+                <!-- Section: KPI cards -->
+                <div class="summary-section-divider"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><h4>Ключові показники</h4></div>
                 <div class="kpi-grid" id="kpiGridSummary"></div>
 
-                <!-- Weekly briefing -->
+                <!-- Section: Weekly briefing -->
+                <div class="summary-section-divider"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg><h4>Тижнева довідка</h4></div>
                 <div class="glass chart-card" style="margin-bottom:20px" id="summaryWeeklyCard">
                     <div class="chart-hdr">
                         <div><h3>Щотижнева довідка</h3><small id="summaryWeeklyDate">Оперативні показники</small></div>
@@ -629,8 +631,11 @@
                     <div id="summaryWeeklySections" style="margin-top:16px;display:none"></div>
                 </div>
 
+                <!-- Section: Detailed analytics -->
+                <div class="summary-section-divider"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg><h4>Детальна аналітика</h4></div>
+
                 <!-- Indicator group tabs -->
-                <div class="toggle-bar" id="tglSummaryGroup" style="margin-bottom:16px">
+                <div class="toggle" id="tglSummaryGroup" style="margin-bottom:16px">
                     <button class="active" data-g="all">Всі</button>
                     <button data-g="finance">Фінанси</button>
                     <button data-g="revenue">Доходи</button>
@@ -650,7 +655,8 @@
                     </table></div>
                 </div>
 
-                <!-- Charts -->
+                <!-- Section: Charts -->
+                <div class="summary-section-divider"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Графіки</h4></div>
                 <div class="chart-row cols-2">
                     <div class="glass chart-card">
                         <div class="chart-hdr"><div><h3>Динаміка доходів</h3><small>Помісячно, млн грн</small></div></div>
@@ -672,7 +678,8 @@
                     </div>
                 </div>
 
-                <!-- Yearly summary table -->
+                <!-- Section: Yearly summary -->
+                <div class="summary-section-divider"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><h4>Річне зведення</h4></div>
                 <div class="glass chart-card" style="margin-bottom:20px">
                     <div class="chart-hdr"><div><h3>Річне зведення</h3><small>Основні показники по роках</small></div></div>
                     <div class="tbl-wrap"><table class="tbl" id="summaryYearlyTable">

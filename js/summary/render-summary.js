@@ -1,7 +1,7 @@
 // ===== Summary Page Rendering =====
 import { $, fmt, show, hide, themeColor } from '../utils.js';
 import { charts } from '../state.js';
-import { kill, freshCanvas, makeGrad, drawSparkline } from '../charts-common.js';
+import { kill, freshCanvas, makeGrad } from '../charts-common.js';
 import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState } from './state-summary.js';
 
 const MO = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
@@ -81,17 +81,26 @@ function getYoyChange(indicatorPattern, group, year) {
     return null;
 }
 
+const KPI_ICONS = {
+    revenue: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
+    payroll: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>',
+    headcount: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>',
+    salary: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
+    cash: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4h-4z"/></svg>',
+    harvest: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V8M5 12l7-8 7 8"/><path d="M8 22h8M3 18l4-4M21 18l-4-4"/></svg>'
+};
+
 function renderKpiCards(year) {
     const grid = $('kpiGridSummary');
     if (!grid) return;
 
     const cards = [
-        { label: 'Загальний дохід', pattern: 'загальна реалізація', group: 'revenue', unit: 'млн грн', color: 'neon-primary', divisor: 1 },
-        { label: 'ФОП', pattern: 'фонд оплати праці', group: 'finance', unit: 'млн грн', color: 'neon-secondary', divisor: 1 },
-        { label: 'Чисельність', pattern: 'чисельність', group: 'finance', unit: '', color: 'neon-accent', divisor: 1 },
-        { label: 'Середня зарплата', pattern: 'середня заробітна', group: 'finance', unit: 'грн', color: 'neon-amber', divisor: 1 },
-        { label: 'Залишки коштів', pattern: 'залишок коштів', group: 'finance', unit: 'млн грн', color: 'neon-green', divisor: 1 },
-        { label: 'Заготівля', pattern: 'заготівля деревини', group: 'forestry', unit: 'тис. м³', color: 'neon-rose', divisor: 1 },
+        { label: 'Загальний дохід', pattern: 'загальна реалізація', group: 'revenue', unit: 'млн грн', color: 'neon-primary', icon: KPI_ICONS.revenue, divisor: 1 },
+        { label: 'ФОП', pattern: 'фонд оплати праці', group: 'finance', unit: 'млн грн', color: 'neon-secondary', icon: KPI_ICONS.payroll, divisor: 1 },
+        { label: 'Чисельність', pattern: 'чисельність', group: 'finance', unit: '', color: 'neon-accent', icon: KPI_ICONS.headcount, divisor: 1 },
+        { label: 'Середня зарплата', pattern: 'середня заробітна', group: 'finance', unit: 'грн', color: 'neon-amber', icon: KPI_ICONS.salary, divisor: 1 },
+        { label: 'Залишки коштів', pattern: 'залишок коштів', group: 'finance', unit: 'млн грн', color: 'neon-green', icon: KPI_ICONS.cash, divisor: 1 },
+        { label: 'Заготівля', pattern: 'заготівля деревини', group: 'forestry', unit: 'тис. м³', color: 'neon-rose', icon: KPI_ICONS.harvest, divisor: 1 },
     ];
 
     grid.innerHTML = cards.map(c => {
@@ -102,8 +111,8 @@ function renderKpiCards(year) {
         const isPartial = data && data.month && data.month < 12;
         const fmtVal = val != null ? fmt(val / c.divisor, val > 100000 ? 0 : 1) : '—';
 
-        return `<div class="glass kpi-card ${c.color}">
-            <div class="kpi-label">${c.label}${isPartial ? ' <small style="opacity:.6">(${MO[data.month - 1]})</small>' : ''}</div>
+        return `<div class="glass kpi-card kpi-card-summary ${c.color}">
+            <div class="kpi-label"><span class="kpi-icon">${c.icon}</span>${c.label}${isPartial ? ` <small style="opacity:.6">(${MO[data.month - 1]})</small>` : ''}</div>
             <div class="kpi-row">
                 <div><div class="kpi-value">${fmtVal}<span class="kpi-unit">${c.unit}</span></div>
                 ${change != null ? `<div class="kpi-change ${change >= 0 ? 'up' : 'down'}">${change >= 0 ? '\u25B2' : '\u25BC'} ${Math.abs(change).toFixed(1)}%</div>` : ''}
@@ -113,13 +122,40 @@ function renderKpiCards(year) {
         </div>`;
     }).join('');
 
-    // Draw sparklines
+    // Draw sparklines with area fill
     cards.forEach(c => {
         const canvas = grid.querySelector(`canvas[data-spark-idx="${c.label}"]`);
         if (!canvas) return;
         const spark = getSparkData(c.pattern, c.group, year);
-        if (spark.length > 2) drawSparkline(canvas, spark, themeColor('--primary'));
+        if (spark.length > 2) drawSparklineWithFill(canvas, spark, themeColor('--primary'));
     });
+}
+
+function drawSparklineWithFill(canvas, data, color) {
+    if (!data.length) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    let max = -Infinity, min = Infinity;
+    for (let i = 0; i < data.length; i++) { if (data[i] > max) max = data[i]; if (data[i] < min) min = data[i]; }
+    const range = max - min || 1;
+    const points = data.map((v, i) => ({
+        x: (i / (data.length - 1)) * w,
+        y: h - ((v - min) / range) * (h - 4) - 2
+    }));
+    // Area fill
+    ctx.beginPath();
+    points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fillStyle = color.replace(')', ',0.12)').replace('rgb(', 'rgba(');
+    if (!ctx.fillStyle.includes('rgba')) ctx.fillStyle = 'rgba(74,157,111,0.12)';
+    ctx.fill();
+    // Line
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
+    points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
 }
 
 // ===== Weekly Briefing =====
@@ -180,55 +216,135 @@ function renderWeeklyNotes(notes) {
     if (!notes.length) { container.style.display = 'none'; return; }
     container.style.display = '';
 
-    const typeLabels = {
-        general: 'Загальна оцінка', events: 'Ключові події',
-        positive: 'Позитивна динаміка', negative: 'Негативна/ризикова',
-        decisions: 'Питання для рішення'
-    };
-    const typeColors = {
-        general: '', events: '', positive: 'note-positive',
-        negative: 'note-negative', decisions: 'note-warning'
+    const typeConfig = {
+        general: { label: 'Загальна оцінка', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>', cls: 'note-general' },
+        events: { label: 'Ключові події', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>', cls: '' },
+        positive: { label: 'Позитивна динаміка', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>', cls: 'note-positive' },
+        negative: { label: 'Негативна / ризикова', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>', cls: 'note-negative' },
+        decisions: { label: 'Питання для рішення', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>', cls: 'note-warning' }
     };
 
-    container.innerHTML = notes.map(n => `
-        <div class="weekly-note ${typeColors[n.note_type] || ''}">
-            <div class="note-label">${typeLabels[n.note_type] || n.note_type}</div>
-            <div class="note-text">${n.content.replace(/\n/g, '<br>')}</div>
-        </div>
-    `).join('');
+    // General note first (full width), then grid for others
+    const generalNote = notes.find(n => n.note_type === 'general');
+    const otherNotes = notes.filter(n => n.note_type !== 'general');
+
+    let html = '';
+    if (generalNote) {
+        const cfg = typeConfig.general;
+        html += `<div class="weekly-note ${cfg.cls}">
+            <div class="note-label">${cfg.icon} ${cfg.label}</div>
+            <div class="note-text">${generalNote.content.replace(/\n/g, '<br>')}</div>
+        </div>`;
+    }
+    if (otherNotes.length) {
+        html += '<div class="notes-grid">';
+        html += otherNotes.map(n => {
+            const cfg = typeConfig[n.note_type] || { label: n.note_type, icon: '', cls: '' };
+            return `<div class="weekly-note ${cfg.cls}">
+                <div class="note-label">${cfg.icon} ${cfg.label}</div>
+                <div class="note-text">${n.content.replace(/\n/g, '<br>')}</div>
+            </div>`;
+        }).join('');
+        html += '</div>';
+    }
+    container.innerHTML = html;
 }
+
+// Section category grouping for two-level navigation
+const SECTION_CATEGORIES = [
+    {
+        id: 'operations', label: 'Операційна',
+        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+        sections: ['harvesting', 'sales', 'contracts']
+    },
+    {
+        id: 'forest', label: 'Ліси та земля',
+        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V8M5 12l7-8 7 8"/><path d="M8 22h8"/></svg>',
+        sections: ['forest_protection', 'certification', 'land_self_forested', 'land_reforestation', 'land_reserves']
+    },
+    {
+        id: 'security', label: 'Безпека',
+        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+        sections: ['raids', 'mru_raids', 'demining', 'zsu']
+    },
+    {
+        id: 'finance', label: 'Фінанси',
+        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
+        sections: ['finance', 'personnel', 'procurement']
+    },
+    {
+        id: 'legal', label: 'Правові',
+        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8l-8 8M8 8l8 8"/></svg>',
+        sections: ['legal']
+    }
+];
+
+const SECTION_LABELS = {
+    forest_protection: 'Охорона лісу', raids: 'Рейди', mru_raids: 'Спільні рейди',
+    demining: 'Розмінування', certification: 'Сертифікація',
+    land_self_forested: 'Самозалісені', land_reforestation: 'Лісорозведення',
+    land_reserves: 'Запас', harvesting: 'Заготівля', contracts: 'Договори',
+    sales: 'Реалізація', finance: 'Фінанси', personnel: 'Персонал',
+    legal: 'Правові питання', procurement: 'Закупівлі', zsu: 'ЗСУ'
+};
 
 function renderWeeklySectionTabs(data, date) {
     const container = $('summaryWeeklySections');
     if (!container) return;
 
-    const sections = [...new Set(data.filter(r => r.section !== 'kpi').map(r => r.section))];
-    if (!sections.length) { container.style.display = 'none'; return; }
+    const availSections = new Set(data.filter(r => r.section !== 'kpi').map(r => r.section));
+    if (!availSections.size) { container.style.display = 'none'; return; }
     container.style.display = '';
 
-    const SECTION_LABELS = {
-        forest_protection: 'Охорона лісу', raids: 'Рейди', mru_raids: 'Спільні рейди',
-        demining: 'Розмінування', certification: 'Сертифікація',
-        land_self_forested: 'Самозалісені', land_reforestation: 'Лісорозведення',
-        land_reserves: 'Запас', harvesting: 'Заготівля', contracts: 'Договори',
-        sales: 'Реалізація', finance: 'Фінанси', personnel: 'Персонал',
-        legal: 'Правові питання', procurement: 'Закупівлі', zsu: 'ЗСУ'
-    };
+    // Filter categories that have data
+    const activeCategories = SECTION_CATEGORIES
+        .map(cat => ({ ...cat, sections: cat.sections.filter(s => availSections.has(s)) }))
+        .filter(cat => cat.sections.length);
 
-    const tabBar = container.querySelector('.toggle-bar') || document.createElement('div');
-    tabBar.className = 'toggle-bar';
-    tabBar.innerHTML = sections.map((s, i) =>
-        `<button ${i === 0 ? 'class="active"' : ''} data-ws="${s}">${SECTION_LABELS[s] || s}</button>`
+    if (!activeCategories.length) { container.style.display = 'none'; return; }
+
+    container.innerHTML = `
+        <div class="ws-category-bar"></div>
+        <div class="ws-section-bar"></div>
+        <div class="ws-section-table"></div>
+    `;
+
+    const catBar = container.querySelector('.ws-category-bar');
+    const secBar = container.querySelector('.ws-section-bar');
+    const tableWrap = container.querySelector('.ws-section-table');
+
+    // Render category pills
+    catBar.innerHTML = activeCategories.map((cat, i) =>
+        `<button class="ws-cat-pill${i === 0 ? ' active' : ''}" data-cat="${cat.id}">${cat.icon}<span>${cat.label}</span></button>`
     ).join('');
-    if (!container.querySelector('.toggle-bar')) container.prepend(tabBar);
 
-    const tableWrap = container.querySelector('.tbl-wrap') || document.createElement('div');
-    tableWrap.className = 'tbl-wrap';
-    if (!container.querySelector('.tbl-wrap')) container.appendChild(tableWrap);
+    function showCategory(catId) {
+        const cat = activeCategories.find(c => c.id === catId);
+        if (!cat) return;
 
-    function showSection(section) {
+        // Update category active state
+        catBar.querySelectorAll('.ws-cat-pill').forEach(b => b.classList.toggle('active', b.dataset.cat === catId));
+
+        // Render section tabs for this category
+        secBar.innerHTML = cat.sections.map((s, i) =>
+            `<button class="ws-sec-tab${i === 0 ? ' active' : ''}" data-ws="${s}">${SECTION_LABELS[s] || s}</button>`
+        ).join('');
+
+        // Wire section tabs
+        secBar.querySelectorAll('.ws-sec-tab').forEach(btn => {
+            btn.onclick = () => {
+                secBar.querySelectorAll('.ws-sec-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                showSectionData(btn.dataset.ws);
+            };
+        });
+
+        // Show first section
+        showSectionData(cat.sections[0]);
+    }
+
+    function showSectionData(section) {
         const sData = data.filter(r => r.section === section);
-        // Determine columns from data
         const hasCurrent = sData.some(r => r.value_current != null);
         const hasPrevious = sData.some(r => r.value_previous != null);
         const hasYtd = sData.some(r => r.value_ytd != null);
@@ -240,7 +356,7 @@ function renderWeeklySectionTabs(data, date) {
         if (hasYtd) cols.push('З поч. року');
         if (hasDelta) cols.push('Δ');
 
-        tableWrap.innerHTML = `<table class="tbl"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
+        tableWrap.innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
             sData.map(r => {
                 let cells = `<td>${r.indicator_name}</td>`;
                 if (hasCurrent) cells += `<td>${r.value_text || fmtNum(r.value_current)}</td>`;
@@ -253,17 +369,16 @@ function renderWeeklySectionTabs(data, date) {
                 }
                 return `<tr>${cells}</tr>`;
             }).join('')
-        }</tbody></table>`;
+        }</tbody></table></div>`;
     }
 
-    showSection(sections[0]);
-    tabBar.querySelectorAll('button').forEach(btn => {
-        btn.onclick = () => {
-            tabBar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            showSection(btn.dataset.ws);
-        };
+    // Wire category pills
+    catBar.querySelectorAll('.ws-cat-pill').forEach(btn => {
+        btn.onclick = () => showCategory(btn.dataset.cat);
     });
+
+    // Show first category
+    showCategory(activeCategories[0].id);
 }
 
 // ===== Group Toggle Tabs =====
@@ -321,7 +436,8 @@ function renderPivotTable(year, group) {
         }
     });
 
-    head.innerHTML = `<tr><th>Показник</th>${MO.map(m => `<th>${m}</th>`).join('')}<th>Рік</th></tr>`;
+    const curMonth = new Date().getMonth(); // 0-indexed
+    head.innerHTML = `<tr><th>Показник</th>${MO.map((m, i) => `<th${year === new Date().getFullYear() && i === curMonth ? ' class="month-current"' : ''}>${m}</th>`).join('')}<th>Рік</th></tr>`;
 
     // Previous year data for coloring
     const prevData = summaryIndicators.filter(r => r.year === year - 1 && r.month > 0);
