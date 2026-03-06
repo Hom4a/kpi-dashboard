@@ -13,15 +13,18 @@ const PAGE_SIZE = 1000;
 const CONCURRENT_DETAILS = 5; // Parallel detail fetches
 
 /**
+ * Cross-browser fetch with timeout (AbortSignal.timeout() not supported everywhere)
+ */
+function fetchWithTimeout(url, ms = 15000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
+/**
  * Search ProZorro for tenders by procuring entity EDRPOU.
  * Phase 1: Scan feed to find matching tender IDs.
  * Phase 2: Fetch full details for each match (title, value, etc.).
- * @param {object} [opts]
- * @param {string} [opts.edrpou] - EDRPOU code to search for
- * @param {string} [opts.since] - ISO date string to limit search depth
- * @param {number} [opts.maxPages] - Max API pages to scan
- * @param {function} [opts.onProgress] - Callback(scanned, found) for progress updates
- * @returns {Promise<Array<object>>} - Array of matching tender summaries with full details
  */
 export async function searchTenders(opts = {}) {
     const edrpou = opts.edrpou || DEFAULT_EDRPOU;
@@ -33,18 +36,23 @@ export async function searchTenders(opts = {}) {
     const matchedIds = [];
     let nextUrl = `${API_BASE}/tenders?descending=1&limit=${PAGE_SIZE}&opt_fields=procuringEntity`;
     let scanned = 0;
-    let consecutiveEmpty = 0;
+    let retryCount = 0;
 
     for (let page = 0; page < maxPages; page++) {
         try {
-            const resp = await fetch(nextUrl, { signal: AbortSignal.timeout(15000) });
+            const resp = await fetchWithTimeout(nextUrl, 15000);
             if (!resp.ok) {
                 if (resp.status === 429) {
-                    await new Promise(r => setTimeout(r, 2000));
+                    retryCount++;
+                    const delay = Math.min(2000 * Math.pow(2, retryCount - 1), 16000);
+                    console.warn(`ProZorro: rate limited, waiting ${delay}ms (retry ${retryCount})`);
+                    await new Promise(r => setTimeout(r, delay));
                     continue;
                 }
+                console.warn(`ProZorro: HTTP ${resp.status} on page ${page}`);
                 break;
             }
+            retryCount = 0; // Reset on success
             const json = await resp.json();
             const items = json.data || [];
             if (!items.length) break;
@@ -52,34 +60,25 @@ export async function searchTenders(opts = {}) {
             // Check date cutoff
             const oldestDate = new Date(items[items.length - 1].dateModified);
             if (oldestDate < sinceDate) {
-                // Scan this batch for matches, then stop
                 for (const t of items) {
                     if (new Date(t.dateModified) < sinceDate) continue;
                     if (matchesEdrpou(t, edrpou)) matchedIds.push(t.id);
                 }
                 scanned += items.length;
                 onProgress(scanned, matchedIds.length);
+                console.log(`ProZorro: reached date cutoff at page ${page}, scanned ${scanned}, found ${matchedIds.length}`);
                 break;
             }
 
             // Filter matching tenders
-            let pageMatches = 0;
             for (const t of items) {
-                if (matchesEdrpou(t, edrpou)) {
-                    matchedIds.push(t.id);
-                    pageMatches++;
-                }
+                if (matchesEdrpou(t, edrpou)) matchedIds.push(t.id);
             }
 
             scanned += items.length;
-            onProgress(scanned, matchedIds.length);
-
-            // Early termination: if we've scanned 50+ pages with no matches, stop
-            if (pageMatches === 0) {
-                consecutiveEmpty++;
-                if (consecutiveEmpty >= 50 && matchedIds.length > 0) break;
-            } else {
-                consecutiveEmpty = 0;
+            if (page % 10 === 0) {
+                onProgress(scanned, matchedIds.length);
+                console.log(`ProZorro: page ${page}, scanned ${scanned}, found ${matchedIds.length}`);
             }
 
             // Get next page URL
@@ -89,11 +88,17 @@ export async function searchTenders(opts = {}) {
                 break;
             }
         } catch (e) {
-            console.warn('ProZorro feed scan error:', e.message);
+            console.warn('ProZorro feed scan error:', e.message, '(page', page, ')');
+            if (e.name === 'AbortError') {
+                // Timeout — retry once
+                retryCount++;
+                if (retryCount <= 3) continue;
+            }
             break;
         }
     }
 
+    console.log(`ProZorro scan complete: scanned ${scanned}, found ${matchedIds.length} matches`);
     if (!matchedIds.length) return [];
 
     // Phase 2: Fetch full details for each match (parallel, batched)
@@ -112,33 +117,31 @@ export async function searchTenders(opts = {}) {
 
 /**
  * Fetch full details for a specific tender
- * @param {string} tenderId - ProZorro internal UUID
- * @returns {Promise<object|null>}
  */
 export async function fetchTenderDetail(tenderId) {
-    try {
-        const resp = await fetch(`${API_BASE}/tenders/${tenderId}`, { signal: AbortSignal.timeout(10000) });
-        if (!resp.ok) {
-            if (resp.status === 429) {
-                await new Promise(r => setTimeout(r, 1000));
-                const retry = await fetch(`${API_BASE}/tenders/${tenderId}`, { signal: AbortSignal.timeout(10000) });
-                if (!retry.ok) return null;
-                const json = await retry.json();
-                return json.data || null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const resp = await fetchWithTimeout(`${API_BASE}/tenders/${tenderId}`, 10000);
+            if (!resp.ok) {
+                if (resp.status === 429) {
+                    await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+                    continue;
+                }
+                console.warn(`ProZorro detail: HTTP ${resp.status} for ${tenderId}`);
+                return null;
             }
-            return null;
+            const json = await resp.json();
+            return json.data || null;
+        } catch (e) {
+            console.warn(`ProZorro detail error (attempt ${attempt + 1}):`, e.message);
+            if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
         }
-        const json = await resp.json();
-        return json.data || null;
-    } catch {
-        return null;
     }
+    return null;
 }
 
 /**
  * Get aggregated procurement KPIs from fetched tenders
- * @param {Array} tenders - Array from searchTenders()
- * @returns {object}
  */
 export function aggregateProcurementKPIs(tenders) {
     const proceduresCount = tenders.length;

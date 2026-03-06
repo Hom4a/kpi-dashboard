@@ -17,7 +17,9 @@ export async function fetchNbuRate(dateStr) {
             const d = dateStr.replace(/-/g, '');
             url = `${NBU_API}?valcode=EUR&date=${d}&json`;
         }
-        const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 5000);
+        const resp = await fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
         if (!resp.ok) return null;
         const data = await resp.json();
         if (!Array.isArray(data) || !data.length) return null;

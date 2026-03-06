@@ -265,7 +265,7 @@ setAuthLoadAndRender(async () => {
     initDashboardList($('builderContent'));
     renderApiSystemPage();
     // ProZorro sync (non-blocking background)
-    syncProzorro().catch(() => {});
+    syncProzorro().catch(e => console.warn('ProZorro bg sync:', e.message));
     // Start Realtime subscriptions
     startRealtime({
         kpi_records: async () => { await loadAndRender(); showRoleButtons(); },
