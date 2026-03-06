@@ -8,8 +8,8 @@
 
 const API_BASE = 'https://public-api.prozorro.gov.ua/api/2.5';
 const DEFAULT_EDRPOU = '44768034';
-const MAX_PAGES = 200; // 200 × 1000 = 200K tenders (~2.8 days at 72K/day)
-const PAGE_SIZE = 1000;
+const MAX_PAGES = 200; // 200 × 100 = 20K tenders
+const PAGE_SIZE = 100; // Smaller pages to fit through CORS proxy (1000 → 413 error)
 const CONCURRENT_DETAILS = 5; // Parallel detail fetches
 
 // CORS proxy — ProZorro API doesn't send Access-Control-Allow-Origin headers
