@@ -55,7 +55,7 @@ import { setRegionalOffices } from './gis/state-gis.js';
 import { openGisAdmin, closeGisAdmin, saveGisAdmin, addNewOffice } from './gis/gis-admin.js';
 import { closeGisDrilldown } from './gis/gis-controls.js';
 // Procurement (ProZorro)
-import { searchTenders, DEFAULT_EDRPOU } from './procurement/prozorro-api.js';
+import { searchTenders, DEFAULT_EDRPOU, diagnoseProzorro } from './procurement/prozorro-api.js';
 import { saveTendersCache, logSync, loadCachedTenders, getLastSync, aggregateCachedKPIs } from './procurement/db-procurement.js';
 
 // ===== Show buttons based on role (called after ALL data loads) =====
@@ -339,6 +339,7 @@ window.syncProzorro = async () => {
     } catch (e) { toast('Помилка: ' + e.message, true); }
     showLoader(false);
 };
+window.diagnoseProzorro = diagnoseProzorro;
 window.getProzorroKPIs = async () => {
     const tenders = await loadCachedTenders(DEFAULT_EDRPOU, { year: new Date().getFullYear() });
     return aggregateCachedKPIs(tenders);

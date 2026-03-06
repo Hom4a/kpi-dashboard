@@ -57,6 +57,12 @@ export async function searchTenders(opts = {}) {
             const items = json.data || [];
             if (!items.length) break;
 
+            // Debug: log first page structure
+            if (page === 0 && items.length) {
+                console.log('ProZorro page 0 sample:', JSON.stringify(items[0].procuringEntity));
+                console.log('ProZorro page 0 item keys:', Object.keys(items[0]));
+            }
+
             // Check date cutoff
             const oldestDate = new Date(items[items.length - 1].dateModified);
             if (oldestDate < sinceDate) {
@@ -176,6 +182,90 @@ function extractTender(t) {
         procuringEntity: pe.name || '',
         procurementMethodType: t.procurementMethodType || ''
     };
+}
+
+/**
+ * Diagnostic function — run in DevTools: await window.diagnoseProzorro()
+ * Checks what the API actually returns in the browser and why matching fails.
+ */
+export async function diagnoseProzorro(edrpou = DEFAULT_EDRPOU) {
+    console.log('=== ProZorro Diagnostics ===');
+    console.log('Target EDRPOU:', edrpou);
+
+    // Step 1: Fetch a small page to inspect structure
+    const url1 = `${API_BASE}/tenders?descending=1&limit=3&opt_fields=procuringEntity`;
+    console.log('Fetching:', url1);
+    try {
+        const resp = await fetchWithTimeout(url1, 10000);
+        console.log('HTTP status:', resp.status);
+        const json = await resp.json();
+        const items = json.data || [];
+        console.log('Items count:', items.length);
+
+        if (items.length) {
+            const sample = items[0];
+            console.log('Sample item keys:', Object.keys(sample));
+            console.log('Has procuringEntity:', !!sample.procuringEntity);
+            if (sample.procuringEntity) {
+                console.log('procuringEntity:', JSON.stringify(sample.procuringEntity));
+                console.log('Has identifier:', !!sample.procuringEntity.identifier);
+                if (sample.procuringEntity.identifier) {
+                    console.log('identifier.id:', sample.procuringEntity.identifier.id);
+                }
+            }
+            console.log('matchesEdrpou result:', matchesEdrpou(sample, edrpou));
+        }
+    } catch (e) {
+        console.error('Step 1 failed:', e.message);
+    }
+
+    // Step 2: Scan 5 pages and count matches
+    console.log('\n--- Scanning 5 pages (5000 items) ---');
+    let nextUrl = `${API_BASE}/tenders?descending=1&limit=${PAGE_SIZE}&opt_fields=procuringEntity`;
+    let totalScanned = 0;
+    let totalMatches = 0;
+    let withPE = 0;
+    let withIdentifier = 0;
+    const sampleEdrpous = new Set();
+
+    for (let page = 0; page < 5; page++) {
+        try {
+            const resp = await fetchWithTimeout(nextUrl, 15000);
+            if (!resp.ok) { console.warn('Page', page, 'HTTP', resp.status); break; }
+            const json = await resp.json();
+            const items = json.data || [];
+            if (!items.length) { console.log('Page', page, '— empty'); break; }
+
+            for (const t of items) {
+                totalScanned++;
+                if (t.procuringEntity) {
+                    withPE++;
+                    if (t.procuringEntity.identifier) {
+                        withIdentifier++;
+                        sampleEdrpous.add(t.procuringEntity.identifier.id);
+                    }
+                    if (matchesEdrpou(t, edrpou)) totalMatches++;
+                }
+            }
+
+            console.log(`Page ${page}: ${items.length} items, PE: ${withPE}/${totalScanned}, matches: ${totalMatches}`);
+
+            if (json.next_page && json.next_page.uri) {
+                nextUrl = json.next_page.uri;
+            } else { break; }
+        } catch (e) {
+            console.error('Page', page, 'error:', e.message);
+            break;
+        }
+    }
+
+    console.log('\n=== Results ===');
+    console.log('Total scanned:', totalScanned);
+    console.log('With procuringEntity:', withPE);
+    console.log('With identifier:', withIdentifier);
+    console.log('Matches for', edrpou + ':', totalMatches);
+    console.log('Unique EDRPOUs seen (first 20):', [...sampleEdrpous].slice(0, 20));
+    return { totalScanned, withPE, withIdentifier, totalMatches };
 }
 
 export { DEFAULT_EDRPOU };
