@@ -5,7 +5,7 @@ export let marketUaDetail = [];     // all periods
 export let marketHistory = [];
 export let eurRates = [];
 export let filteredMarketPrices = [];
-export let marketMeta = { period: '', eurRate: 0 };
+export let marketMeta = { period: '', eurRate: 0, nbuRate: null, nbuDate: null };
 export let marketFilterState = { country: '', woodType: 'all', period: '' };
 export let allPeriods = [];         // sorted desc: ['грудень 2025', 'листопад 2025']
 

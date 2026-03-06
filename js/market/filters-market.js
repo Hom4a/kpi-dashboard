@@ -1,6 +1,6 @@
 // ===== Market Dashboard — Filters =====
 import { $ } from '../utils.js';
-import { marketPrices, marketUaDetail, marketFilterState, allPeriods,
+import { marketPrices, marketUaDetail, marketMeta, marketFilterState, allPeriods,
          setFilteredMarketPrices, setMarketFilterState, setMarketMeta } from './state-market.js';
 import { setMarketTableMode } from './render-market-table.js';
 
@@ -39,7 +39,7 @@ export function applyMarketFilter() {
     // Update meta for the active period
     if (activePeriod && filtered.length) {
         const rec = filtered[0];
-        setMarketMeta({ period: rec.period || '', eurRate: rec.eur_rate || 0 });
+        setMarketMeta({ period: rec.period || '', eurRate: rec.eur_rate || 0, nbuRate: marketMeta.nbuRate, nbuDate: marketMeta.nbuDate });
     }
 
     if (country) {

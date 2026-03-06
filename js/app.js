@@ -28,7 +28,8 @@ import { renderHarvestingDashboard } from './harvesting/render-harvesting.js';
 import { renderExecutiveDashboard } from './executive/render-executive.js';
 // Market modules
 import { setMarketPrices, setMarketUaDetail, setMarketHistory, setEurRates, setMarketMeta, setAllPeriods } from './market/state-market.js';
-import { loadMarketPrices, loadMarketUaDetail, loadMarketHistory, loadEurRates, clearMarketData as clearMarketDB, undoLastMarketUpload as undoMarketDB } from './market/db-market.js';
+import { loadMarketPrices, loadMarketUaDetail, loadMarketHistory, loadEurRates, upsertNbuRate, clearMarketData as clearMarketDB, undoLastMarketUpload as undoMarketDB } from './market/db-market.js';
+import { fetchNbuRate } from './market/nbu-api.js';
 import { populateMarketFilters, applyMarketFilter, initMarketFilterEvents, setRenderMarketCallback } from './market/filters-market.js';
 import { renderMarketDashboard } from './market/render-market.js';
 // Summary modules
@@ -163,12 +164,33 @@ async function loadMarketDataAndRender() {
         setMarketUaDetail(uaDetail);
         setMarketHistory(history);
         setEurRates(rates);
+        // Auto-fetch today's EUR/UAH from NBU API (non-blocking)
+        fetchNbuRate().then(async (nbu) => {
+            if (!nbu) return;
+            try {
+                const res = await upsertNbuRate(nbu.date, nbu.rate);
+                if (res.action === 'inserted' || res.action === 'updated') {
+                    console.log(`NBU rate ${res.action}: ${nbu.date} = ${nbu.rate}`);
+                    // Reload rates to include the new one
+                    const freshRates = await loadEurRates();
+                    setEurRates(freshRates);
+                }
+            } catch (e) { console.warn('NBU rate save failed:', e.message); }
+        }).catch(() => {});
         // Build sorted period list and set meta from latest
         const periods = [...new Set(prices.map(r => r.period).filter(Boolean))].sort().reverse();
         setAllPeriods(periods);
+        // Build market meta: period rate + latest NBU rate from eur_rates table
+        const latestNbu = rates.length ? rates.reduce((a, b) => a.rate_date > b.rate_date ? a : b) : null;
         if (prices.length) {
             const latest = prices.find(r => r.period === periods[0]) || prices[0];
-            setMarketMeta({ period: latest.period || '', eurRate: latest.eur_rate || 0 });
+            setMarketMeta({
+                period: latest.period || '', eurRate: latest.eur_rate || 0,
+                nbuRate: latestNbu ? latestNbu.eur_uah : null,
+                nbuDate: latestNbu ? latestNbu.rate_date : null
+            });
+        } else if (latestNbu) {
+            setMarketMeta({ period: '', eurRate: latestNbu.eur_uah, nbuRate: latestNbu.eur_uah, nbuDate: latestNbu.rate_date });
         }
         if (prices.length || history.length) {
             hide('empty'); $('dash').style.display = 'block';

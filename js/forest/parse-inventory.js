@@ -1,4 +1,5 @@
 // ===== Parse Forest Inventory Excel =====
+import { normalizeSpecies, normalizeQuality } from '../validation.js';
 
 export function parseInventoryFile(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -64,8 +65,8 @@ export function parseInventoryFile(wb) {
             product: (r[colMap.product] || '').toString().trim(),
             product_name: (r[colMap.product_name] || '').toString().trim(),
             wood_group: (r[colMap.wood_group] || '').toString().trim(),
-            species: (r[colMap.species] || '').toString().trim(),
-            quality_class: (r[colMap.quality_class] || '').toString().trim(),
+            species: normalizeSpecies(r[colMap.species]),
+            quality_class: normalizeQuality(r[colMap.quality_class]),
             remaining_volume_m3: vol
         });
     }

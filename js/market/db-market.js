@@ -101,18 +101,14 @@ export async function saveMarketData(parsedResult, fileName) {
 }
 
 export async function loadMarketPrices() {
-    const all = [];
-    let from = 0;
-    while (true) {
-        const { data, error } = await sb.from('market_prices')
-            .select('*').range(from, from + 999).order('period', { ascending: false }).order('row_type').order('country');
-        if (error) throw error;
-        if (!data || !data.length) break;
-        all.push(...data);
-        if (data.length < 1000) break;
-        from += 1000;
-    }
-    return all;
+    const { paginatedLoad } = await import('../db-utils.js');
+    return paginatedLoad('market_prices', {
+        order: [
+            { col: 'period', ascending: false },
+            { col: 'row_type' },
+            { col: 'country' }
+        ]
+    });
 }
 
 export async function loadMarketUaDetail() {
@@ -160,6 +156,23 @@ export async function undoLastMarketUpload() {
     await sb.from('eur_rates').delete().eq('upload_batch_id', bid);
 
     await sb.from('forest_upload_history').delete().eq('id', last.id);
+}
+
+// ===== NBU Rate — upsert single rate by date =====
+// Requires UNIQUE INDEX on eur_rates(rate_date) — see sql/add-composite-indexes.sql
+export async function upsertNbuRate(rateDate, eurUah) {
+    const { data: { session } } = await sb.auth.getSession();
+    const userId = session?.user?.id || null;
+    const { data, error } = await sb.from('eur_rates')
+        .upsert({
+            upload_batch_id: crypto.randomUUID(),
+            rate_date: rateDate,
+            eur_uah: eurUah,
+            uploaded_by: userId
+        }, { onConflict: 'rate_date' })
+        .select('id');
+    if (error) throw error;
+    return { action: data?.length ? 'upserted' : 'unchanged' };
 }
 
 export async function clearMarketData() {

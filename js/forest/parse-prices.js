@@ -1,4 +1,5 @@
 // ===== Parse Forest Prices Excel =====
+import { normalizeSpecies, normalizeQuality } from '../validation.js';
 
 export function parsePricesFile(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -50,8 +51,8 @@ export function parsePricesFile(wb) {
             region: (r[colMap.region] || '').toString().trim(),
             warehouse: (r[colMap.warehouse] || '').toString().trim(),
             product: (r[colMap.product] || '').toString().trim(),
-            species: (r[colMap.species] || '').toString().trim(),
-            quality_class: (r[colMap.quality_class] || '').toString().trim(),
+            species: normalizeSpecies(r[colMap.species]),
+            quality_class: normalizeQuality(r[colMap.quality_class]),
             volume_m3: cleanNumber(r[colMap.volume_m3]),
             weighted_price_uah: cleanNumber(r[colMap.weighted_price_uah]),
             total_value_uah: cleanNumber(r[colMap.total_value_uah])

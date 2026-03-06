@@ -5,7 +5,7 @@
 import { allData, targets } from '../state.js';
 import { pricesData, inventoryData } from '../forest/state-forest.js';
 import { planFactData, zsuData } from '../harvesting/state-harvesting.js';
-import { marketPrices, marketMeta } from '../market/state-market.js';
+import { marketPrices, marketMeta, eurRates } from '../market/state-market.js';
 import { sb } from '../config.js';
 
 export let execCharts = {};
@@ -90,7 +90,9 @@ function computeMarketComparison() {
     const marketAvgUa = avgBiz(uaRow);
     const marketAvgEu = avgBiz(avgRow);
     const marketDiff = marketAvgEu > 0 ? ((marketAvgUa - marketAvgEu) / marketAvgEu) * 100 : 0;
-    const eurRate = marketMeta.eurRate || 0;
+    // Prefer NBU rate (latest from eur_rates table), fallback to period rate from market_prices
+    const latestNbu = eurRates.length ? eurRates.reduce((a, b) => a.rate_date > b.rate_date ? a : b) : null;
+    const eurRate = latestNbu ? latestNbu.eur_uah : (marketMeta.eurRate || 0);
     const speciesKeys = [
         { key: 'pine_business', label: 'Сосна' },
         { key: 'spruce_business', label: 'Ялина' },
@@ -187,7 +189,9 @@ function computeExecMetricsLocal() {
     const marketAvgUa = avgBiz(uaRow);
     const marketAvgEu = avgBiz(avgRow);
     const marketDiff = marketAvgEu > 0 ? ((marketAvgUa - marketAvgEu) / marketAvgEu) * 100 : 0;
-    const eurRate = marketMeta.eurRate || 0;
+    // Prefer NBU rate (latest from eur_rates table), fallback to period rate
+    const latestNbuLocal = eurRates.length ? eurRates.reduce((a, b) => a.rate_date > b.rate_date ? a : b) : null;
+    const eurRate = latestNbuLocal ? latestNbuLocal.eur_uah : (marketMeta.eurRate || 0);
 
     // Market by species for executive chart
     const speciesKeys = [

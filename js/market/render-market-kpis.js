@@ -78,6 +78,7 @@ export function renderMarketKPIs() {
             <div class="kpi-label">Курс EUR</div>
             <div class="kpi-value" style="color:var(--amber)">₴${fmt(rate, 2)}</div>
             <div class="kpi-sub">${activePeriod || '—'}</div>
+            ${marketMeta.nbuRate ? `<div class="kpi-sub" style="margin-top:4px;font-size:11px;opacity:.7" title="Офіційний курс НБУ на ${marketMeta.nbuDate || ''}">НБУ: ₴${fmt(marketMeta.nbuRate, 2)}</div>` : ''}
         </div>
         ${deltaHtml}
     `;

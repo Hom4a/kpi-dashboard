@@ -71,29 +71,13 @@ export async function saveZsuData(records, fileName) {
 }
 
 export async function loadPlanFactData() {
-    const all = []; let from = 0;
-    while (true) {
-        const { data, error } = await sb.from('harvesting_plan_fact').select('*').range(from, from + 999);
-        if (error) throw new Error(error.message);
-        if (!data || !data.length) break;
-        all.push(...data);
-        if (data.length < 1000) break;
-        from += 1000;
-    }
-    return all;
+    const { paginatedLoad } = await import('../db-utils.js');
+    return paginatedLoad('harvesting_plan_fact');
 }
 
 export async function loadZsuData() {
-    const all = []; let from = 0;
-    while (true) {
-        const { data, error } = await sb.from('harvesting_zsu').select('*').range(from, from + 999);
-        if (error) throw new Error(error.message);
-        if (!data || !data.length) break;
-        all.push(...data);
-        if (data.length < 1000) break;
-        from += 1000;
-    }
-    return all;
+    const { paginatedLoad } = await import('../db-utils.js');
+    return paginatedLoad('harvesting_zsu');
 }
 
 export async function clearPlanFactData() {

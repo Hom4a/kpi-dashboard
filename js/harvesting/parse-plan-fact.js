@@ -1,4 +1,5 @@
 // ===== Parse Harvesting Plan-Fact Excel =====
+import { normalizeOffice, isKnownOffice } from '../validation.js';
 
 function cleanNumber(val) {
     if (val == null || val === '') return 0;
@@ -8,21 +9,16 @@ function cleanNumber(val) {
     return isNaN(num) ? 0 : num;
 }
 
-const KNOWN_OFFICES = ['карпатськ', 'південн', 'північн', 'подільськ', 'поліськ',
-    'слобожанськ', 'столичн', 'центральн', 'східн'];
-
 function isOfficeRow(row) {
     for (const cell of row) {
-        const lower = (cell || '').toString().toLowerCase();
-        if (KNOWN_OFFICES.some(o => lower.includes(o))) return true;
+        if (isKnownOffice(cell)) return true;
     }
     return false;
 }
 
 function findOfficeCell(row) {
     for (let i = 0; i < row.length; i++) {
-        const lower = (row[i] || '').toString().toLowerCase();
-        if (KNOWN_OFFICES.some(o => lower.includes(o))) return i;
+        if (isKnownOffice(row[i])) return i;
     }
     return 0;
 }
@@ -62,8 +58,9 @@ export function parsePlanFactFile(wb) {
         const lower = officeName.toLowerCase();
         // Stop at summary/section rows
         if (lower.includes('всього') || lower.includes('разом') || lower.includes('підсумок') || lower.includes('залишки')) break;
-        // Must be a known office
-        if (!KNOWN_OFFICES.some(o => lower.includes(o))) continue;
+        // Must be a known office — normalize to canonical name
+        const canonicalOffice = normalizeOffice(officeName);
+        if (!canonicalOffice) continue;
 
         const apr = cleanNumber(r[colMap.apr]);
         const apf = cleanNumber(r[colMap.apf]);
@@ -82,7 +79,7 @@ export function parsePlanFactFile(wb) {
         const paf = cleanNumber(r[colMap.paf]) || (apf > 0 ? hf / apf * 100 : 0);
 
         records.push({
-            regional_office: officeName,
+            regional_office: canonicalOffice,
             annual_plan_total: apt, annual_plan_rgk: apr, annual_plan_rfiol: apf,
             nine_month_plan_total: npt, nine_month_plan_rgk: npr, nine_month_plan_rfiol: npf,
             harvested_total: ht, harvested_rgk: hr, harvested_rfiol: hf,

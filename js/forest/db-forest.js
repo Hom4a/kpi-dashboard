@@ -14,25 +14,15 @@ export async function fetchForestSummary(branch = null, product = null, species 
     } catch { return null; }
 }
 
-// Smart merge: fetch existing keys, insert only new records
+// Smart merge: check for duplicates, then replace-all + batch-insert
 export async function savePricesData(records, fileName) {
     const { data: { session } } = await sb.auth.getSession();
     const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
 
-    // Fetch existing composite keys
-    const existingKeys = new Set();
-    let from = 0;
-    while (true) {
-        const { data, error } = await sb.from('forest_prices')
-            .select('branch,warehouse,product,species,quality_class')
-            .range(from, from + 4999);
-        if (error) throw new Error(error.message);
-        if (!data || !data.length) break;
-        data.forEach(r => existingKeys.add(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
-        if (data.length < 5000) break;
-        from += 5000;
-    }
+    // Quick dedup check: count existing records
+    const { count: existingCount } = await sb.from('forest_prices')
+        .select('*', { count: 'exact', head: true });
 
     const rows = records.map(r => ({
         upload_batch_id: batchId,
@@ -42,17 +32,24 @@ export async function savePricesData(records, fileName) {
         uploaded_by: userId
     }));
 
-    const newRows = rows.filter(r => !existingKeys.has(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
-    const replacedRows = rows.filter(r => existingKeys.has(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
-
-    // Delete existing records that will be replaced
-    for (const r of replacedRows) {
-        await sb.from('forest_prices').delete()
-            .eq('branch', r.branch).eq('warehouse', r.warehouse)
-            .eq('product', r.product).eq('species', r.species).eq('quality_class', r.quality_class);
+    // If same row count, check if data is identical (skip re-upload)
+    if (existingCount === rows.length) {
+        const { data: sample } = await sb.from('forest_prices')
+            .select('branch,warehouse,product,species,quality_class')
+            .limit(5);
+        const sampleKeys = new Set((sample || []).map(r => `${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
+        const allMatch = rows.slice(0, 5).every(r => sampleKeys.has(`${r.branch}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`));
+        if (allMatch && rows.length === existingCount) {
+            return { added: 0, replaced: 0, skipped: rows.length };
+        }
     }
 
-    // Insert all records (new + replacements)
+    // Delete all existing records (single request instead of per-row loop)
+    if (existingCount > 0) {
+        await sb.from('forest_prices').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    }
+
+    // Batch insert all records
     for (let i = 0; i < rows.length; i += 500) {
         const { error } = await sb.from('forest_prices').insert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
@@ -63,7 +60,7 @@ export async function savePricesData(records, fileName) {
         file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
 
-    return { added: newRows.length, replaced: replacedRows.length };
+    return { added: rows.length, replaced: existingCount > 0 ? existingCount : 0 };
 }
 
 export async function saveInventoryData(records, fileName) {
@@ -71,21 +68,9 @@ export async function saveInventoryData(records, fileName) {
     const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
 
-    // Fetch existing composite keys
-    const existingKeys = new Set();
-    let from = 0;
-    while (true) {
-        const { data, error } = await sb.from('forest_inventory')
-            .select('branch,forest_unit,forestry_div,warehouse,product,species,quality_class')
-            .range(from, from + 4999);
-        if (error) throw new Error(error.message);
-        if (!data || !data.length) break;
-        data.forEach(r => existingKeys.add(
-            `${r.branch}|${r.forest_unit}|${r.forestry_div}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`
-        ));
-        if (data.length < 5000) break;
-        from += 5000;
-    }
+    // Quick dedup check
+    const { count: existingCount } = await sb.from('forest_inventory')
+        .select('*', { count: 'exact', head: true });
 
     const rows = records.map(r => ({
         upload_batch_id: batchId,
@@ -96,18 +81,23 @@ export async function saveInventoryData(records, fileName) {
         uploaded_by: userId
     }));
 
-    const makeKey = r => `${r.branch}|${r.forest_unit}|${r.forestry_div}|${r.warehouse}|${r.product}|${r.species}|${r.quality_class}`;
-    const newRows = rows.filter(r => !existingKeys.has(makeKey(r)));
-    const replacedRows = rows.filter(r => existingKeys.has(makeKey(r)));
-
-    // Delete existing records that will be replaced
-    for (const r of replacedRows) {
-        await sb.from('forest_inventory').delete()
-            .eq('branch', r.branch).eq('forest_unit', r.forest_unit).eq('forestry_div', r.forestry_div)
-            .eq('warehouse', r.warehouse).eq('product', r.product).eq('species', r.species).eq('quality_class', r.quality_class);
+    // If same row count, likely identical data
+    if (existingCount === rows.length && rows.length > 0) {
+        const { data: sample } = await sb.from('forest_inventory')
+            .select('branch,forest_unit,species').limit(5);
+        const sampleKeys = new Set((sample || []).map(r => `${r.branch}|${r.forest_unit}|${r.species}`));
+        const allMatch = rows.slice(0, 5).every(r => sampleKeys.has(`${r.branch}|${r.forest_unit}|${r.species}`));
+        if (allMatch) {
+            return { added: 0, replaced: 0, skipped: rows.length };
+        }
     }
 
-    // Insert all records (new + replacements)
+    // Delete all existing records (single request instead of per-row loop)
+    if (existingCount > 0) {
+        await sb.from('forest_inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    }
+
+    // Batch insert all records
     for (let i = 0; i < rows.length; i += 500) {
         const { error } = await sb.from('forest_inventory').insert(rows.slice(i, i + 500));
         if (error) throw new Error(error.message);
@@ -118,33 +108,17 @@ export async function saveInventoryData(records, fileName) {
         file_name: fileName, row_count: rows.length, uploaded_by: userId
     });
 
-    return { added: newRows.length, replaced: replacedRows.length };
+    return { added: rows.length, replaced: existingCount > 0 ? existingCount : 0 };
 }
 
 export async function loadPricesData() {
-    const all = []; let from = 0;
-    while (true) {
-        const { data, error } = await sb.from('forest_prices').select('*').range(from, from + 999);
-        if (error) throw new Error(error.message);
-        if (!data || !data.length) break;
-        all.push(...data);
-        if (data.length < 1000) break;
-        from += 1000;
-    }
-    return all;
+    const { paginatedLoad } = await import('../db-utils.js');
+    return paginatedLoad('forest_prices');
 }
 
 export async function loadInventoryData() {
-    const all = []; let from = 0;
-    while (true) {
-        const { data, error } = await sb.from('forest_inventory').select('*').range(from, from + 999);
-        if (error) throw new Error(error.message);
-        if (!data || !data.length) break;
-        all.push(...data);
-        if (data.length < 1000) break;
-        from += 1000;
-    }
-    return all;
+    const { paginatedLoad } = await import('../db-utils.js');
+    return paginatedLoad('forest_inventory');
 }
 
 export async function getPricesCount() {

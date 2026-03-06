@@ -1,4 +1,5 @@
 // ===== Parse ZSU Withdrawals Excel =====
+import { normalizeOffice, isKnownOffice } from '../validation.js';
 
 function cleanNumber(val) {
     if (val == null || val === '') return 0;
@@ -7,9 +8,6 @@ function cleanNumber(val) {
     const num = parseFloat(cleaned);
     return isNaN(num) ? 0 : num;
 }
-
-const KNOWN_OFFICES = ['карпатськ', 'південн', 'північн', 'подільськ', 'поліськ',
-    'слобожанськ', 'столичн', 'центральн', 'східн'];
 
 export function parseZsuFile(wb) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -36,8 +34,7 @@ export function parseZsuFile(wb) {
     for (let i = (headerIdx >= 0 ? headerIdx + 1 : 4); i < Math.min(rows.length, 15); i++) {
         const row = rows[i] || [];
         for (let j = 0; j < row.length; j++) {
-            const lower = (row[j] || '').toString().toLowerCase();
-            if (KNOWN_OFFICES.some(o => lower.includes(o))) {
+            if (isKnownOffice(row[j])) {
                 officeCol = j;
                 fpDeclared = j + 1; fpShipped = j + 2; fpValue = j + 3;
                 lDeclared = j + 4; lShipped = j + 5; lValue = j + 6;
@@ -57,11 +54,12 @@ export function parseZsuFile(wb) {
         const lower = officeName.toLowerCase();
         // Skip totals and summary rows
         if (lower.includes('всього') || lower.includes('разом') || lower.includes('підсумок') || lower.includes('итого')) continue;
-        // Must be a known office
-        if (!KNOWN_OFFICES.some(o => lower.includes(o))) continue;
+        // Must be a known office — normalize to canonical name
+        const canonicalOffice = normalizeOffice(officeName);
+        if (!canonicalOffice) continue;
 
         records.push({
-            regional_office: officeName,
+            regional_office: canonicalOffice,
             forest_products_declared_m3: cleanNumber(r[fpDeclared]),
             forest_products_shipped_m3: cleanNumber(r[fpShipped]),
             forest_products_value_uah: cleanNumber(r[fpValue]),

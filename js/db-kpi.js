@@ -57,16 +57,8 @@ export async function saveRecords(records, fileName) {
 }
 
 export async function loadAllRecords() {
-    const all = []; let from = 0;
-    while (true) {
-        const { data, error } = await sb.from('kpi_records').select('*').range(from, from + 999);
-        if (error) throw new Error(error.message);
-        if (!data || !data.length) break;
-        all.push(...data);
-        if (data.length < 1000) break;
-        from += 1000;
-    }
-    return all;
+    const { paginatedLoad } = await import('./db-utils.js');
+    return paginatedLoad('kpi_records');
 }
 
 export async function clearDB() {

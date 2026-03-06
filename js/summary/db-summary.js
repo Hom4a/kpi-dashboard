@@ -49,18 +49,9 @@ export async function saveSummaryIndicators(records, fileName) {
 }
 
 export async function loadSummaryIndicators(year = null) {
-    const all = []; let from = 0;
-    while (true) {
-        let q = sb.from('summary_indicators').select('*').range(from, from + 999);
-        if (year) q = q.eq('year', year);
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        if (!data || !data.length) break;
-        all.push(...data);
-        if (data.length < 1000) break;
-        from += 1000;
-    }
-    return all;
+    const { paginatedLoad } = await import('../db-utils.js');
+    const filters = year ? [{ col: 'year', op: 'eq', val: year }] : [];
+    return paginatedLoad('summary_indicators', { filters });
 }
 
 // ===== Weekly Briefing =====
