@@ -30,7 +30,7 @@ const PAGE_ACCESS = {
 };
 
 // Roles that can upload files
-const UPLOAD_ROLES = ['admin', 'editor', 'accountant', 'hr', 'forester', 'operator'];
+const UPLOAD_ROLES = ['admin', 'director', 'analyst', 'editor', 'accountant', 'hr', 'forester', 'operator'];
 
 // Roles that see data management (clear/undo)
 const DATA_MANAGE_ROLES = ['admin', 'editor'];

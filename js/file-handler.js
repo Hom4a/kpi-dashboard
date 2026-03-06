@@ -236,7 +236,11 @@ async function handleDocxFile(buffer, fileName) {
             reportDate = fm ? `${fm[3]}-${fm[2]}-${fm[1]}` : new Date().toISOString().slice(0, 10);
         }
         const result = await saveSummaryWeekly(parsed.records, parsed.notes, reportDate, fileName);
-        toast(`Тижнева довідка: ${result.count} показників, ${result.notes} нотаток (${reportDate})`);
+        if (result.added === 0 && result.updated === 0) {
+            toast('Тижнева довідка: дані вже актуальні, змін не внесено.');
+        } else {
+            toast(`Тижнева довідка (${reportDate}): додано ${result.added}, оновлено ${result.updated} показників`);
+        }
 
         if (_loadSummaryFn) await _loadSummaryFn();
     } catch (err) {

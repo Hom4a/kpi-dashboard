@@ -70,17 +70,20 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
     const userId = session?.user?.id || null;
     const batchId = crypto.randomUUID();
 
-    // Delete existing records for this report_date
-    await sb.from('summary_weekly').delete().eq('report_date', reportDate);
-    await sb.from('summary_weekly_notes').delete().eq('report_date', reportDate);
+    // Count existing records for this date before upsert
+    const { count: before } = await sb.from('summary_weekly')
+        .select('*', { count: 'exact', head: true })
+        .eq('report_date', reportDate);
 
     // Deduplicate records (keep last occurrence for same section+indicator)
+    let upsertCount = 0;
     if (records.length) {
         const dedup = new Map();
         for (const r of records) {
             dedup.set(`${r.section}|${r.indicator_name}`, r);
         }
         const unique = [...dedup.values()];
+        upsertCount = unique.length;
         const rows = unique.map(r => ({
             upload_batch_id: batchId,
             report_date: reportDate,
@@ -101,7 +104,8 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
         }
     }
 
-    // Insert text notes
+    // Upsert text notes (preserves existing notes for other types)
+    let notesCount = 0;
     if (notes && notes.length) {
         const noteRows = notes
             .filter(n => n.content && n.content.trim())
@@ -111,6 +115,7 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
                 content: n.content.trim(),
                 uploaded_by: userId
             }));
+        notesCount = noteRows.length;
         if (noteRows.length) {
             const { error } = await sb.from('summary_weekly_notes')
                 .upsert(noteRows, { onConflict: 'report_date,note_type' });
@@ -118,12 +123,20 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
         }
     }
 
+    // Count after upsert to determine added vs updated
+    const { count: after } = await sb.from('summary_weekly')
+        .select('*', { count: 'exact', head: true })
+        .eq('report_date', reportDate);
+
+    const added = (after || 0) - (before || 0);
+    const updated = upsertCount - added;
+
     await sb.from('summary_upload_history').insert({
         data_type: 'weekly_briefing', batch_id: batchId,
-        file_name: fileName || `weekly_${reportDate}`, row_count: records.length, uploaded_by: userId
+        file_name: fileName || `weekly_${reportDate}`, row_count: upsertCount, uploaded_by: userId
     });
 
-    return { count: records.length, notes: (notes || []).filter(n => n.content && n.content.trim()).length };
+    return { added, updated, total: upsertCount, notes: notesCount };
 }
 
 export async function loadSummaryWeekly(limit = 4) {

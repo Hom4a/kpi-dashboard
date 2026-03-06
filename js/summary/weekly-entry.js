@@ -368,7 +368,11 @@ async function saveAllSections() {
         }
 
         const result = await saveSummaryWeekly(records, notes, reportDate);
-        toast(`Збережено: ${result.count} показників, ${result.notes} нотаток`);
+        if (result.added === 0 && result.updated === 0) {
+            toast('Дані вже актуальні, змін не внесено.');
+        } else {
+            toast(`Збережено (${reportDate}): додано ${result.added}, оновлено ${result.updated} показників`);
+        }
 
         // Reload and rerender
         const [weekly, weeklyNotes] = await Promise.all([
