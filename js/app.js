@@ -54,6 +54,9 @@ import { loadRegionalOffices } from './gis/db-gis.js';
 import { setRegionalOffices } from './gis/state-gis.js';
 import { openGisAdmin, closeGisAdmin, saveGisAdmin, addNewOffice } from './gis/gis-admin.js';
 import { closeGisDrilldown } from './gis/gis-controls.js';
+// Procurement (ProZorro)
+import { searchTenders, DEFAULT_EDRPOU } from './procurement/prozorro-api.js';
+import { saveTendersCache, logSync, loadCachedTenders, getLastSync, aggregateCachedKPIs } from './procurement/db-procurement.js';
 
 // ===== Show buttons based on role (called after ALL data loads) =====
 function showRoleButtons() {
@@ -218,6 +221,36 @@ async function loadSummaryDataAndRender() {
     } catch(e) { console.error('loadSummaryDataAndRender error:', e); }
 }
 
+// ===== ProZorro Sync (non-blocking) =====
+async function syncProzorro(force = false) {
+    try {
+        // Check last sync — skip if synced within last 6 hours (unless forced)
+        if (!force) {
+            const last = await getLastSync(DEFAULT_EDRPOU);
+            if (last && (Date.now() - new Date(last.syncedAt).getTime()) < 6 * 3600 * 1000) {
+                console.log('ProZorro: skipping sync (recent:', last.syncedAt, ')');
+                return;
+            }
+        }
+        console.log('ProZorro: syncing tenders for EDRPOU', DEFAULT_EDRPOU);
+        const start = Date.now();
+        let pagesScanned = 0;
+        const tenders = await searchTenders({
+            edrpou: DEFAULT_EDRPOU,
+            onProgress: (scanned) => { pagesScanned = Math.ceil(scanned / 1000); }
+        });
+        const duration = Date.now() - start;
+        console.log(`ProZorro: found ${tenders.length} tenders in ${duration}ms`);
+
+        if (tenders.length) {
+            await saveTendersCache(tenders, DEFAULT_EDRPOU);
+        }
+        await logSync(DEFAULT_EDRPOU, tenders.length, pagesScanned, duration);
+    } catch (e) {
+        console.warn('ProZorro sync failed:', e.message);
+    }
+}
+
 // ===== Wire callbacks =====
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
@@ -231,6 +264,8 @@ setAuthLoadAndRender(async () => {
     initDataEntry();
     initDashboardList($('builderContent'));
     renderApiSystemPage();
+    // ProZorro sync (non-blocking background)
+    syncProzorro().catch(() => {});
     // Start Realtime subscriptions
     startRealtime({
         kpi_records: async () => { await loadAndRender(); showRoleButtons(); },
@@ -295,6 +330,19 @@ window.closeGisAdmin = closeGisAdmin;
 window.saveGisAdmin = saveGisAdmin;
 window.addNewOffice = addNewOffice;
 window.closeGisDrilldown = closeGisDrilldown;
+// ProZorro
+window.syncProzorro = async () => {
+    showLoader(true);
+    try {
+        await syncProzorro(true);
+        toast('ProZorro синхронізовано');
+    } catch (e) { toast('Помилка: ' + e.message, true); }
+    showLoader(false);
+};
+window.getProzorroKPIs = async () => {
+    const tenders = await loadCachedTenders(DEFAULT_EDRPOU, { year: new Date().getFullYear() });
+    return aggregateCachedKPIs(tenders);
+};
 
 // ===== Data Management action handlers =====
 window.clearKpiData = async () => {

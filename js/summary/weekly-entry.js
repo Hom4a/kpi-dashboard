@@ -299,7 +299,12 @@ function renderSectionInputs(sectionKey) {
     const cols = section.cols;
     const colLabels = section.colLabels;
 
+    const prozorroBtn = sectionKey === 'procurement'
+        ? '<button class="btn btn-sm" id="weFillProzorro" style="margin-bottom:8px">&#x1F50D; Заповнити з ProZorro</button>'
+        : '';
+
     container.innerHTML = `
+        ${prozorroBtn}
         <table class="tbl entry-tbl">
             <thead><tr><th>Показник</th>${colLabels.map(l => `<th>${l}</th>`).join('')}</tr></thead>
             <tbody>
@@ -312,6 +317,12 @@ function renderSectionInputs(sectionKey) {
             </tbody>
         </table>
     `;
+
+    // ProZorro auto-fill for procurement section
+    if (sectionKey === 'procurement') {
+        const pzBtn = container.querySelector('#weFillProzorro');
+        if (pzBtn) pzBtn.onclick = fillFromProzorro;
+    }
 
     // Auto-calculate delta when current and previous change
     if (cols.includes('current') && cols.includes('delta')) {
@@ -330,6 +341,33 @@ function renderSectionInputs(sectionKey) {
             inp.oninput = () => { inp.dataset.manual = '1'; };
         });
     }
+}
+
+async function fillFromProzorro() {
+    showLoader(true);
+    try {
+        if (!window.getProzorroKPIs) {
+            toast('ProZorro модуль не завантажено', true);
+            showLoader(false);
+            return;
+        }
+        const kpis = await window.getProzorroKPIs();
+        // Map KPIs to procurement indicators:
+        // 0: Процедури з початку року, шт.
+        // 1: Сума, млн грн
+        // 2: Укладено договорів, шт.
+        // 3: Сума договорів, млн грн
+        const inputs = document.querySelectorAll('.entry-input[data-section="procurement"]');
+        inputs.forEach(inp => {
+            const idx = parseInt(inp.dataset.ind);
+            if (idx === 0) inp.value = kpis.proceduresCount || '';
+            else if (idx === 1) inp.value = kpis.totalAmount ? (kpis.totalAmount / 1e6).toFixed(2) : '';
+            else if (idx === 2) inp.value = kpis.contractsCount || '';
+            else if (idx === 3) inp.value = kpis.contractsAmount ? (kpis.contractsAmount / 1e6).toFixed(2) : '';
+        });
+        toast(`ProZorro: ${kpis.proceduresCount} процедур, ${(kpis.totalAmount / 1e6).toFixed(1)} млн грн`);
+    } catch (e) { toast('Помилка ProZorro: ' + e.message, true); }
+    showLoader(false);
 }
 
 async function fillFromPreviousWeek() {
