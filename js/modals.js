@@ -8,6 +8,7 @@ import { getPricesCount, getInventoryCount } from './forest/db-forest.js';
 import { getPlanFactCount, getZsuCount } from './harvesting/db-harvesting.js';
 import { getMarketPricesCount } from './market/db-market.js';
 import { getSummaryIndicatorCount, getSummaryWeeklyCount } from './summary/db-summary.js';
+import { PAGE_ACCESS } from './auth.js';
 
 let _renderAllFn = null;
 export function setRenderAllCallback(fn) { _renderAllFn = fn; }
@@ -71,6 +72,7 @@ const ALL_PAGES = [
     { id: 'harvesting', label: 'Заготівля' },
     { id: 'market', label: 'Ринок' },
     { id: 'executive', label: 'Керівний' },
+    { id: 'summary', label: 'Зведення' },
     { id: 'gis', label: 'Карта' },
     { id: 'data-entry', label: 'Введення' },
     { id: 'builder', label: 'Дашборди' }
@@ -108,6 +110,7 @@ const PAGE_DESCRIPTIONS = {
     harvesting:  { desc: 'Виконання плану заготівлі по регіонах', data: 'Excel план-факт + Excel довідка ЗСУ' },
     market:      { desc: 'Міжнародне порівняння цін на деревину', data: 'Excel міжнародних цін' },
     executive:   { desc: 'Агрегований дашборд для керівництва: scorecard, тренди', data: 'Всі вищезазначені джерела' },
+    summary:     { desc: 'Зведення: основні показники діяльності та тижнева довідка', data: 'Excel показників + Word довідка' },
     gis:         { desc: 'Інтерактивна карта лісових офісів з регіональною аналітикою', data: 'Агреговані дані по областях' },
     'data-entry':{ desc: 'Сторінка завантаження файлів та введення даних', data: '—' },
     builder:     { desc: 'Конструктор кастомних дашбордів з віджетами', data: 'Використовує існуючі дані' }
@@ -310,40 +313,37 @@ export async function openViewerAccess() {
                     <div class="ua-role-desc" style="margin-top:8px;padding:6px 10px;background:rgba(74,157,111,0.05);border-left:2px solid rgba(74,157,111,0.3);border-radius:6px">
                         ${renderRoleDesc(u.role)}
                     </div>
-                    ${isViewer ? `<div style="margin-top:8px">
+                    <div style="margin-top:8px">
                         <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">Доступні сторінки</label>
                         <div class="ua-pages-wrap" style="display:flex;gap:8px;flex-wrap:wrap">
-                            ${ALL_PAGES.map(p => `<label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer" title="${PAGE_DESCRIPTIONS[p.id]?.desc || ''} | Дані: ${PAGE_DESCRIPTIONS[p.id]?.data || ''}">
-                                <input type="checkbox" data-page="${p.id}" ${(u.allowed_pages || ALL_PAGES.map(x => x.id)).includes(p.id) ? 'checked' : ''}> ${p.label}
-                            </label>`).join('')}
+                            ${(() => {
+                                const defaultPages = Object.entries(PAGE_ACCESS)
+                                    .filter(([, roles]) => roles.includes(u.role))
+                                    .map(([page]) => page);
+                                const userPages = u.allowed_pages || defaultPages;
+                                return ALL_PAGES.map(p => `<label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer" title="${PAGE_DESCRIPTIONS[p.id]?.desc || ''} | Дані: ${PAGE_DESCRIPTIONS[p.id]?.data || ''}">
+                                    <input type="checkbox" data-page="${p.id}" ${userPages.includes(p.id) ? 'checked' : ''}> ${p.label}
+                                </label>`).join('');
+                            })()}
                         </div>
-                    </div>` : ''}
+                    </div>
                 </div>`;
             }).join('');
 
-        // Show/hide viewer pages + update role description on role change
+        // Update page checkboxes + role description on role change
         list.querySelectorAll('.ua-role-select').forEach(sel => {
             sel.addEventListener('change', () => {
                 const card = sel.closest('[data-user-id]');
-                const pagesWrap = card.querySelector('.ua-pages-wrap');
                 // Update role description
                 const descDiv = card.querySelector('.ua-role-desc');
                 if (descDiv) descDiv.innerHTML = renderRoleDesc(sel.value);
-                if (sel.value === 'viewer') {
-                    if (!pagesWrap) {
-                        const div = document.createElement('div');
-                        div.style.cssText = 'margin-top:8px';
-                        div.innerHTML = `<label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">Доступні сторінки</label>
-                            <div class="ua-pages-wrap" style="display:flex;gap:8px;flex-wrap:wrap">
-                                ${ALL_PAGES.map(p => `<label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer" title="${PAGE_DESCRIPTIONS[p.id]?.desc || ''} | Дані: ${PAGE_DESCRIPTIONS[p.id]?.data || ''}">
-                                    <input type="checkbox" data-page="${p.id}" checked> ${p.label}
-                                </label>`).join('')}
-                            </div>`;
-                        card.appendChild(div);
-                    }
-                } else if (pagesWrap) {
-                    pagesWrap.closest('div[style*="margin-top"]')?.remove();
-                }
+                // Reset page checkboxes to new role's defaults
+                const newDefaults = Object.entries(PAGE_ACCESS)
+                    .filter(([, roles]) => roles.includes(sel.value))
+                    .map(([page]) => page);
+                card.querySelectorAll('.ua-pages-wrap input[type=checkbox]').forEach(cb => {
+                    cb.checked = newDefaults.includes(cb.dataset.page);
+                });
             });
         });
 
@@ -373,11 +373,9 @@ export async function saveViewerAccess() {
 
         const update = { role, org_level: orgLevel, org_unit: orgUnit };
 
-        // Save allowed_pages only for viewers
-        if (role === 'viewer') {
-            const checked = [...item.querySelectorAll('.ua-pages-wrap input[type=checkbox]:checked')].map(c => c.dataset.page);
-            update.allowed_pages = checked;
-        }
+        // Save allowed_pages for all roles
+        const checked = [...item.querySelectorAll('.ua-pages-wrap input[type=checkbox]:checked')].map(c => c.dataset.page);
+        update.allowed_pages = checked;
 
         const { error } = await sb.from('profiles').update(update).eq('id', id);
         if (error) { toast('Помилка: ' + error.message, true); return; }

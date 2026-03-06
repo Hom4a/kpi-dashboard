@@ -169,6 +169,7 @@ const NOTE_TYPES = [
 ];
 
 let _entryVisible = false;
+let _onBackCallback = null;
 
 export function initWeeklyEntry() {
     const btn = $('btnWeeklyEntry');
@@ -183,11 +184,50 @@ function toggleEntryPanel() {
     const panel = $('weeklyEntryPanel');
     if (!panel) return;
     panel.style.display = _entryVisible ? '' : 'none';
-    if (_entryVisible) buildEntryForm();
+    if (_entryVisible) buildEntryForm(panel, null);
 }
 
-function buildEntryForm() {
-    const panel = $('weeklyEntryPanel');
+/**
+ * Render weekly entry form in any container (used from data-entry page)
+ * @param {HTMLElement} container - target container
+ * @param {Function} onBack - callback when user clicks "Назад"
+ */
+export function renderWeeklyEntryForm(container, onBack) {
+    _onBackCallback = onBack || null;
+    container.innerHTML = `
+        <div class="de-form-header">
+            <button class="btn btn-sm de-back-btn" id="weBackBtn">\u2190 Назад</button>
+            <div class="de-form-title">
+                <h3>Тижнева довідка</h3>
+                <small>Внесення оперативних показників за тиждень</small>
+            </div>
+            <label class="btn btn-sm" style="margin-left:auto">Завантажити .docx
+                <input type="file" id="weDocxUpload" accept=".docx" style="display:none">
+            </label>
+        </div>
+        <div id="weeklyEntryFormBody"></div>
+    `;
+    const body = container.querySelector('#weeklyEntryFormBody');
+    buildEntryForm(body, onBack);
+
+    container.querySelector('#weBackBtn').onclick = () => {
+        if (_onBackCallback) _onBackCallback();
+    };
+
+    // .docx upload via dynamic import
+    const docxInput = container.querySelector('#weDocxUpload');
+    if (docxInput) {
+        docxInput.onchange = async () => {
+            if (docxInput.files[0]) {
+                const { handleFile } = await import('../file-handler.js');
+                await handleFile(docxInput.files[0], 'summary_weekly');
+                if (_onBackCallback) _onBackCallback();
+            }
+        };
+    }
+}
+
+function buildEntryForm(panel, onBack) {
     if (!panel) return;
 
     const today = new Date().toISOString().slice(0, 10);
@@ -221,21 +261,33 @@ function buildEntryForm() {
     `;
 
     // Bind section selector
-    const sel = $('weSectionSelect');
-    sel.onchange = () => renderSectionInputs(sel.value);
+    const sel = panel.querySelector('#weSectionSelect') || $('weSectionSelect');
+    if (sel) {
+        sel.onchange = () => renderSectionInputs(sel.value);
+    }
     renderSectionInputs('kpi');
 
     // Fill from previous week
-    $('weFillPrev').onclick = fillFromPreviousWeek;
+    const fillBtn = panel.querySelector('#weFillPrev') || $('weFillPrev');
+    if (fillBtn) fillBtn.onclick = fillFromPreviousWeek;
 
     // Save
-    $('weSaveAll').onclick = saveAllSections;
+    const saveBtn = panel.querySelector('#weSaveAll') || $('weSaveAll');
+    if (saveBtn) saveBtn.onclick = () => saveAllSections(onBack);
 
     // Cancel
-    $('weCancel').onclick = () => {
-        _entryVisible = false;
-        panel.style.display = 'none';
-    };
+    const cancelBtn = panel.querySelector('#weCancel') || $('weCancel');
+    if (cancelBtn) {
+        cancelBtn.onclick = () => {
+            if (onBack) {
+                onBack();
+            } else {
+                _entryVisible = false;
+                const p = $('weeklyEntryPanel');
+                if (p) p.style.display = 'none';
+            }
+        };
+    }
 }
 
 function renderSectionInputs(sectionKey) {
@@ -289,8 +341,8 @@ async function fillFromPreviousWeek() {
             showLoader(false);
             return;
         }
-        // Fill inputs from previous data
-        const inputs = document.querySelectorAll('#weSectionTable .entry-input');
+        // Fill inputs from previous data (works in both summary page and data-entry page)
+        const inputs = document.querySelectorAll('.entry-input[data-section]');
         inputs.forEach(inp => {
             const section = inp.dataset.section;
             const idx = parseInt(inp.dataset.ind);
@@ -320,8 +372,8 @@ async function fillFromPreviousWeek() {
     showLoader(false);
 }
 
-async function saveAllSections() {
-    const reportDate = $('weReportDate')?.value;
+async function saveAllSections(onBack) {
+    const reportDate = document.getElementById('weReportDate')?.value;
     if (!reportDate) { toast('Вкажіть дату звіту', true); return; }
 
     showLoader(true);
@@ -381,8 +433,15 @@ async function saveAllSections() {
         setSummaryWeekly(weekly);
         setSummaryWeeklyNotes(weeklyNotes);
 
-        _entryVisible = false;
-        $('weeklyEntryPanel').style.display = 'none';
+        if (onBack) {
+            // Called from data-entry page — go back to form list
+            onBack();
+        } else {
+            // Called from summary page inline panel
+            _entryVisible = false;
+            const panel = $('weeklyEntryPanel');
+            if (panel) panel.style.display = 'none';
+        }
         renderSummaryDashboard();
     } catch (e) { toast('Помилка збереження: ' + e.message, true); console.error(e); }
     showLoader(false);

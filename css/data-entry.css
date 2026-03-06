@@ -28,6 +28,45 @@
     border-bottom: 1px solid var(--border);
 }
 
+/* Thematic groups */
+.de-theme-group {
+    margin-bottom: 24px;
+}
+.de-theme-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+.de-theme-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(74, 157, 111, 0.08);
+    color: var(--primary);
+    flex-shrink: 0;
+}
+.de-theme-icon svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.de-theme-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.3px;
+}
+
 /* Cards grid */
 .de-cards-grid {
     display: grid;

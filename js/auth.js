@@ -47,15 +47,14 @@ const ROLE_LABELS = {
 
 /** Get pages visible for a given role + profile */
 export function getVisiblePages(role, profile) {
-    // Viewer uses allowed_pages from profile
-    if (role === 'viewer' && profile && profile.allowed_pages) {
+    // If allowed_pages is set in profile — use it (for any role)
+    if (profile && profile.allowed_pages && profile.allowed_pages.length) {
         return profile.allowed_pages;
     }
-    // Other roles use PAGE_ACCESS matrix
+    // Fallback: use PAGE_ACCESS matrix
     const pages = Object.entries(PAGE_ACCESS)
         .filter(([, roles]) => roles.includes(role))
         .map(([page]) => page);
-    // Fallback: always show at least volumes if no pages matched
     return pages.length ? pages : ['volumes'];
 }
 
