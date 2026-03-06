@@ -2,16 +2,18 @@
 import { $, fmt } from '../utils.js';
 import { filteredPrices, filteredInventory } from './state-forest.js';
 import { marketPrices, marketMeta } from '../market/state-market.js';
+import { kpiCard, initCollapsible, ICONS } from '../ui-helpers.js';
 
 export function renderPriceKPIs() {
     const grid = $('kpiGridPrices');
     if (!grid) return;
     if (!filteredPrices.length) { grid.innerHTML = ''; return; }
 
+    initCollapsible('#pageForest');
+
     const totalVol = filteredPrices.reduce((s, r) => s + r.volume_m3, 0);
     const totalVal = filteredPrices.reduce((s, r) => s + r.total_value_uah, 0);
     const avgPrice = totalVol > 0 ? totalVal / totalVol : 0;
-    // Find highest price species
     const bySpecies = {};
     filteredPrices.forEach(r => {
         if (!bySpecies[r.species]) bySpecies[r.species] = { vol: 0, val: 0 };
@@ -25,7 +27,7 @@ export function renderPriceKPIs() {
     });
 
     // Market benchmark
-    let marketCard = null;
+    let marketCardHtml = '';
     if (marketPrices.length > 0) {
         const uaRow = marketPrices.find(r => (r.country || '').toLowerCase().includes('україна') && r.row_type === 'country');
         const avgRow = marketPrices.find(r => r.row_type === 'average');
@@ -37,27 +39,23 @@ export function renderPriceKPIs() {
             const ua = biz(uaRow), eu = biz(avgRow);
             const diff = eu > 0 ? ((ua - eu) / eu * 100) : 0;
             const rate = marketMeta.eurRate || 0;
-            marketCard = {
-                label: 'Ціна vs Ринок', val: `€${fmt(ua, 0)}`, unit: '',
+            marketCardHtml = kpiCard({
+                label: 'Ціна vs Ринок', value: `€${fmt(ua, 0)}`, unit: '',
                 cls: diff >= 0 ? 'neon-green' : 'neon-rose',
-                change: diff,
+                icClass: diff >= 0 ? 'ic-green' : 'ic-rose',
+                icon: ICONS.globe, change: diff,
                 sub: `EU сер. €${fmt(eu, 0)}` + (rate > 0 ? ` · ${fmt(ua * rate, 0)} грн` : '')
-            };
+            });
         }
     }
 
-    const kpis = [
-        { label: 'Загальний обсяг', val: fmt(totalVol / 1000, 1), unit: 'тис м\u00B3', cls: 'neon-primary', sub: `${filteredPrices.length} позицій` },
-        { label: 'Середня ціна', val: fmt(avgPrice, 0), unit: 'грн/м\u00B3', cls: 'neon-secondary', sub: 'Середньозважена' },
-        { label: 'Загальна вартість', val: fmt(totalVal / 1e6, 2), unit: 'млн грн', cls: 'neon-accent', sub: 'Сума всіх продажів' },
-        { label: 'Найвища ціна', val: fmt(maxPrice, 0), unit: 'грн/м\u00B3', cls: 'neon-amber', sub: maxPriceSpecies || '' },
-    ];
-    if (marketCard) kpis.push(marketCard);
-    grid.innerHTML = kpis.map(k => `
-        <div class="glass kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div>
-        <div class="kpi-value">${k.val}<span class="kpi-unit">${k.unit}</span></div>
-        ${k.change != null ? `<div class="kpi-change ${k.change >= 0 ? 'up' : 'down'}">${k.change >= 0 ? '\u25B2' : '\u25BC'} ${Math.abs(k.change).toFixed(1)}%</div>` : ''}
-        ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}</div>`).join('');
+    grid.innerHTML = [
+        kpiCard({ label: 'Загальний обсяг', value: fmt(totalVol / 1000, 1), unit: 'тис м\u00B3', cls: 'neon-primary', icClass: 'ic-primary', icon: ICONS.package, sub: `${filteredPrices.length} позицій` }),
+        kpiCard({ label: 'Середня ціна', value: fmt(avgPrice, 0), unit: 'грн/м\u00B3', cls: 'neon-secondary', icClass: 'ic-secondary', icon: ICONS.tag, sub: 'Середньозважена' }),
+        kpiCard({ label: 'Загальна вартість', value: fmt(totalVal / 1e6, 2), unit: 'млн грн', cls: 'neon-accent', icClass: 'ic-accent', icon: ICONS.dollar, sub: 'Сума всіх продажів' }),
+        kpiCard({ label: 'Найвища ціна', value: fmt(maxPrice, 0), unit: 'грн/м\u00B3', cls: 'neon-amber', icClass: 'ic-amber', icon: ICONS.trendUp, sub: maxPriceSpecies || '' }),
+        marketCardHtml,
+    ].filter(Boolean).join('');
 }
 
 export function renderInventoryKPIs() {
@@ -69,7 +67,6 @@ export function renderInventoryKPIs() {
     const posCount = filteredInventory.length;
     const speciesSet = new Set(filteredInventory.map(r => r.species).filter(Boolean));
 
-    // Find branch with largest inventory
     const byBranch = {};
     filteredInventory.forEach(r => {
         byBranch[r.branch] = (byBranch[r.branch] || 0) + r.remaining_volume_m3;
@@ -79,14 +76,10 @@ export function renderInventoryKPIs() {
         if (vol > maxBranchVol) { maxBranchVol = vol; maxBranch = br; }
     });
 
-    const kpis = [
-        { label: 'Загальні залишки', val: fmt(totalVol / 1000, 1), unit: 'тис м\u00B3', cls: 'neon-primary', sub: 'Всі склади' },
-        { label: 'Кількість позицій', val: fmt(posCount), unit: '', cls: 'neon-secondary', sub: 'Унікальних записів' },
-        { label: 'Найбільший залишок', val: fmt(maxBranchVol / 1000, 1), unit: 'тис м\u00B3', cls: 'neon-accent', sub: maxBranch },
-        { label: 'Кількість порід', val: fmt(speciesSet.size), unit: '', cls: 'neon-green', sub: 'Унікальних порід' },
-    ];
-    grid.innerHTML = kpis.map(k => `
-        <div class="glass kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div>
-        <div class="kpi-value">${k.val}<span class="kpi-unit">${k.unit}</span></div>
-        ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}</div>`).join('');
+    grid.innerHTML = [
+        kpiCard({ label: 'Загальні залишки', value: fmt(totalVol / 1000, 1), unit: 'тис м\u00B3', cls: 'neon-primary', icClass: 'ic-primary', icon: ICONS.database, sub: 'Всі склади' }),
+        kpiCard({ label: 'Кількість позицій', value: fmt(posCount), unit: '', cls: 'neon-secondary', icClass: 'ic-secondary', icon: ICONS.list, sub: 'Унікальних записів' }),
+        kpiCard({ label: 'Найбільший залишок', value: fmt(maxBranchVol / 1000, 1), unit: 'тис м\u00B3', cls: 'neon-accent', icClass: 'ic-accent', icon: ICONS.arrowUp, sub: maxBranch }),
+        kpiCard({ label: 'Кількість порід', value: fmt(speciesSet.size), unit: '', cls: 'neon-green', icClass: 'ic-green', icon: ICONS.layers, sub: 'Унікальних порід' }),
+    ].join('');
 }

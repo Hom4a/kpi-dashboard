@@ -1,8 +1,9 @@
 // ===== Finance Page Rendering =====
-import { $, fmt, themeColor } from './utils.js';
+import { $, fmt, fmtDate, themeColor } from './utils.js';
 import { filtered, allData, charts, MO } from './state.js';
 import { kill, freshCanvas, makeGrad, getTargetAnnotation } from './charts-common.js';
 import { buildTableRows } from './render-volumes.js';
+import { kpiCard, drawEnhancedSparkline, ICONS } from './ui-helpers.js';
 
 export function renderFinKPIs() {
     const cashD = filtered.filter(r => r.type === 'cash_daily');
@@ -12,16 +13,22 @@ export function renderFinKPIs() {
     const sumM = cashM.reduce((s, r) => s + r.value, 0);
     const avgD = cashD.length ? sumD / cashD.length : 0;
     const maxD = cashD.length ? Math.max(...cashD.map(r => r.value)) : 0;
-    const kpis = [
-        { label: 'Гроші (дні)', val: fmt(sumD / 1e6, 2), unit: 'млн грн', cls: 'neon-primary', sub: 'Денна динаміка' },
-        { label: 'Гроші (міс)', val: fmt(sumM / 1e6, 2), unit: 'млн грн', cls: 'neon-secondary', sub: 'Помісячна агрегація' },
-        { label: 'Середнє/день', val: fmt(avgD / 1e3, 1), unit: 'тис грн', cls: 'neon-accent', sub: 'Грошові надходження' },
-        { label: 'Макс за день', val: fmt(maxD / 1e3, 1), unit: 'тис грн', cls: 'neon-amber' },
-    ];
-    $('kpiGridFin').innerHTML = kpis.map(k => `
-        <div class="glass kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div>
-        <div class="kpi-value">${k.val}<span class="kpi-unit">${k.unit}</span></div>
-        ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}</div>`).join('');
+    const last30 = cashD.slice(-30).map(r => r.value);
+
+    // Data date
+    const dateSub = $('finDataDate');
+    if (dateSub && cashD.length) dateSub.textContent = `Дані за ${fmtDate(cashD[cashD.length - 1].date)}`;
+
+    $('kpiGridFin').innerHTML = [
+        kpiCard({ label: 'Гроші (дні)', value: fmt(sumD / 1e6, 2), unit: 'млн грн', cls: 'neon-primary', icClass: 'ic-primary', icon: ICONS.banknote, sub: 'Денна динаміка', sparkId: 'finSpk0' }),
+        kpiCard({ label: 'Гроші (міс)', value: fmt(sumM / 1e6, 2), unit: 'млн грн', cls: 'neon-secondary', icClass: 'ic-secondary', icon: ICONS.creditCard, sub: 'Помісячна агрегація' }),
+        kpiCard({ label: 'Середнє/день', value: fmt(avgD / 1e3, 1), unit: 'тис грн', cls: 'neon-accent', icClass: 'ic-accent', icon: ICONS.trendUp, sub: 'Грошові надходження' }),
+        kpiCard({ label: 'Макс за день', value: fmt(maxD / 1e3, 1), unit: 'тис грн', cls: 'neon-amber', icClass: 'ic-amber', icon: ICONS.zap }),
+    ].join('');
+
+    // Draw sparkline
+    const spk0 = document.querySelector('[data-spark-id="finSpk0"]');
+    if (spk0 && last30.length) drawEnhancedSparkline(spk0, last30, themeColor('--primary'));
 }
 
 export function renderCashChart() {

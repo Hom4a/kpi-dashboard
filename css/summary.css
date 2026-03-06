@@ -1,116 +1,8 @@
-/* ===== Summary Page — Redesigned Styles ===== */
+/* ===== Summary Page — Specific Styles ===== */
+/* Enhanced KPI, page-header, section-divider, chart-stat → now in components.css */
 
-/* ===== Page Header ===== */
-.summary-page-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
-}
-.summary-title {
-    font-size: 22px; font-weight: 700; color: var(--text1); margin: 0;
-    letter-spacing: -0.02em;
-}
-.summary-subtitle {
-    font-size: 12px; color: var(--text2); margin-top: 2px; display: block;
-}
-
-/* ===== Section Dividers — Collapsible ===== */
-.summary-section-divider {
-    display: flex; align-items: center; gap: 10px;
-    margin: 28px 0 16px; padding: 0; cursor: pointer;
-    user-select: none;
-}
-.summary-section-divider svg { color: var(--primary); opacity: .7; flex-shrink: 0; }
-.summary-section-divider h4 {
-    font-size: 13px; font-weight: 600; color: var(--text2);
-    text-transform: uppercase; letter-spacing: .06em; margin: 0; white-space: nowrap;
-}
-.summary-section-divider::after {
-    content: ''; flex: 1; height: 1px;
-    background: linear-gradient(90deg, var(--border), transparent);
-}
-.section-toggle {
-    background: none; border: none; color: var(--text2); cursor: pointer;
-    padding: 4px; border-radius: 4px; transition: transform .2s;
-    display: flex; align-items: center;
-}
-.section-toggle.collapsed { transform: rotate(-90deg); }
-
-/* ===== KPI Cards — Enhanced ===== */
-.kpi-card-summary {
-    position: relative; overflow: hidden;
-    transition: transform .2s ease, box-shadow .2s ease;
-    cursor: pointer;
-}
-.kpi-card-summary::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-}
-.kpi-card-summary.neon-primary::before { background: linear-gradient(90deg, #4A9D6F, #6BBF8A); }
-.kpi-card-summary.neon-secondary::before { background: linear-gradient(90deg, #2196F3, #42A5F5); }
-.kpi-card-summary.neon-accent::before { background: linear-gradient(90deg, #9C27B0, #BA68C8); }
-.kpi-card-summary.neon-amber::before { background: linear-gradient(90deg, #FF9800, #FFB74D); }
-.kpi-card-summary.neon-green::before { background: linear-gradient(90deg, #2E7D32, #66BB6A); }
-.kpi-card-summary.neon-rose::before { background: linear-gradient(90deg, #E91E63, #F06292); }
-
-.kpi-card-summary:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 32px rgba(0,0,0,.18);
-}
-
-/* Icon circle */
-.kpi-icon-circle {
-    width: 40px; height: 40px; border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-}
-.kpi-icon-circle svg { width: 20px; height: 20px; }
-.kpi-icon-circle.ic-primary { background: rgba(74,157,111,.12); color: #4A9D6F; }
-.kpi-icon-circle.ic-secondary { background: rgba(33,150,243,.12); color: #2196F3; }
-.kpi-icon-circle.ic-accent { background: rgba(156,39,176,.12); color: #9C27B0; }
-.kpi-icon-circle.ic-amber { background: rgba(255,152,0,.12); color: #FF9800; }
-.kpi-icon-circle.ic-green { background: rgba(46,125,50,.12); color: #2E7D32; }
-.kpi-icon-circle.ic-rose { background: rgba(233,30,99,.12); color: #E91E63; }
-
-/* KPI card layout */
-.kpi-card-summary .kpi-header {
-    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
-}
-.kpi-card-summary .kpi-label {
-    font-size: 12px; font-weight: 500; color: var(--text2);
-    text-transform: uppercase; letter-spacing: .03em;
-}
-.kpi-card-summary .kpi-value {
-    font-size: 26px; font-weight: 700; color: var(--text1);
-    line-height: 1.1; letter-spacing: -0.02em;
-}
-.kpi-card-summary .kpi-unit { font-size: 13px; font-weight: 400; color: var(--text2); margin-left: 4px; }
-.kpi-card-summary .kpi-change {
-    font-size: 12px; font-weight: 600; margin-top: 2px;
-}
-.kpi-card-summary .kpi-change.up { color: #4A9D6F; }
-.kpi-card-summary .kpi-change.down { color: #E74C3C; }
-.kpi-card-summary .kpi-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
-.kpi-card-summary .kpi-row {
-    display: flex; justify-content: space-between; align-items: flex-end;
-}
-
-/* Sparkline with labels */
-.sparkline-wrap { position: relative; }
-.spark-labels {
-    display: flex; justify-content: space-between; font-size: 9px; color: var(--text3);
-    margin-top: 2px;
-}
-
-/* Count-up animation class */
-.kpi-countup { opacity: 0; transform: translateY(8px); animation: kpiCountIn .5s ease forwards; }
-@keyframes kpiCountIn { to { opacity: 1; transform: translateY(0); } }
-
-/* Staggered entry */
-.kpi-card-summary:nth-child(1) .kpi-countup { animation-delay: 0ms; }
-.kpi-card-summary:nth-child(2) .kpi-countup { animation-delay: 80ms; }
-.kpi-card-summary:nth-child(3) .kpi-countup { animation-delay: 160ms; }
-.kpi-card-summary:nth-child(4) .kpi-countup { animation-delay: 240ms; }
-.kpi-card-summary:nth-child(5) .kpi-countup { animation-delay: 320ms; }
-.kpi-card-summary:nth-child(6) .kpi-countup { animation-delay: 400ms; }
+/* Summary uses .kpi-enhanced (shared) + .kpi-card-summary for summary-specific clickable */
+.kpi-card-summary { cursor: pointer; }
 
 /* ===== Weekly Notes — Alert Style ===== */
 .summary-alert {
@@ -313,22 +205,7 @@
 .delta-up { color: #2e7d32; font-weight: 600; }
 .delta-down { color: #c62828; font-weight: 600; }
 
-/* ===== Charts — Enhanced ===== */
-.chart-stat {
-    font-size: 14px; font-weight: 700; color: var(--primary);
-    margin-right: 8px; white-space: nowrap;
-}
-.chart-hdr-actions {
-    display: flex; align-items: center; gap: 6px;
-}
-
-/* Fullscreen mode for chart cards */
-.chart-card.fullscreen {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 9999; margin: 0; border-radius: 0;
-    display: flex; flex-direction: column;
-}
-.chart-card.fullscreen .chart-wrap { flex: 1; height: auto !important; }
+/* chart-stat, chart-hdr-actions, fullscreen → now in components.css */
 
 /* ===== Yearly Summary — Enhanced ===== */
 #summaryYearlyTable { font-size: 13px; }
@@ -379,13 +256,11 @@
     .glass { background: white !important; box-shadow: none !important; border: 1px solid #ddd; }
     .kpi-card { page-break-inside: avoid; }
     .chart-row { page-break-inside: avoid; }
-    .summary-section-divider::after { background: #ddd; }
+    .section-divider::after { background: #ddd; }
 }
 
-/* ===== Mobile ===== */
+/* ===== Summary Mobile (page-specific overrides) ===== */
 @media (max-width: 768px) {
-    .summary-page-header { flex-direction: column; align-items: flex-start; }
-    .summary-title { font-size: 18px; }
     .summary-alerts-grid { grid-template-columns: 1fr; }
     .summary-filter-bar { flex-direction: column; align-items: stretch; }
     .summary-filter-bar > div:last-child { margin-left: 0; }
@@ -397,15 +272,8 @@
     .entry-row { flex-direction: column; }
     .ws-cat-pill { padding: 6px 12px; font-size: 11px; }
     .ws-cat-pill span { display: none; }
-    .summary-section-divider { margin: 20px 0 12px; }
-    .summary-section-divider h4 { font-size: 11px; }
-    .chart-stat { display: none; }
-    .kpi-card-summary .kpi-value { font-size: 22px; }
-    .spark-labels { display: none; }
 }
 
 @media (max-width: 480px) {
-    .kpi-icon-circle { display: none; }
-    .kpi-card-summary .kpi-value { font-size: 20px; }
     .ws-cat-pill .pill-count { display: none; }
 }

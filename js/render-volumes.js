@@ -3,6 +3,7 @@ import { $, fmt, fmtDate, themeColor } from './utils.js';
 import { filtered, allData, charts, tblTab, MO, WD } from './state.js';
 import { kill, freshCanvas, makeGrad, getTargetAnnotation, drawSparkline } from './charts-common.js';
 import { showDrillDown } from './modals.js';
+import { kpiCard, drawEnhancedSparkline, ICONS } from './ui-helpers.js';
 
 export function renderKPIs() {
     const real = filtered.filter(r => r.type === 'realized');
@@ -25,29 +26,25 @@ export function renderKPIs() {
     const last30 = real.slice(-30).map(r => r.value);
     const last30h = harv.slice(-30).map(r => r.value);
 
-    const kpis = [
-        { label: 'Реалізація', val: fmt(sumR / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-primary', sub: 'За обраний період', spark: last30, sparkColor: themeColor('--primary') },
-        { label: 'Заготівля', val: fmt(sumH / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-secondary', sub: 'За обраний період', spark: last30h, sparkColor: themeColor('--secondary') },
-        { label: 'Середнє/день', val: fmt(avgR, 0), unit: 'м\u00B3', cls: 'neon-accent', sub: 'Реалізація' },
-        { label: 'Макс за день', val: fmt(maxR, 0), unit: 'м\u00B3', cls: 'neon-amber', sub: maxRDate ? fmtDate(maxRDate) : '' },
-        { label: MO[cm] + ' ' + cy + (isPartialMonth ? ` (${curMDays.length} дн)` : ''), val: fmt(curM / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-green', change: isPartialMonth ? null : mom, sub: isPartialMonth ? `Неповний місяць (${curMDays.length} днів з даними)` : `vs ${MO[pm]}: ${fmt(prevM / 1000, 1)} тис.м\u00B3` },
-        { label: 'Робочі дні', val: fmt(work), unit: 'днів', cls: 'neon-rose', sub: `${fmt(real.length - work)} вихідних` },
-    ];
-    $('kpiGrid').innerHTML = kpis.map(k => `
-        <div class="glass kpi-card ${k.cls}">
-            <div class="kpi-label">${k.label}</div>
-            <div class="kpi-row">
-                <div><div class="kpi-value">${k.val}<span class="kpi-unit">${k.unit}</span></div>
-                ${k.change != null ? `<div class="kpi-change ${k.change >= 0 ? 'up' : 'down'}">${k.change >= 0 ? '\u25B2' : '\u25BC'} ${Math.abs(k.change).toFixed(1)}%</div>` : ''}
-                ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}</div>
-                ${k.spark ? `<div class="sparkline-wrap"><canvas width="80" height="30" data-spark="${k.sparkColor || ''}"></canvas></div>` : ''}
-            </div>
-        </div>`).join('');
+    // Data date
+    const dateSub = $('volumesDataDate');
+    if (dateSub && filtered.length) dateSub.textContent = `Дані за ${fmtDate(filtered[filtered.length - 1].date)}`;
+
+    $('kpiGrid').innerHTML = [
+        kpiCard({ label: 'Реалізація', value: fmt(sumR / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-primary', icClass: 'ic-primary', icon: ICONS.truck, sub: 'За обраний період', sparkId: 'volSpk0' }),
+        kpiCard({ label: 'Заготівля', value: fmt(sumH / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-secondary', icClass: 'ic-secondary', icon: ICONS.tree, sub: 'За обраний період', sparkId: 'volSpk1' }),
+        kpiCard({ label: 'Середнє/день', value: fmt(avgR, 0), unit: 'м\u00B3', cls: 'neon-accent', icClass: 'ic-accent', icon: ICONS.chartLine, sub: 'Реалізація' }),
+        kpiCard({ label: 'Макс за день', value: fmt(maxR, 0), unit: 'м\u00B3', cls: 'neon-amber', icClass: 'ic-amber', icon: ICONS.zap, sub: maxRDate ? fmtDate(maxRDate) : '' }),
+        kpiCard({ label: MO[cm] + ' ' + cy + (isPartialMonth ? ` (${curMDays.length} дн)` : ''), value: fmt(curM / 1000, 1), unit: 'тис.м\u00B3', cls: 'neon-green', icClass: 'ic-green', icon: ICONS.calendar, change: isPartialMonth ? null : mom, sub: isPartialMonth ? `Неповний місяць (${curMDays.length} днів)` : `vs ${MO[pm]}: ${fmt(prevM / 1000, 1)} тис.м\u00B3` }),
+        kpiCard({ label: 'Робочі дні', value: fmt(work), unit: 'днів', cls: 'neon-rose', icClass: 'ic-rose', icon: ICONS.briefcase, sub: `${fmt(real.length - work)} вихідних` }),
+    ].join('');
+
     // Draw sparklines
-    document.querySelectorAll('#kpiGrid .sparkline-wrap canvas').forEach((c, i) => {
-        const data = i === 0 ? last30 : i === 1 ? last30h : [];
-        if (data.length) drawSparkline(c, data, c.dataset.spark || themeColor('--primary'));
-    });
+    const spk0 = document.querySelector('[data-spark-id="volSpk0"]');
+    const spk1 = document.querySelector('[data-spark-id="volSpk1"]');
+    if (spk0 && last30.length) drawEnhancedSparkline(spk0, last30, themeColor('--primary'));
+    if (spk1 && last30h.length) drawEnhancedSparkline(spk1, last30h, themeColor('--secondary'));
+
     // Stats bar
     const types = [...new Set(allData.map(r => r.type))];
     const typeNames = { realized: 'Реалізація', harvested: 'Заготівля', cash_daily: 'Гроші(дні)', cash_monthly: 'Гроші(міс)' };

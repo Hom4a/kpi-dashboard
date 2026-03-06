@@ -3,6 +3,7 @@ import { $, fmt, show, hide, themeColor } from '../utils.js';
 import { charts } from '../state.js';
 import { kill, freshCanvas, makeGrad } from '../charts-common.js';
 import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState } from './state-summary.js';
+import { initCollapsible, drawEnhancedSparkline } from '../ui-helpers.js';
 
 const MO = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 
@@ -32,7 +33,7 @@ export function renderSummaryDashboard() {
     renderPivotTable(selYear, selGroup);
     renderYearlySummary(years);
     renderCharts(selYear);
-    initCollapsible();
+    initCollapsible('#pageSummary');
     updateDataDate(selYear);
 }
 
@@ -45,23 +46,6 @@ function updateDataDate(year) {
         const maxMonth = Math.max(...monthly.map(r => r.month));
         el.textContent = `Дані за ${MO[maxMonth - 1]} ${year}`;
     }
-}
-
-// ===== Collapsible Sections =====
-function initCollapsible() {
-    document.querySelectorAll('#pageSummary .summary-section-divider[data-collapse]').forEach(div => {
-        if (div._collInit) return;
-        div._collInit = true;
-        div.addEventListener('click', () => {
-            const targetId = div.dataset.collapse;
-            const target = $(targetId);
-            const toggle = div.querySelector('.section-toggle');
-            if (!target) return;
-            const hidden = target.style.display === 'none';
-            target.style.display = hidden ? '' : 'none';
-            if (toggle) toggle.classList.toggle('collapsed', !hidden);
-        });
-    });
 }
 
 // ===== Year Selector =====
@@ -147,7 +131,7 @@ function renderKpiCards(year) {
             sparkMaxLabel = MO[sparkData[maxIdx].month - 1];
         }
 
-        return `<div class="glass kpi-card kpi-card-summary ${c.color}" data-kpi-group="${c.group}" data-kpi-pattern="${c.pattern}">
+        return `<div class="glass kpi-card kpi-enhanced kpi-card-summary ${c.color}" data-kpi-group="${c.group}" data-kpi-pattern="${c.pattern}">
             <div class="kpi-header">
                 <div class="kpi-icon-circle ${c.icClass}">${c.icon}</div>
                 <div class="kpi-label">${c.label}${isPartial ? ` <small style="opacity:.5">(${MO[data.month - 1]})</small>` : ''}</div>
@@ -168,11 +152,11 @@ function renderKpiCards(year) {
         const canvas = grid.querySelector(`canvas[data-spark-idx="${idx}"]`);
         if (!canvas) return;
         const sparkData = getSparkData(c.pattern, c.group, year);
-        if (sparkData.length > 2) drawSparklineWithFill(canvas, sparkData.map(s => s.value), themeColor('--primary'));
+        if (sparkData.length > 2) drawEnhancedSparkline(canvas, sparkData.map(s => s.value), themeColor('--primary'));
     });
 
     // Click → scroll to pivot row
-    grid.querySelectorAll('.kpi-card-summary').forEach(card => {
+    grid.querySelectorAll('.kpi-enhanced kpi-card-summary').forEach(card => {
         card.addEventListener('click', () => {
             const pattern = card.dataset.kpiPattern;
             const pivotTable = $('summaryIndicatorsTable');
@@ -192,34 +176,7 @@ function renderKpiCards(year) {
     });
 }
 
-function drawSparklineWithFill(canvas, data, color) {
-    if (!data.length) return;
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-    let max = -Infinity, min = Infinity;
-    for (let i = 0; i < data.length; i++) { if (data[i] > max) max = data[i]; if (data[i] < min) min = data[i]; }
-    const range = max - min || 1;
-    const points = data.map((v, i) => ({
-        x: (i / (data.length - 1)) * w,
-        y: h - ((v - min) / range) * (h - 4) - 2
-    }));
-    // Area fill
-    ctx.beginPath();
-    points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
-    ctx.fillStyle = color.replace(')', ',0.12)').replace('rgb(', 'rgba(');
-    if (!ctx.fillStyle.includes('rgba')) ctx.fillStyle = 'rgba(74,157,111,0.12)';
-    ctx.fill();
-    // Line
-    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
-    points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.stroke();
-    // Dot at end
-    const last = points[points.length - 1];
-    ctx.beginPath(); ctx.arc(last.x, last.y, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = color; ctx.fill();
-}
+// drawEnhancedSparkline imported from ui-helpers.js
 
 // ===== Weekly Briefing — Alert Style =====
 

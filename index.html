@@ -177,10 +177,14 @@
             <label class="btn btn-sm page-upload-compact" title="Оновити дані обсягів"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Оновити<input type="file" class="page-upload" data-expected="kpi" accept=".xlsx,.xls"></label>
         </div>
 
-        <div class="stats-bar" id="statsBar"></div>
-
         <!-- Volumes page -->
         <div class="page-section active" id="pageVolumes">
+            <div class="page-header">
+                <div><h2 class="page-header-title">Обсяги реалізації та заготівлі</h2><small id="volumesDataDate" class="page-header-sub"></small></div>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <div class="stats-bar" id="statsBar"></div>
+                </div>
+            </div>
             <div class="kpi-grid" id="kpiGrid"></div>
             <div class="insights-bar" id="insightsBar"></div>
 
@@ -229,6 +233,9 @@
 
         <!-- Finance page -->
         <div class="page-section" id="pageFinance">
+            <div class="page-header">
+                <div><h2 class="page-header-title">Фінансова панель</h2><small id="finDataDate" class="page-header-sub"></small></div>
+            </div>
             <div class="kpi-grid" id="kpiGridFin"></div>
             <div class="glass chart-card" id="cashChartCard" style="margin-bottom:20px">
                 <div class="chart-hdr"><div><h3>Надходження грошових коштів</h3><small>Денна динаміка та помісячна агрегація, грн</small></div>
@@ -287,9 +294,12 @@
             </div>
 
             <div id="forestContent" style="display:none">
+                <div class="page-header">
+                    <div><h2 class="page-header-title">Лісопродукція</h2><small id="forestDataDate" class="page-header-sub"></small></div>
+                </div>
                 <!-- Prices Section -->
+                <div class="section-divider" data-collapse="pricesSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg><h4>Середньозважені ціни</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="pricesSection">
-                    <div class="section-title" style="font-size:14px;font-weight:700;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Середньозважені ціни</div>
                     <div class="kpi-grid" id="kpiGridPrices"></div>
 
                     <div class="chart-row cols-2">
@@ -330,8 +340,8 @@
                 </div>
 
                 <!-- Inventory Section -->
+                <div class="section-divider" data-collapse="inventorySection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg><h4>Залишки лісопродукції</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="inventorySection">
-                    <div class="section-title" style="font-size:14px;font-weight:700;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Залишки лісопродукції</div>
                     <div class="kpi-grid" id="kpiGridInventory"></div>
 
                     <div class="chart-row cols-2">
@@ -372,8 +382,8 @@
                 </div>
 
                 <!-- Combined Analytics Section -->
+                <div class="section-divider" data-collapse="combinedSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><h4>Аналітика: ціна vs залишки</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="combinedSection">
-                    <div class="section-title" style="font-size:14px;font-weight:700;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Аналітика: ціна vs залишки</div>
                     <div class="kpi-grid" id="kpiGridCombined" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))"></div>
 
                     <div class="chart-row cols-2">
@@ -401,9 +411,12 @@
             </div>
 
             <div id="harvestingContent" style="display:none">
+                <div class="page-header">
+                    <div><h2 class="page-header-title">Заготівля деревини</h2><small id="harvestingDataDate" class="page-header-sub"></small></div>
+                </div>
                 <!-- Plan-Fact Section -->
+                <div class="section-divider" data-collapse="planFactSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg><h4>Виконання планових показників</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="planFactSection">
-                    <div class="section-title" style="font-size:14px;font-weight:700;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Виконання планових показників заготівлі</div>
                     <div class="kpi-grid" id="kpiGridHarvesting"></div>
 
                     <div class="chart-row cols-2">
@@ -428,8 +441,8 @@
                 </div>
 
                 <!-- ZSU Section -->
+                <div class="section-divider" data-collapse="zsuSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><h4>Лісопродукція для ЗСУ</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="zsuSection">
-                    <div class="section-title" style="font-size:14px;font-weight:700;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Вилучення лісопродукції на потреби ЗСУ</div>
 
                     <div class="chart-row cols-2">
                         <div class="glass chart-card" id="zsuByRegionCard">
@@ -470,7 +483,9 @@
                 <label class="btn btn-primary page-upload-btn" style="margin-top:16px"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Завантажити ринкові ціни<input type="file" class="page-upload" data-expected="market_prices" accept=".xlsx,.xls"></label>
             </div>
             <div id="marketContent" style="display:none">
-                <div class="section-title" style="font-size:14px;font-weight:700;margin:20px 0 12px;color:var(--text)">Міжнародне порівняння цін на деревину</div>
+                <div class="page-header">
+                    <div><h2 class="page-header-title">Ринок деревини</h2><small id="marketDataDate" class="page-header-sub"></small></div>
+                </div>
                 <div class="kpi-grid" id="kpiGridMarket"></div>
 
                 <div class="chart-row cols-2">
@@ -610,10 +625,10 @@
             </div>
             <div id="summaryContent" style="display:none">
                 <!-- Page header -->
-                <div class="summary-page-header">
+                <div class="page-header">
                     <div>
-                        <h2 class="summary-title">Зведена панель</h2>
-                        <small id="summaryDataDate" class="summary-subtitle"></small>
+                        <h2 class="page-header-title">Зведена панель</h2>
+                        <small id="summaryDataDate" class="page-header-sub"></small>
                     </div>
                     <div style="display:flex;gap:8px;align-items:center">
                         <label class="btn btn-sm">Завантажити<input type="file" class="page-upload" accept=".xlsx,.xls,.docx" data-expected="summary_indicators,summary_weekly"></label>
@@ -622,13 +637,13 @@
                 </div>
 
                 <!-- Section: KPI cards -->
-                <div class="summary-section-divider" data-collapse="summaryKpiSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><h4>Ключові показники</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+                <div class="section-divider" data-collapse="summaryKpiSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><h4>Ключові показники</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="summaryKpiSection">
                     <div class="kpi-grid" id="kpiGridSummary"></div>
                 </div>
 
                 <!-- Section: Weekly briefing -->
-                <div class="summary-section-divider" data-collapse="summaryWeeklySection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg><h4>Тижнева довідка</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+                <div class="section-divider" data-collapse="summaryWeeklySection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg><h4>Тижнева довідка</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="summaryWeeklySection">
                     <div class="glass chart-card" style="margin-bottom:20px" id="summaryWeeklyCard">
                         <div class="chart-hdr">
@@ -644,7 +659,7 @@
                 </div>
 
                 <!-- Section: Detailed analytics -->
-                <div class="summary-section-divider" data-collapse="summaryAnalyticsSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg><h4>Детальна аналітика</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+                <div class="section-divider" data-collapse="summaryAnalyticsSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg><h4>Детальна аналітика</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="summaryAnalyticsSection">
                     <!-- Filter bar: group tabs + year selector + fullscreen -->
                     <div class="summary-filter-bar">
@@ -670,7 +685,7 @@
                 </div>
 
                 <!-- Section: Charts -->
-                <div class="summary-section-divider" data-collapse="summaryChartsSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Графіки</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+                <div class="section-divider" data-collapse="summaryChartsSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Графіки</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="summaryChartsSection">
                     <div class="chart-row cols-2">
                         <div class="glass chart-card">
@@ -707,7 +722,7 @@
                 </div>
 
                 <!-- Section: Yearly summary -->
-                <div class="summary-section-divider" data-collapse="summaryYearlySection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><h4>Річне зведення</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+                <div class="section-divider" data-collapse="summaryYearlySection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><h4>Річне зведення</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                 <div id="summaryYearlySection">
                     <div class="glass chart-card" style="margin-bottom:20px">
                         <div class="tbl-wrap"><table class="tbl" id="summaryYearlyTable">
