@@ -405,6 +405,7 @@ export function generateNewUserPassword() {
 }
 
 export async function createUser() {
+    console.log('[createUser] started');
     const email = document.getElementById('newUserEmail')?.value.trim();
     const fullName = document.getElementById('newUserName')?.value.trim();
     const password = document.getElementById('newUserPass')?.value;
@@ -428,14 +429,19 @@ export async function createUser() {
 
     btn.disabled = true;
     btn.textContent = 'Створення...';
-    if (statusEl) statusEl.innerHTML = '';
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--text3)">Підключення до Supabase...</span>';
 
     try {
         // Step 1: Create auth user via ephemeral client (won't affect admin session)
-        const { data: signUpData, error: signUpError } = await getSignupClient().auth.signUp({
+        console.log('[createUser] calling signUp for', email);
+        const signupClient = getSignupClient();
+        console.log('[createUser] signupClient obtained:', !!signupClient);
+
+        const { data: signUpData, error: signUpError } = await signupClient.auth.signUp({
             email, password,
             options: { data: { full_name: fullName, role: role } }
         });
+        console.log('[createUser] signUp result:', { user: !!signUpData?.user, error: signUpError?.message || null });
 
         if (signUpError) {
             const msg = mapSignUpError(signUpError.message);
