@@ -2,7 +2,7 @@
 import { $, fmt, toast, themeColor } from './utils.js';
 import { allData, charts, targets, MO, setTargets } from './state.js';
 import { kill, freshCanvas, getTargetAnnotation } from './charts-common.js';
-import { sb, getSignupClient } from './config.js';
+import { sb, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { getRecordCount, getUploadHistory } from './db-kpi.js';
 import { getPricesCount, getInventoryCount } from './forest/db-forest.js';
 import { getPlanFactCount, getZsuCount } from './harvesting/db-harvesting.js';
@@ -431,37 +431,28 @@ export async function createUser() {
     if (statusEl) statusEl.innerHTML = '<span style="color:var(--text3)">Створення користувача...</span>';
 
     try {
-        // Create auth user via ephemeral client (won't affect admin session)
-        const { data: signUpData, error: signUpError } = await getSignupClient().auth.signUp({
-            email, password,
-            options: { data: { full_name: fullName, role: role } }
+        // Call Edge Function (uses service_role key server-side, no email confirmation needed)
+        const { data: { session } } = await sb.auth.getSession();
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({
+                email, password, full_name: fullName, role,
+                org_level: orgLevel, org_unit: orgUnit,
+                allowed_pages: allowedPages || ALL_PAGES.map(p => p.id)
+            })
         });
 
-        if (signUpError) {
-            const msg = mapSignUpError(signUpError.message);
+        const result = await res.json();
+
+        if (!res.ok || result.error) {
+            const msg = mapSignUpError(result.error || `HTTP ${res.status}`);
             toast(msg, true);
             if (statusEl) statusEl.innerHTML = `<span style="color:var(--rose)">${esc(msg)}</span>`;
-            return;
-        }
-        if (!signUpData.user) {
-            const msg = 'Помилка: користувач не створений (можливо, email вже зареєстровано)';
-            toast(msg, true);
-            if (statusEl) statusEl.innerHTML = `<span style="color:var(--rose)">${esc(msg)}</span>`;
-            return;
-        }
-
-        const userId = signUpData.user.id;
-
-        // Insert profile via main client (admin's RLS session)
-        const { error: profileError } = await sb.from('profiles').insert({
-            id: userId, email, full_name: fullName, role,
-            org_level: orgLevel, org_unit: orgUnit,
-            allowed_pages: allowedPages || ALL_PAGES.map(p => p.id)
-        });
-
-        if (profileError) {
-            toast('Auth створено, але профіль не додано: ' + profileError.message, true);
-            if (statusEl) statusEl.innerHTML = `<span style="color:var(--amber)">Auth OK, профіль потребує повторної спроби</span>`;
             return;
         }
 
