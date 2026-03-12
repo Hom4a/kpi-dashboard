@@ -319,7 +319,6 @@ window.saveViewerAccess = saveViewerAccess;
 window.createUser = createUser;
 window.toggleAddUserForm = toggleAddUserForm;
 window.generateNewUserPassword = generateNewUserPassword;
-console.log('[app.js] createUser bound to window:', typeof window.createUser);
 window.openDataManage = openDataManage;
 window.closeDataManage = closeDataManage;
 window.openDashboardsPage = () => { switchPage('builder'); initDashboardList($('builderContent')); };

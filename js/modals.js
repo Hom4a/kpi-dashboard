@@ -405,7 +405,6 @@ export function generateNewUserPassword() {
 }
 
 export async function createUser() {
-    console.log('[createUser] started');
     const email = document.getElementById('newUserEmail')?.value.trim();
     const fullName = document.getElementById('newUserName')?.value.trim();
     const password = document.getElementById('newUserPass')?.value;
@@ -429,19 +428,14 @@ export async function createUser() {
 
     btn.disabled = true;
     btn.textContent = 'Створення...';
-    if (statusEl) statusEl.innerHTML = '<span style="color:var(--text3)">Підключення до Supabase...</span>';
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--text3)">Створення користувача...</span>';
 
     try {
-        // Step 1: Create auth user via ephemeral client (won't affect admin session)
-        console.log('[createUser] calling signUp for', email);
-        const signupClient = getSignupClient();
-        console.log('[createUser] signupClient obtained:', !!signupClient);
-
-        const { data: signUpData, error: signUpError } = await signupClient.auth.signUp({
+        // Create auth user via ephemeral client (won't affect admin session)
+        const { data: signUpData, error: signUpError } = await getSignupClient().auth.signUp({
             email, password,
             options: { data: { full_name: fullName, role: role } }
         });
-        console.log('[createUser] signUp result:', { user: !!signUpData?.user, error: signUpError?.message || null });
 
         if (signUpError) {
             const msg = mapSignUpError(signUpError.message);
@@ -458,7 +452,7 @@ export async function createUser() {
 
         const userId = signUpData.user.id;
 
-        // Step 2: Insert profile via main client (admin's RLS session)
+        // Insert profile via main client (admin's RLS session)
         const { error: profileError } = await sb.from('profiles').insert({
             id: userId, email, full_name: fullName, role,
             org_level: orgLevel, org_unit: orgUnit,
@@ -471,7 +465,7 @@ export async function createUser() {
             return;
         }
 
-        // Step 3: Success
+        // Success
         toast(`Користувач ${esc(fullName)} (${esc(email)}) створений як ${ROLE_LABELS[role]}`);
 
         // Show credentials for copying
