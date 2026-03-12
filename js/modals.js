@@ -437,8 +437,18 @@ export async function createUser() {
             options: { data: { full_name: fullName, role: role } }
         });
 
-        if (signUpError) { toast(mapSignUpError(signUpError.message), true); return; }
-        if (!signUpData.user) { toast('Помилка: користувач не створений', true); return; }
+        if (signUpError) {
+            const msg = mapSignUpError(signUpError.message);
+            toast(msg, true);
+            if (statusEl) statusEl.innerHTML = `<span style="color:var(--rose)">${esc(msg)}</span>`;
+            return;
+        }
+        if (!signUpData.user) {
+            const msg = 'Помилка: користувач не створений (можливо, email вже зареєстровано)';
+            toast(msg, true);
+            if (statusEl) statusEl.innerHTML = `<span style="color:var(--rose)">${esc(msg)}</span>`;
+            return;
+        }
 
         const userId = signUpData.user.id;
 
@@ -481,6 +491,7 @@ export async function createUser() {
 
     } catch (e) {
         toast('Помилка: ' + e.message, true);
+        if (statusEl) statusEl.innerHTML = `<span style="color:var(--rose)">${esc(e.message)}</span>`;
     } finally {
         btn.disabled = false;
         btn.textContent = 'Створити';

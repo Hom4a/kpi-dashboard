@@ -156,7 +156,7 @@ function renderKpiCards(year) {
     });
 
     // Click → scroll to pivot row
-    grid.querySelectorAll('.kpi-enhanced kpi-card-summary').forEach(card => {
+    grid.querySelectorAll('.kpi-enhanced.kpi-card-summary').forEach(card => {
         card.addEventListener('click', () => {
             const pattern = card.dataset.kpiPattern;
             const pivotTable = $('summaryIndicatorsTable');
