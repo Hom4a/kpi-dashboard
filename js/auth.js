@@ -48,18 +48,21 @@ const ROLE_LABELS = {
 
 /** Get pages visible for a given role + profile */
 export function getVisiblePages(role, profile) {
+    // Pages allowed by role in PAGE_ACCESS matrix
+    const rolePages = Object.entries(PAGE_ACCESS)
+        .filter(([, roles]) => roles.includes(role))
+        .map(([page]) => page);
+
     if (profile && profile.allowed_pages && profile.allowed_pages.length) {
         // Viewer: always use allowed_pages from profile
         if (role === 'viewer') return profile.allowed_pages;
-        // Other roles: use allowed_pages only if admin explicitly customized them
-        // (old migration default was ['volumes','finance','forest','harvesting'] — no 'summary')
-        if (profile.allowed_pages.includes('summary')) return profile.allowed_pages;
+        // Other roles: merge profile pages with role-based pages (so new pages appear automatically)
+        if (profile.allowed_pages.includes('summary')) {
+            const merged = new Set([...profile.allowed_pages, ...rolePages]);
+            return [...merged];
+        }
     }
-    // Fallback: use PAGE_ACCESS matrix
-    const pages = Object.entries(PAGE_ACCESS)
-        .filter(([, roles]) => roles.includes(role))
-        .map(([page]) => page);
-    return pages.length ? pages : ['volumes'];
+    return rolePages.length ? rolePages : ['volumes'];
 }
 
 export { PAGE_ACCESS, UPLOAD_ROLES, DATA_MANAGE_ROLES, TARGET_ROLES, ROLE_LABELS };
