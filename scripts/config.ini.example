@@ -1,0 +1,28 @@
+# ===== ЕОД Sync Configuration =====
+# Скопіюй цей файл як config.ini і заповни реальні значення.
+# config.ini НЕ потрапляє в git (додано в .gitignore).
+
+[1c]
+# Шлях до 1С:Підприємство
+exe_path = C:\Program Files\1cv8\8.3.25.1501\bin\1cv8.exe
+
+# Ім'я інформаційної бази (як у списку баз 1С)
+base_path = ЕОД ДП Ліси України 1
+
+# COM-підключення (для COM-режиму)
+# com_server = server_name
+# com_base = database_name
+
+# Облікові дані
+username = ДП Ліси України 1
+password = YOUR_PASSWORD_HERE
+
+# Папка для збереження звітів
+output_dir = C:\Projects\kpi-dashboard-deploy\scripts\exports
+
+[supabase]
+# URL Edge Function
+function_url = https://qfggalnkosrpfaosrqhj.supabase.co/functions/v1/upload-wood-data
+
+# API ключ (service_role key для прямого доступу)
+api_key = YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE
