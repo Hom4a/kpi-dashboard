@@ -59,7 +59,6 @@ def load_config():
 def upload_to_supabase(cfg, data_type, period_start, period_end, rows):
     """Upload parsed data to Supabase via Edge Function."""
     url = cfg.get('supabase', 'function_url')
-    api_key = cfg.get('supabase', 'api_key')
 
     payload = {
         'type': data_type,
@@ -70,7 +69,6 @@ def upload_to_supabase(cfg, data_type, period_start, period_end, rows):
 
     log.info(f'Uploading {data_type}: {len(rows)} rows for {period_start} — {period_end}')
     resp = requests.post(url, json=payload, headers={
-        'x-api-key': api_key,
         'Content-Type': 'application/json'
     }, timeout=30)
 

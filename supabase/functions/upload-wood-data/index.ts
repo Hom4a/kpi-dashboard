@@ -1,6 +1,6 @@
 // ===== Upload Wood Data — Edge Function for ЕОД automation =====
 // Receives wood reception/sales data from Python script and stores in Supabase.
-// Auth: API key in x-api-key header (matches SUPABASE_ANON_KEY or custom secret).
+// No custom auth — uses service_role key in Authorization header for admin access.
 //
 // Deploy: supabase functions deploy upload-wood-data --no-verify-jwt
 
@@ -8,7 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
@@ -20,14 +20,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    // Auth: accept either Authorization bearer or x-api-key
-    const apiKey = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '')
-    const expectedKey = Deno.env.get('EOD_API_KEY') || serviceRoleKey
-
-    if (!apiKey || (apiKey !== expectedKey && apiKey !== serviceRoleKey)) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
-
+    // Use service_role to operate as admin (bypasses RLS)
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false }
     })
