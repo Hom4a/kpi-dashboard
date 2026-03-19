@@ -15,17 +15,22 @@ import { saveMarketData } from './market/db-market.js';
 import { parseSummaryXlsx } from './summary/parse-summary-xlsx.js';
 import { parseSummaryDocx } from './summary/parse-summary-docx.js';
 import { saveSummaryIndicators, saveSummaryWeekly } from './summary/db-summary.js';
+import { parseReception } from './wood-accounting/parse-reception.js';
+import { parseSales } from './wood-accounting/parse-sales.js';
+import { saveReceptionData, saveSalesData } from './wood-accounting/db-wood.js';
 
 let _loadAndRenderFn = null;
 let _loadForestFn = null;
 let _loadHarvestingFn = null;
 let _loadMarketFn = null;
 let _loadSummaryFn = null;
+let _loadWoodFn = null;
 export function setLoadAndRenderCallback(fn) { _loadAndRenderFn = fn; }
 export function setLoadForestCallback(fn) { _loadForestFn = fn; }
 export function setLoadHarvestingCallback(fn) { _loadHarvestingFn = fn; }
 export function setLoadMarketCallback(fn) { _loadMarketFn = fn; }
 export function setLoadSummaryCallback(fn) { _loadSummaryFn = fn; }
+export function setLoadWoodCallback(fn) { _loadWoodFn = fn; }
 
 const MARKET_COUNTRIES = ['україна', 'фінляндія', 'німеччина', 'польща', 'латвія', 'литва', 'швеція', 'норвегія', 'естонія', 'австрія'];
 
@@ -41,6 +46,9 @@ export function detectFileType(wb, fileName) {
     for (let i = 0; i < Math.min(15, rows.length); i++) {
         const row = (rows[i] || []).map(c => (c || '').toString().toLowerCase());
         const joined = row.join(' ');
+        // ЕОД reports (1С) — check before other forest-related patterns
+        if (joined.includes('приймання лісопродукції')) return 'wood_reception';
+        if (joined.includes('реалізація лісопродукції')) return 'wood_sales';
         if (joined.includes('ціна за 1 м3') || joined.includes('ціна за 1 м³') ||
             (joined.includes('країна') && (joined.includes('сосна') || joined.includes('ялина')) && joined.includes('дуб'))) return 'market_prices';
         if (joined.includes('середньозважен') || (joined.includes('вартість') && joined.includes('продукція'))) return 'prices';
@@ -62,7 +70,9 @@ const FILE_TYPE_LABELS = {
     kpi: 'KPI обсяги/фінанси', prices: 'середньозважені ціни', inventory: 'залишки лісопродукції',
     harvesting_plan_fact: 'план-факт заготівлі', harvesting_zsu: 'дані ЗСУ', market_prices: 'ринкові ціни',
     summary_indicators: 'основні показники діяльності',
-    summary_weekly: 'тижнева довідка (.docx)'
+    summary_weekly: 'тижнева довідка (.docx)',
+    wood_reception: 'приймання лісопродукції (ЕОД)',
+    wood_sales: 'реалізація лісопродукції (ЕОД)'
 };
 
 export async function handleFile(file, expectedType = null) {
@@ -178,6 +188,34 @@ export async function handleFile(file, expectedType = null) {
                 toast(`Дані ЗСУ: додано ${result.added} нових, замінено ${result.replaced} існуючих`);
             }
             if (_loadHarvestingFn) await _loadHarvestingFn();
+            showLoader(false);
+            return;
+        }
+
+        if (fileType === 'wood_reception') {
+            const parsed = parseReception(wb);
+            if (!parsed.rows.length) { toast('Файл не містить даних приймання. Перевірте формат.', true); showLoader(false); return; }
+            const result = await saveReceptionData(parsed, file.name);
+            if (result.replaced > 0) {
+                toast(`Приймання (ЕОД): оновлено ${result.added} записів (замінено ${result.replaced})`);
+            } else {
+                toast(`Приймання (ЕОД): завантажено ${result.added} записів`);
+            }
+            if (_loadWoodFn) await _loadWoodFn();
+            showLoader(false);
+            return;
+        }
+
+        if (fileType === 'wood_sales') {
+            const parsed = parseSales(wb);
+            if (!parsed.rows.length) { toast('Файл не містить даних реалізації. Перевірте формат.', true); showLoader(false); return; }
+            const result = await saveSalesData(parsed, file.name);
+            if (result.replaced > 0) {
+                toast(`Реалізація (ЕОД): оновлено ${result.added} записів (замінено ${result.replaced})`);
+            } else {
+                toast(`Реалізація (ЕОД): завантажено ${result.added} записів`);
+            }
+            if (_loadWoodFn) await _loadWoodFn();
             showLoader(false);
             return;
         }

@@ -88,6 +88,10 @@
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             <span>Ринок</span>
         </div>
+        <div class="nav-item" data-page="wood-accounting" onclick="switchPage('wood-accounting')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            <span>Облік</span>
+        </div>
         <div class="nav-item" data-page="executive" onclick="switchPage('executive')">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             <span>Керівний</span>
@@ -550,6 +554,39 @@
             </div>
         </div>
 
+        <!-- Wood Accounting page (ЕОД) -->
+        <div class="page-section" id="pageWoodAccounting">
+            <div class="page-header">
+                <h1 class="page-header-title">Облік деревини</h1>
+                <div class="page-header-sub" id="woodDataDate">Дані не завантажено</div>
+            </div>
+            <div id="woodKpiGrid"></div>
+
+            <div class="section-divider" data-collapse="woodReceptionSection">
+                <span>Приймання лісопродукції по філіях</span>
+                <button class="section-toggle"></button>
+            </div>
+            <div id="woodReceptionSection">
+                <div id="woodReceptionTable"></div>
+            </div>
+
+            <div class="section-divider" data-collapse="woodSalesSection">
+                <span>Реалізація лісопродукції по філіях</span>
+                <button class="section-toggle"></button>
+            </div>
+            <div id="woodSalesSection">
+                <div id="woodSalesTable"></div>
+            </div>
+
+            <div class="section-divider" data-collapse="woodChartsSection">
+                <span>Реалізація по філіях (графік)</span>
+                <button class="section-toggle"></button>
+            </div>
+            <div id="woodChartsSection">
+                <div style="height:350px"><canvas id="woodChart"></canvas></div>
+            </div>
+        </div>
+
         <!-- Executive page -->
         <div class="page-section" id="pageExecutive">
             <div id="execEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
@@ -963,6 +1000,10 @@
         <button class="mobile-nav-item" data-page="market" onclick="switchPage('market')">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             <span>Ринок</span>
+        </button>
+        <button class="mobile-nav-item" data-page="wood-accounting" onclick="switchPage('wood-accounting')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            <span>Облік</span>
         </button>
         <button class="mobile-nav-item" data-page="executive" onclick="switchPage('executive')">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>

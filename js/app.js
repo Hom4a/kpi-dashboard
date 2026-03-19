@@ -11,7 +11,7 @@ import { renderAll } from './render-all.js';
 import { setMainMode, renderTable } from './render-volumes.js';
 import { exportExcel } from './export.js';
 import { loadAllRecords, clearDB, undoLastKpiUpload } from './db-kpi.js';
-import { handleFile, setLoadAndRenderCallback as setFileHandlerLoadAndRender, setLoadForestCallback, setLoadHarvestingCallback, setLoadMarketCallback, setLoadSummaryCallback } from './file-handler.js';
+import { handleFile, setLoadAndRenderCallback as setFileHandlerLoadAndRender, setLoadForestCallback, setLoadHarvestingCallback, setLoadMarketCallback, setLoadSummaryCallback, setLoadWoodCallback } from './file-handler.js';
 import { startAutoRefresh, stopAutoRefresh, checkThresholds, setLoadAndRenderCallback as setAutoRefreshLoadAndRender } from './auto-refresh.js';
 // Forest modules
 import { setPricesData, setInventoryData, setFilteredPrices, setFilteredInventory } from './forest/state-forest.js';
@@ -38,6 +38,10 @@ import { loadSummaryIndicators, loadSummaryWeekly, loadSummaryWeeklyNotes, clear
 import { renderSummaryDashboard } from './summary/render-summary.js';
 import { initWeeklyEntry } from './summary/weekly-entry.js';
 import { exportSummaryExcel } from './summary/export-summary.js';
+// Wood Accounting modules (ЕОД)
+import { setReceptionData, setSalesData } from './wood-accounting/state-wood.js';
+import { loadReceptionData, loadSalesData, clearReceptionData, clearSalesData } from './wood-accounting/db-wood.js';
+import { renderWoodDashboard } from './wood-accounting/render-wood.js';
 // Data Entry modules
 import { initDataEntry, setDataEntryReloadCallback } from './data-entry/data-entry.js';
 // Builder modules
@@ -221,6 +225,16 @@ async function loadSummaryDataAndRender() {
     } catch(e) { console.error('loadSummaryDataAndRender error:', e); }
 }
 
+async function loadWoodDataAndRender() {
+    try {
+        const [reception, sales] = await Promise.all([loadReceptionData(), loadSalesData()]);
+        setReceptionData(reception);
+        setSalesData(sales);
+        renderWoodDashboard();
+        console.log('Wood accounting loaded:', reception.length, 'reception,', sales.length, 'sales');
+    } catch(e) { console.error('loadWoodDataAndRender error:', e); }
+}
+
 // ===== ProZorro Sync (non-blocking) =====
 async function syncProzorro(force = false) {
     try {
@@ -258,7 +272,7 @@ setModalsRenderAll(renderAll);
 setAuthLoadAndRender(async () => {
     // Load regional offices in parallel with data
     const officesPromise = loadRegionalOffices().then(o => setRegionalOffices(o)).catch(e => console.warn('Regional offices not loaded (table may not exist):', e.message));
-    await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender(), loadSummaryDataAndRender(), officesPromise]);
+    await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender(), loadSummaryDataAndRender(), loadWoodDataAndRender(), officesPromise]);
     await renderExecutiveDashboard();
     showRoleButtons();
     initDataEntry();
@@ -284,7 +298,8 @@ setLoadForestCallback(async () => { await loadForestDataAndRender(); await rende
 setLoadHarvestingCallback(async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); });
 setLoadMarketCallback(async () => { await loadMarketDataAndRender(); await renderExecutiveDashboard(); });
 setLoadSummaryCallback(async () => { await loadSummaryDataAndRender(); await renderExecutiveDashboard(); });
-setAutoRefreshLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender(), loadSummaryDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); });
+setLoadWoodCallback(async () => { await loadWoodDataAndRender(); });
+setAutoRefreshLoadAndRender(async () => { await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender(), loadSummaryDataAndRender(), loadWoodDataAndRender()]); await renderExecutiveDashboard(); showRoleButtons(); });
 setRenderForestCallback(renderForestDashboard);
 setRenderHarvestingCallback(renderHarvestingDashboard);
 setRenderMarketCallback(renderMarketDashboard);

@@ -27,6 +27,7 @@ const PAGE_ACCESS = {
     builder:     ['admin', 'analyst', 'editor'],
     'api-system':['admin', 'analyst'],
     gis:         ['admin', 'director', 'analyst', 'editor', 'forester'],
+    'wood-accounting': ['admin', 'director', 'analyst', 'editor', 'forester', 'operator'],
 };
 
 // Roles that can upload files
