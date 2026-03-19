@@ -1,7 +1,12 @@
 // ===== Wood Accounting Dashboard Renderer =====
-import { $, fmtNum, fmtDate } from '../utils.js';
+import { $, fmtDate } from '../utils.js';
 import { kpiCard, ICONS, initCollapsible } from '../ui-helpers.js';
 import { receptionData, salesData } from './state-wood.js';
+
+function fmtNum(v, decimals = 0) {
+    if (v == null || isNaN(v)) return '—';
+    return Number(v).toLocaleString('uk-UA', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
 
 let chartInstance = null;
 
