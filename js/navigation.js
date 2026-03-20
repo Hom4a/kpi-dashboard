@@ -14,7 +14,8 @@ const pageMap = {
     'data-entry': 'pageDataEntry',
     builder: 'pageBuilder',
     'api-system': 'pageApiSystem',
-    gis: 'pageGis'
+    gis: 'pageGis',
+    'wood-accounting': 'pageWoodAccounting'
 };
 
 const pageIdMap = {};
@@ -25,7 +26,7 @@ const filterBarMap = {
     volumes: 'filterBar', finance: 'filterBar',
     forest: 'forestFilterBar', harvesting: 'harvestingFilterBar',
     market: 'marketFilterBar',
-    executive: null, summary: null, 'data-entry': null, builder: null, 'api-system': null, gis: null
+    executive: null, summary: null, 'data-entry': null, builder: null, 'api-system': null, gis: null, 'wood-accounting': null
 };
 
 const ALL_FILTER_BARS = ['filterBar', 'forestFilterBar', 'harvestingFilterBar', 'marketFilterBar'];
