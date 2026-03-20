@@ -1,29 +1,24 @@
 """
-ЕОД Sync — автоматичне вивантаження звітів з 1С:Підприємство 8.3
-та завантаження в KPI Dashboard (Supabase).
+ЕОД Sync — парсинг звітів з 1С та завантаження в KPI Dashboard (Supabase).
 
-Два режими роботи:
-  1. COM — підключення до бази 1С через V83.COMConnector (без UI)
-  2. UI  — автоматизація інтерфейсу 1С через pywinauto (fallback)
+Режими:
+  python eod-sync.py --file report.xls          # парсити один файл
+  python eod-sync.py --folder C:\ЕОД_Звіти      # парсити всі .xls в папці
+  python eod-sync.py --watch C:\ЕОД_Звіти       # моніторити папку (фоновий режим)
 
-Використання:
-  python eod-sync.py              # авторежим (COM → UI fallback)
-  python eod-sync.py --mode com   # тільки COM
-  python eod-sync.py --mode ui    # тільки UI автоматизація
-  python eod-sync.py --date 2026-03-18  # конкретна дата
-
-Встановлення залежностей:
-  pip install pywinauto pywin32 requests openpyxl xlrd
+Залежності:
+  pip install requests xlrd
 """
 
 import os
 import sys
 import json
 import time
+import shutil
 import logging
 import argparse
 import configparser
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -46,44 +41,33 @@ CONFIG_PATH = Path(__file__).parent / 'config.ini'
 
 def load_config():
     if not CONFIG_PATH.exists():
-        log.error(f'Config file not found: {CONFIG_PATH}')
-        log.info('Create config.ini from config.ini.example')
+        log.error(f'Config not found: {CONFIG_PATH}')
         sys.exit(1)
-
     cfg = configparser.ConfigParser()
     cfg.read(str(CONFIG_PATH), encoding='utf-8')
     return cfg
 
 
-# ===== Supabase Upload =====
-def upload_to_supabase(cfg, data_type, period_start, period_end, rows):
-    """Upload parsed data to Supabase via Edge Function."""
-    url = cfg.get('supabase', 'function_url')
+# ===== Detect file type =====
+def detect_type(filepath):
+    """Detect if file is reception or sales report."""
+    import xlrd
+    wb = xlrd.open_workbook(str(filepath))
+    ws = wb.sheet_by_index(0)
 
-    payload = {
-        'type': data_type,
-        'period_start': period_start,
-        'period_end': period_end,
-        'rows': rows
-    }
-
-    log.info(f'Uploading {data_type}: {len(rows)} rows for {period_start} — {period_end}')
-    resp = requests.post(url, json=payload, headers={
-        'Content-Type': 'application/json'
-    }, timeout=30)
-
-    if resp.status_code == 200:
-        result = resp.json()
-        log.info(f'  OK: {result}')
-        return True
-    else:
-        log.error(f'  FAIL ({resp.status_code}): {resp.text}')
-        return False
+    for i in range(min(10, ws.nrows)):
+        row_text = ' '.join(str(ws.cell_value(i, j)) for j in range(ws.ncols)).lower()
+        if 'приймання лісопродукції' in row_text:
+            return 'reception'
+        if 'реалізація лісопродукції' in row_text:
+            return 'sales'
+    return None
 
 
 # ===== Parse Excel files =====
 def parse_reception_xls(filepath):
-    """Parse reception Excel file (same logic as JS parser)."""
+    """Parse reception Excel file."""
+    import re
     import xlrd
     wb = xlrd.open_workbook(str(filepath))
     ws = wb.sheet_by_index(0)
@@ -94,17 +78,14 @@ def parse_reception_xls(filepath):
     for i in range(min(10, ws.nrows)):
         row_text = ' '.join(str(ws.cell_value(i, j)) for j in range(ws.ncols))
         if 'Початок періоду' in row_text:
-            import re
             m = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', row_text)
             if m:
                 period_start = f'{m.group(3)}-{m.group(2)}-{m.group(1)}'
         if 'Кінець періоду' in row_text:
-            import re
             m = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', row_text)
             if m:
                 period_end = f'{m.group(3)}-{m.group(2)}-{m.group(1)}'
 
-    # Find header row
     for i in range(min(15, ws.nrows)):
         cell = str(ws.cell_value(i, 0)).strip().lower()
         if cell == 'лісгосп':
@@ -114,7 +95,6 @@ def parse_reception_xls(filepath):
     if header_row < 0:
         raise ValueError('Header row "Лісгосп" not found')
 
-    # Map columns
     col_map = {'np': -1, 'pv': -1, 'long': -1, 'round': -1, 'total': -1}
     for j in range(ws.ncols):
         h = str(ws.cell_value(header_row, j)).lower().strip()
@@ -129,7 +109,6 @@ def parse_reception_xls(filepath):
         elif h == 'разом':
             col_map['total'] = j
 
-    # Parse data rows
     OFFICE_MAP = {
         'карпатськ': 'Карпатська ЛО', 'південн': 'Південна ЛО',
         'північн': 'Північна ЛО', 'подільськ': 'Подільська ЛО',
@@ -175,6 +154,7 @@ def parse_reception_xls(filepath):
 
 def parse_sales_xls(filepath):
     """Parse sales Excel file."""
+    import re
     import xlrd
     wb = xlrd.open_workbook(str(filepath))
     ws = wb.sheet_by_index(0)
@@ -185,12 +165,10 @@ def parse_sales_xls(filepath):
     for i in range(min(10, ws.nrows)):
         row_text = ' '.join(str(ws.cell_value(i, j)) for j in range(ws.ncols))
         if 'Початок періоду' in row_text:
-            import re
             m = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', row_text)
             if m:
                 period_start = f'{m.group(3)}-{m.group(2)}-{m.group(1)}'
         if 'Кінець періоду' in row_text:
-            import re
             m = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', row_text)
             if m:
                 period_end = f'{m.group(3)}-{m.group(2)}-{m.group(1)}'
@@ -203,7 +181,6 @@ def parse_sales_xls(filepath):
     if header_row < 0:
         raise ValueError('Header row "Лісгосп" not found')
 
-    # Map sub-header columns
     col_vol, col_price, col_amount = -1, -1, -1
     for j in range(ws.ncols):
         h = str(ws.cell_value(header_row + 1, j)).lower().strip()
@@ -255,251 +232,178 @@ def parse_sales_xls(filepath):
     return period_start, period_end, rows
 
 
-# ===== UI Automation (pywinauto) =====
-def run_ui_mode(cfg, target_date=None):
-    """Automate 1C UI to generate and export reports."""
-    try:
-        from pywinauto import Application, Desktop
-        from pywinauto.keyboard import send_keys
-        from pywinauto.timings import wait_until
-    except ImportError:
-        log.error('pywinauto not installed. Run: pip install pywinauto')
+# ===== Upload to Supabase =====
+def upload_to_supabase(cfg, data_type, period_start, period_end, rows):
+    """Upload parsed data to Supabase via Edge Function."""
+    url = cfg.get('supabase', 'function_url')
+
+    payload = {
+        'type': data_type,
+        'period_start': period_start,
+        'period_end': period_end,
+        'rows': rows
+    }
+
+    log.info(f'Uploading {data_type}: {len(rows)} rows for {period_start} — {period_end}')
+    resp = requests.post(url, json=payload, headers={
+        'Content-Type': 'application/json'
+    }, timeout=30)
+
+    if resp.status_code == 200:
+        result = resp.json()
+        log.info(f'  OK: {result}')
+        return True
+    else:
+        log.error(f'  FAIL ({resp.status_code}): {resp.text}')
         return False
 
-    exe_path = cfg.get('1c', 'exe_path')
-    base_path = cfg.get('1c', 'base_path', fallback='')
-    username = cfg.get('1c', 'username')
-    password = cfg.get('1c', 'password')
-    output_dir = Path(cfg.get('1c', 'output_dir', fallback=str(LOG_DIR / 'exports')))
-    output_dir.mkdir(parents=True, exist_ok=True)
 
-    if not target_date:
-        target_date = (datetime.now() - timedelta(days=1)).strftime('%d.%m.%Y')
-
-    log.info(f'UI mode: launching 1C, date={target_date}')
-
-    # Launch 1C
-    launch_cmd = f'"{exe_path}" ENTERPRISE'
-    if base_path:
-        launch_cmd += f' /IBName "{base_path}"'
-
-    try:
-        app = Application(backend='uia').start(launch_cmd, timeout=30)
-    except Exception as e:
-        log.error(f'Failed to start 1C: {e}')
+# ===== Process a single file =====
+def process_file(cfg, filepath):
+    """Detect type, parse, and upload a single file."""
+    filepath = Path(filepath)
+    if not filepath.exists():
+        log.error(f'File not found: {filepath}')
         return False
 
+    log.info(f'Processing: {filepath.name}')
+
+    file_type = detect_type(filepath)
+    if not file_type:
+        log.warning(f'  Unknown file type, skipping: {filepath.name}')
+        return False
+
+    log.info(f'  Detected: {file_type}')
+
     try:
-        # Wait for login window
-        log.info('Waiting for login window...')
-        login_dlg = app.window(title_re='.*Доступ до інформаційної бази.*', timeout=30)
-        login_dlg.wait('visible', timeout=30)
+        if file_type == 'reception':
+            ps, pe, rows = parse_reception_xls(filepath)
+        else:
+            ps, pe, rows = parse_sales_xls(filepath)
 
-        # Enter credentials
-        login_dlg.child_window(title='Користувач:').parent().children()[1].set_text(username)
-        login_dlg.child_window(title='Пароль:').parent().children()[1].set_text(password)
-        login_dlg.child_window(title='OK').click()
-        time.sleep(5)
+        if not rows:
+            log.warning(f'  No data rows found in {filepath.name}')
+            return False
 
-        # Main window
-        log.info('Waiting for main window...')
-        main_win = app.window(title_re='.*ЕОД.*1С.*', timeout=60)
-        main_win.wait('visible', timeout=60)
-
-        success = True
-
-        # Generate and save both reports
-        for report_name, report_type, filename in [
-            ('Приймання лісопродукції', 'reception', 'reception.xls'),
-            ('Реалізація лісопродукції', 'sales', 'sales.xls')
-        ]:
-            log.info(f'Generating report: {report_name}')
-
-            # Click "Лісозаготівля" tab
-            main_win.child_window(title='Лісозаготівля').click_input()
-            time.sleep(2)
-
-            # Find and click the report link
-            main_win.child_window(title_re=f'.*{report_name}.*').click_input()
-            time.sleep(3)
-
-            # Set period
-            report_win = app.window(title_re=f'.*{report_name}.*', timeout=15)
-            report_win.wait('visible', timeout=15)
-
-            # Click period button (...)
-            report_win.child_window(title='...').click_input()
-            time.sleep(2)
-
-            # Period dialog
-            period_dlg = app.window(title_re='.*Виберіть період.*', timeout=10)
-            period_dlg.wait('visible', timeout=10)
-
-            # Select "Вчора"
-            period_dlg.child_window(title='Вчора').click_input()
-            time.sleep(1)
-            period_dlg.child_window(title='Вибрати').click_input()
-            time.sleep(2)
-
-            # Click "Сформувати"
-            report_win.child_window(title='Сформувати').click_input()
-            log.info('  Waiting for report generation...')
-            time.sleep(10)
-
-            # Save as Excel: Всі дії → В Excel
-            report_win.child_window(title='В Excel').click_input()
-            time.sleep(3)
-
-            # Save dialog
-            save_dlg = app.window(title_re='.*Збереження файлу.*', timeout=10)
-            save_dlg.wait('visible', timeout=10)
-
-            filepath = output_dir / filename
-            save_dlg.child_window(title='Ім\'я файлу:').parent().children()[-1].set_text(str(filepath))
-
-            # Set file type to Excel if needed
-            save_dlg.child_window(title='Зберегти').click_input()
-            time.sleep(3)
-
-            # Close report tab
-            send_keys('^{F4}')
-            time.sleep(2)
-
-            log.info(f'  Saved: {filepath}')
-
-        # Close 1C
-        send_keys('%{F4}')
-        time.sleep(2)
-
-        # Parse and upload files
-        for report_type, filename, parser in [
-            ('reception', 'reception.xls', parse_reception_xls),
-            ('sales', 'sales.xls', parse_sales_xls)
-        ]:
-            filepath = output_dir / filename
-            if filepath.exists():
-                try:
-                    ps, pe, rows = parser(filepath)
-                    if rows:
-                        upload_to_supabase(cfg, report_type, ps, pe, rows)
-                    else:
-                        log.warning(f'No data rows in {filename}')
-                except Exception as e:
-                    log.error(f'Parse error {filename}: {e}')
-                    success = False
-            else:
-                log.error(f'File not found: {filepath}')
-                success = False
-
-        return success
+        return upload_to_supabase(cfg, file_type, ps, pe, rows)
 
     except Exception as e:
-        log.error(f'UI automation error: {e}')
-        # Try to close 1C gracefully
+        log.error(f'  Error processing {filepath.name}: {e}')
+        return False
+
+
+# ===== Watch mode =====
+def watch_folder(cfg, watch_dir, archive_dir=None):
+    """Monitor folder for new .xls files and process them."""
+    watch_dir = Path(watch_dir)
+    watch_dir.mkdir(parents=True, exist_ok=True)
+
+    if archive_dir is None:
+        archive_dir = watch_dir / 'archive'
+    else:
+        archive_dir = Path(archive_dir)
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    processed = set()
+    log.info(f'Watching folder: {watch_dir}')
+    log.info(f'Archive folder: {archive_dir}')
+    log.info('Press Ctrl+C to stop')
+
+    while True:
         try:
-            send_keys('%{F4}')
-        except:
-            pass
-        return False
+            for f in sorted(watch_dir.glob('*.xls')):
+                if f.name.startswith('~') or f.name.startswith('.'):
+                    continue
+                key = (f.name, f.stat().st_size, f.stat().st_mtime)
+                if key in processed:
+                    continue
 
+                # Wait a moment to ensure file is fully written
+                time.sleep(2)
 
-# ===== COM Mode =====
-def run_com_mode(cfg, target_date=None):
-    """Connect to 1C via COM and extract data directly."""
-    try:
-        import win32com.client
-    except ImportError:
-        log.error('pywin32 not installed. Run: pip install pywin32')
-        return False
+                ok = process_file(cfg, f)
+                processed.add(key)
 
-    server = cfg.get('1c', 'com_server', fallback='')
-    base = cfg.get('1c', 'com_base', fallback='')
-    username = cfg.get('1c', 'username')
-    password = cfg.get('1c', 'password')
+                if ok:
+                    # Move to archive
+                    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    dest = archive_dir / f'{ts}_{f.name}'
+                    shutil.move(str(f), str(dest))
+                    log.info(f'  Archived: {dest.name}')
 
-    if not server or not base:
-        log.error('COM connection requires [1c] com_server and com_base in config.ini')
-        return False
+            # Also check .xlsx files
+            for f in sorted(watch_dir.glob('*.xlsx')):
+                if f.name.startswith('~') or f.name.startswith('.'):
+                    continue
+                key = (f.name, f.stat().st_size, f.stat().st_mtime)
+                if key in processed:
+                    continue
 
-    if not target_date:
-        yesterday = datetime.now() - timedelta(days=1)
-        target_date = yesterday.strftime('%Y%m%d')
+                time.sleep(2)
+                ok = process_file(cfg, f)
+                processed.add(key)
 
-    log.info(f'COM mode: connecting to {server}/{base}')
+                if ok:
+                    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    dest = archive_dir / f'{ts}_{f.name}'
+                    shutil.move(str(f), str(dest))
+                    log.info(f'  Archived: {dest.name}')
 
-    try:
-        connector = win32com.client.Dispatch('V83.COMConnector')
-        conn_string = f'Srvr="{server}";Ref="{base}";Usr="{username}";Pwd="{password}"'
-        conn = connector.Connect(conn_string)
-        log.info('Connected to 1C via COM')
+        except KeyboardInterrupt:
+            log.info('Watch stopped by user')
+            break
+        except Exception as e:
+            log.error(f'Watch error: {e}')
 
-        # ====================================================================
-        # УВАГА: Наступний код потребує знання метаданих конкретної конфігурації.
-        # Назви регістрів, документів та реквізитів треба з'ясувати в Конфігураторі.
-        #
-        # Приклад запиту (потребує адаптації під реальну конфігурацію):
-        # ====================================================================
-
-        query = conn.NewObject('Запит')
-
-        # Запит для приймання (ПРИКЛАД — адаптувати під реальні метадані)
-        query.Text = '''
-        ВЫБРАТЬ
-            Лісгосп.Наименование КАК Лісгосп,
-            СУММА(Обєм) КАК Обєм
-        ИЗ
-            РегістрНакопичення.ПриймальнийАкт.Обороти(
-                &ДатаПочатку, &ДатаКінця, , )
-        ЗГРУПУВАТИ ПО
-            Лісгосп.Наименование
-        '''
-
-        # Встановити параметри
-        # query.SetParameter('ДатаПочатку', ...)
-        # query.SetParameter('ДатаКінця', ...)
-
-        log.warning('COM query requires metadata names specific to your 1C configuration.')
-        log.warning('Please update the query in eod-sync.py after checking metadata in Конфігуратор.')
-
-        conn = None
-        return False
-
-    except Exception as e:
-        log.error(f'COM connection failed: {e}')
-        log.info('Hint: Ensure V83.COMConnector is registered (run 1C installer with /regserver)')
-        return False
+        time.sleep(30)
 
 
 # ===== Main =====
 def main():
     parser = argparse.ArgumentParser(description='ЕОД → KPI Dashboard sync')
-    parser.add_argument('--mode', choices=['auto', 'com', 'ui'], default='auto',
-                        help='Режим: auto (COM → UI), com, ui')
-    parser.add_argument('--date', help='Дата звіту (YYYY-MM-DD), за замовчуванням — вчора')
+    parser.add_argument('--file', help='Парсити один файл')
+    parser.add_argument('--folder', help='Парсити всі .xls/.xlsx в папці')
+    parser.add_argument('--watch', help='Моніторити папку (фоновий режим)')
     args = parser.parse_args()
 
-    log.info('=' * 50)
-    log.info(f'ЕОД Sync started, mode={args.mode}')
+    if not any([args.file, args.folder, args.watch]):
+        parser.print_help()
+        print('\nПриклади:')
+        print('  python eod-sync.py --file report.xls')
+        print('  python eod-sync.py --folder C:\\ЕОД_Звіти')
+        print('  python eod-sync.py --watch C:\\ЕОД_Звіти')
+        sys.exit(0)
 
+    log.info('=' * 50)
     cfg = load_config()
 
-    target_date = args.date
+    if args.file:
+        log.info(f'Mode: single file — {args.file}')
+        ok = process_file(cfg, args.file)
+        sys.exit(0 if ok else 1)
 
-    success = False
+    if args.folder:
+        log.info(f'Mode: folder scan — {args.folder}')
+        folder = Path(args.folder)
+        if not folder.exists():
+            log.error(f'Folder not found: {folder}')
+            sys.exit(1)
 
-    if args.mode in ('auto', 'com'):
-        log.info('Trying COM mode...')
-        success = run_com_mode(cfg, target_date)
+        files = list(folder.glob('*.xls')) + list(folder.glob('*.xlsx'))
+        files = [f for f in files if not f.name.startswith('~')]
+        log.info(f'Found {len(files)} files')
 
-    if not success and args.mode in ('auto', 'ui'):
-        log.info('Trying UI automation mode...')
-        success = run_ui_mode(cfg, target_date)
+        success = 0
+        for f in files:
+            if process_file(cfg, f):
+                success += 1
 
-    if success:
-        log.info('Sync completed successfully')
-    else:
-        log.error('Sync failed')
-        sys.exit(1)
+        log.info(f'Done: {success}/{len(files)} files uploaded')
+        sys.exit(0 if success > 0 else 1)
+
+    if args.watch:
+        log.info(f'Mode: watch — {args.watch}')
+        watch_folder(cfg, args.watch)
 
 
 if __name__ == '__main__':
