@@ -11,6 +11,14 @@ function fmtNum(v, decimals = 0) {
 let chartInstance = null;
 
 export function renderWoodDashboard() {
+    const hasData = receptionData.length > 0 || salesData.length > 0;
+    const emptyEl = $('woodEmptyState');
+    const contentEl = $('woodContent');
+    if (emptyEl) emptyEl.style.display = hasData ? 'none' : '';
+    if (contentEl) contentEl.style.display = hasData ? '' : 'none';
+
+    if (!hasData) return;
+
     renderKpis();
     renderReceptionTable();
     renderSalesTable();

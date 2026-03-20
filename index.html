@@ -559,7 +559,14 @@
             <div class="page-header">
                 <h1 class="page-header-title">Облік деревини</h1>
                 <div class="page-header-sub" id="woodDataDate">Дані не завантажено</div>
+                <label class="btn btn-sm page-upload-compact" title="Завантажити звіт ЕОД"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Оновити<input type="file" class="page-upload" data-expected="wood_reception,wood_sales" accept=".xlsx,.xls"></label>
             </div>
+            <div id="woodEmptyState" style="text-align:center;padding:60px 20px;color:var(--text2)">
+                <p style="font-size:15px;margin-bottom:8px">Завантажте звіт з ЕОД (Приймання або Реалізація лісопродукції)</p>
+                <p style="font-size:12px;margin-bottom:16px">Формат: .xls вивантажений з 1С:Підприємство</p>
+                <label class="btn btn-primary page-upload-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Завантажити звіт ЕОД<input type="file" class="page-upload" data-expected="wood_reception,wood_sales" accept=".xlsx,.xls"></label>
+            </div>
+            <div id="woodContent" style="display:none">
             <div id="woodKpiGrid"></div>
 
             <div class="section-divider" data-collapse="woodReceptionSection">
@@ -585,6 +592,7 @@
             <div id="woodChartsSection">
                 <div style="height:350px"><canvas id="woodChart"></canvas></div>
             </div>
+            </div><!-- /woodContent -->
         </div>
 
         <!-- Executive page -->
