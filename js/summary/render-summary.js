@@ -34,6 +34,7 @@ export function renderSummaryDashboard() {
     renderWeeklyBriefing();
     renderGroupTabs(selGroup);
     renderPivotTable(selYear, selGroup);
+    setupTzToggle(selYear);
     renderYearlySummary(years);
     renderCharts(selYear);
     initCollapsible('#pageSummary');
@@ -619,6 +620,153 @@ function renderPivotTable(year, group) {
             if (card) card.classList.toggle('fullscreen');
         };
     }
+}
+
+// ===== TZ Toggle (pivot ↔ TZ format) =====
+
+function setupTzToggle(year) {
+    const btn = $('btnTzToggle');
+    if (!btn || btn._init) return;
+    btn._init = true;
+    let tzMode = false;
+
+    btn.onclick = () => {
+        tzMode = !tzMode;
+        const pivotCard = $('summaryIndicatorsCard');
+        const tzCard = $('summaryTzReport');
+        const groupBar = $('tglSummaryGroup');
+
+        if (tzMode) {
+            if (pivotCard) pivotCard.style.display = 'none';
+            if (tzCard) tzCard.style.display = '';
+            if (groupBar) groupBar.style.display = 'none';
+            btn.classList.add('active');
+            btn.textContent = 'Зведена таблиця';
+            renderMonthlyTzReport(year);
+        } else {
+            if (pivotCard) pivotCard.style.display = '';
+            if (tzCard) tzCard.style.display = 'none';
+            if (groupBar) groupBar.style.display = '';
+            btn.classList.remove('active');
+            btn.textContent = 'ТЗ довідка';
+        }
+    };
+}
+
+// ===== Monthly TZ Format — Years comparison =====
+
+function renderMonthlyTzReport(year, month) {
+    const container = $('summaryTzReport');
+    if (!container) return;
+
+    if (!month) month = new Date().getMonth() + 1;
+    const allYears = [...new Set(summaryIndicators.map(r => r.year))].sort();
+    const showYears = allYears.slice(-5); // last 5 years
+
+    // Month selector
+    const monthSel = container.querySelector('#tzMonthSelect');
+    if (monthSel && !monthSel._init) {
+        monthSel._init = true;
+        monthSel.innerHTML = MO.map((m, i) =>
+            `<option value="${i + 1}"${i + 1 === month ? ' selected' : ''}>${m}</option>`
+        ).join('');
+        monthSel.onchange = () => {
+            renderMonthlyTzReport(year, parseInt(monthSel.value));
+        };
+    }
+
+    const tbody = container.querySelector('#tblBodyTzMonthly');
+    if (!tbody) return;
+
+    const head = container.querySelector('#tzMonthlyHead');
+    if (head) {
+        head.innerHTML = `<tr>
+            <th>Показник</th>
+            ${showYears.map(y => `<th>${y} рік</th>`).join('')}
+            <th>${MO[month - 1]} ${year}</th>
+            <th>Δ%</th>
+        </tr>`;
+    }
+
+    // Build rows grouped by MONTHLY_BLOCKS
+    const { MONTHLY_BLOCKS } = await_import_blocks();
+    const GROUP_LABELS_M = { finance: 'Фінансові показники', revenue: 'Доходи та реалізація', production: 'Виробництво', forestry: 'Лісове господарство' };
+
+    const allData = summaryIndicators.filter(r => r.sub_type === 'value');
+    const names = [...new Set(allData.map(r => r.indicator_name))];
+
+    let html = '';
+    for (const block of MONTHLY_BLOCKS) {
+        if (block.isText) continue;
+
+        const blockNames = names.filter(name => {
+            const rec = allData.find(r => r.indicator_name === name);
+            return rec && block.groups.includes(rec.indicator_group);
+        });
+        if (!blockNames.length) continue;
+
+        html += `<tr class="pivot-group-header"><td colspan="${showYears.length + 3}">
+            <span class="pivot-group-dot" style="background:${GROUP_COLORS[block.groups[0]] || '#666'}"></span>
+            ${block.name}
+        </td></tr>`;
+
+        for (const name of blockNames) {
+            let cells = `<td class="ind-name">${name}</td>`;
+
+            // Year annual values
+            for (const y of showYears) {
+                const annual = allData.find(r => r.indicator_name === name && r.year === y && r.month === 0);
+                cells += `<td>${annual?.value_numeric != null ? fmtNum(annual.value_numeric) : '—'}</td>`;
+            }
+
+            // Selected month value
+            const monthRec = allData.find(r => r.indicator_name === name && r.year === year && r.month === month);
+            const prevMonthRec = allData.find(r => r.indicator_name === name && r.year === year && r.month === month - 1);
+
+            cells += `<td><b>${monthRec?.value_numeric != null ? fmtNum(monthRec.value_numeric) : '—'}</b></td>`;
+
+            // Delta %
+            let deltaCls = '', deltaText = '—';
+            if (monthRec?.value_numeric != null && prevMonthRec?.value_numeric != null) {
+                if (prevMonthRec.value_numeric === 0) {
+                    deltaCls = 'cell-orange';
+                    deltaText = `<span class="pivot-badge-orange">${monthRec.value_numeric > 0 ? '+' : ''}${fmtNum(monthRec.value_numeric)}</span>`;
+                } else {
+                    const pct = ((monthRec.value_numeric - prevMonthRec.value_numeric) / Math.abs(prevMonthRec.value_numeric) * 100);
+                    if (pct > 0) {
+                        deltaCls = 'cell-up';
+                        deltaText = `<span class="pivot-badge-up">+${pct.toFixed(0)}%</span>`;
+                    } else if (pct < 0) {
+                        deltaCls = 'cell-down';
+                        deltaText = `<span class="pivot-badge-down">${pct.toFixed(0)}%</span>`;
+                    } else {
+                        deltaText = '0%';
+                    }
+                }
+            }
+            cells += `<td class="${deltaCls}">${deltaText}</td>`;
+
+            html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
+        }
+    }
+
+    tbody.innerHTML = html;
+
+    // Click → monthly infographic
+    tbody.querySelectorAll('.clickable-row').forEach(row => {
+        row.onclick = () => openMonthlyIndicatorModal(row.dataset.indicator, '');
+    });
+}
+
+// Sync import for MONTHLY_BLOCKS (already imported at top via block-map.js)
+function await_import_blocks() {
+    // MONTHLY_BLOCKS is statically available from block-map.js
+    return { MONTHLY_BLOCKS: [
+        { id: 'M1', name: 'Фінансові показники', groups: ['finance'] },
+        { id: 'M2', name: 'Доходи та реалізація', groups: ['revenue'] },
+        { id: 'M3', name: 'Виробництво та лісове господарство', groups: ['production', 'forestry'] },
+        { id: 'M_TEXT', name: 'Текстовий коментар', isText: true }
+    ]};
 }
 
 // ===== Yearly Summary — Enhanced =====
