@@ -6,6 +6,7 @@ import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterStat
 import { initCollapsible, drawEnhancedSparkline } from '../ui-helpers.js';
 import { WEEKLY_BLOCKS } from './block-map.js';
 import { saveBlockComment } from './db-summary.js';
+import { openWeeklyIndicatorModal, openMonthlyIndicatorModal } from './infographic-modal.js';
 
 const MO = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 
@@ -220,7 +221,7 @@ function renderWeeklyBriefing() {
             else if (delta > 0) badgeCls = 'badge-up';
             else if (delta < 0) badgeCls = 'badge-down';
         }
-        return `<tr>
+        return `<tr class="clickable-row" data-section="kpi" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${r.value_delta ?? ''}" style="cursor:pointer">
             <td><b>${r.indicator_name}</b></td>
             <td>${fmtNum(r.value_current)}</td>
             <td>${fmtNum(r.value_previous)}</td>
@@ -228,6 +229,16 @@ function renderWeeklyBriefing() {
             <td>${delta != null ? `<span class="summary-delta-badge ${badgeCls}">${deltaStr}</span>` : '—'}</td>
         </tr>`;
     }).join('');
+
+    // Click on KPI row → infographic modal
+    tbody.querySelectorAll('.clickable-row').forEach(row => {
+        row.onclick = () => openWeeklyIndicatorModal(
+            row.dataset.section, row.dataset.indicator,
+            parseFloat(row.dataset.current) || null,
+            parseFloat(row.dataset.prev) || null,
+            parseFloat(row.dataset.delta) || null
+        );
+    });
 
     renderWeeklySectionTabs(latestData, latestDate);
 }
@@ -361,6 +372,16 @@ function renderWeeklySectionTabs(data, date) {
         };
     });
 
+    // Wire clickable rows → infographic modal
+    container.querySelectorAll('.clickable-row').forEach(row => {
+        row.onclick = () => openWeeklyIndicatorModal(
+            row.dataset.section, row.dataset.indicator,
+            parseFloat(row.dataset.current) || null,
+            parseFloat(row.dataset.prev) || null,
+            parseFloat(row.dataset.delta) || null
+        );
+    });
+
     // Wire comment save buttons
     container.querySelectorAll('.ws-comment-save').forEach(btn => {
         btn.onclick = async () => {
@@ -406,6 +427,7 @@ function renderSectionTable(sData) {
     const hasPrevious = sData.some(r => r.value_previous != null);
     const hasYtd = sData.some(r => r.value_ytd != null);
     const hasDelta = sData.some(r => r.value_delta != null);
+    const section = sData[0]?.section || '';
 
     let cols = ['Показник'];
     if (hasCurrent) cols.push('За тиждень');
@@ -430,7 +452,7 @@ function renderSectionTable(sData) {
                 }
                 cells += `<td>${d != null ? `<span class="summary-delta-badge ${badgeCls}">${d >= 0 ? '+' : ''}${fmtNum(d)}</span>` : '\u2014'}</td>`;
             }
-            return `<tr>${cells}</tr>`;
+            return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${r.value_delta ?? ''}" style="cursor:pointer">${cells}</tr>`;
         }).join('')
     }</tbody></table></div>`;
 }
