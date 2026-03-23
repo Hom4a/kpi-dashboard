@@ -46,7 +46,7 @@ export function renderMarketKPIs() {
 
     grid.innerHTML = [
         kpiCard({ label: 'Ціна Україна (ділова)', value: `€${fmt(uaBusiness, 1)}`, unit: '', cls: 'neon-primary', icClass: 'ic-primary', icon: ICONS.tag, sub: `\u2248 ${fmt(uaUah, 0)} грн/м\u00B3` }),
-        kpiCard({ label: 'Середня Європа (ділова)', value: `€${fmt(euBusiness, 1)}`, unit: '', cls: 'neon-secondary', icClass: 'ic-secondary', icon: ICONS.globe, sub: `\u2248 ${fmt(euBusiness * rate, 0)} грн/м\u00B3` }),
+        kpiCard({ label: 'Середня ціна ЄС (ділова)', value: `€${fmt(euBusiness, 1)}`, unit: '', cls: 'neon-secondary', icClass: 'ic-secondary', icon: ICONS.globe, sub: `\u2248 ${fmt(euBusiness * rate, 0)} грн/м\u00B3` }),
         kpiCard({ label: 'Різниця UA vs EU', value: `${diff >= 0 ? '+' : ''}${fmt(diff, 1)}%`, unit: '', cls: diff >= 0 ? 'neon-green' : 'neon-rose', icClass: diff >= 0 ? 'ic-green' : 'ic-rose', icon: ICONS.chartLine, sub: diff < 0 ? 'Нижче ринку' : 'Вище ринку' }),
         kpiCard({ label: 'Курс EUR', value: `\u20B4${fmt(rate, 2)}`, unit: '', cls: 'neon-amber', icClass: 'ic-amber', icon: ICONS.dollar, sub: marketMeta.nbuRate ? `НБУ: \u20B4${fmt(marketMeta.nbuRate, 2)}` : (activePeriod || '\u2014') }),
         deltaCardHtml,

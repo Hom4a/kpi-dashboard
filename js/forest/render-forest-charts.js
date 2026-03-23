@@ -3,26 +3,38 @@ import { themeColor, fmt } from '../utils.js';
 import { kill, freshCanvas, makeGrad } from '../charts-common.js';
 import { charts } from '../state.js';
 import { filteredPrices, filteredInventory } from './state-forest.js';
+import { normalizeProduct, normalizeWarehouse, displayProduct } from '../validation.js';
+
+function normalizeKey(key, raw) {
+    if (key === 'product') return normalizeProduct(raw);
+    if (key === 'warehouse') return normalizeWarehouse(raw);
+    return raw || 'Інше';
+}
+
+function displayKey(key, raw) {
+    if (key === 'product') return displayProduct(raw);
+    return raw;
+}
 
 function aggregateBy(data, key, valueKey) {
     const map = {};
     data.forEach(r => {
-        const k = r[key] || 'Інше';
+        const k = normalizeKey(key, r[key]);
         if (!map[k]) map[k] = 0;
         map[k] += r[valueKey] || 0;
     });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k, v]) => [displayKey(key, k), v]);
 }
 
 function avgPriceBy(data, key) {
     const map = {};
     data.forEach(r => {
-        const k = r[key] || 'Інше';
+        const k = normalizeKey(key, r[key]);
         if (!map[k]) map[k] = { vol: 0, val: 0 };
         map[k].vol += r.volume_m3 || 0;
         map[k].val += r.total_value_uah || 0;
     });
-    return Object.entries(map).map(([k, d]) => [k, d.vol > 0 ? d.val / d.vol : 0]).sort((a, b) => b[1] - a[1]);
+    return Object.entries(map).map(([k, d]) => [displayKey(key, k), d.vol > 0 ? d.val / d.vol : 0]).sort((a, b) => b[1] - a[1]);
 }
 
 const COLORS = ['#4A9D6F', '#9CAF88', '#D4A574', '#fbbf24', '#22c55e', '#fb7185', '#60a5fa', '#a78bfa', '#f472b6', '#34d399', '#f97316', '#06b6d4'];

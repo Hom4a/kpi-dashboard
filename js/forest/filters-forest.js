@@ -6,12 +6,20 @@ import {
     forestFilterState,
     setFilteredPrices, setFilteredInventory, setForestFilterState
 } from './state-forest.js';
+import { normalizeProduct, normalizeWarehouse } from '../validation.js';
 
 let _renderFn = null;
 export function setRenderForestCallback(fn) { _renderFn = fn; }
 
 function unique(arr, key) {
-    return [...new Set(arr.map(r => r[key]).filter(Boolean))].sort();
+    const vals = arr.map(r => {
+        const v = r[key];
+        if (!v) return null;
+        if (key === 'product') return normalizeProduct(v);
+        if (key === 'warehouse') return normalizeWarehouse(v);
+        return v;
+    }).filter(Boolean);
+    return [...new Set(vals)].sort();
 }
 
 export function populateForestFilters() {

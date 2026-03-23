@@ -80,3 +80,54 @@ export function normalizeQuality(raw) {
     const lower = raw.toString().trim().toLowerCase();
     return CANONICAL_QUALITY[lower] || raw.toString().trim();
 }
+
+/**
+ * Normalize product name — remove EN suffixes, standardize
+ */
+export function normalizeProduct(name) {
+    if (!name) return 'Інше';
+    let n = name.toString().trim();
+    // Remove trailing " EN" suffix (e.g., "Круглі лісоматеріали EN" → "Круглі лісоматеріали")
+    n = n.replace(/\s+EN$/i, '');
+    return n;
+}
+
+/**
+ * Normalize warehouse name — standardize dashes, map aliases
+ */
+const WAREHOUSE_ALIASES = {
+    'франко-ліс': 'Верхній склад',
+    'франко-трель': 'Верхній склад',
+    'франко - ліс': 'Верхній склад',
+    'франко – ліс': 'Верхній склад',
+    'франко-проміжний': 'Проміжний склад',
+    'франко - проміжний': 'Проміжний склад',
+    'франко – проміжний': 'Проміжний склад'
+};
+
+export function normalizeWarehouse(name) {
+    if (!name) return 'Інше';
+    const lower = name.toString().trim().toLowerCase();
+    if (WAREHOUSE_ALIASES[lower]) return WAREHOUSE_ALIASES[lower];
+    // Standardize dashes
+    return name.toString().trim().replace(/\s*[–—]\s*/g, '-');
+}
+
+/**
+ * Map product name to full display name
+ */
+const PRODUCT_DISPLAY_NAMES = {
+    'ділова довгомірна': 'Ділова деревина довгомірна',
+    'дров. деревина': 'Деревина дров\'яна',
+    'дрова': 'Деревина дров\'яна',
+    'деревина дров\'яна нп': 'Деревина дров\'яна НП',
+    'деревина дров\'яна пв': 'Деревина дров\'яна ПВ',
+    'круглі лісоматеріали': 'Круглі лісоматеріали'
+};
+
+export function displayProduct(name) {
+    if (!name) return 'Інше';
+    const n = normalizeProduct(name);
+    const lower = n.toLowerCase();
+    return PRODUCT_DISPLAY_NAMES[lower] || n;
+}
