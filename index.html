@@ -38,6 +38,7 @@
     <link rel="stylesheet" href="css/api-system.css">
     <link rel="stylesheet" href="css/gis.css">
     <link rel="stylesheet" href="css/summary.css">
+    <link rel="stylesheet" href="css/print-summary.css" media="print">
 </head>
 <body>
 
@@ -678,6 +679,9 @@
                     <div style="display:flex;gap:8px;align-items:center">
                         <label class="btn btn-sm">Завантажити<input type="file" class="page-upload" accept=".xlsx,.xls,.docx" data-expected="summary_indicators,summary_weekly"></label>
                         <button class="btn btn-sm" id="btnSummaryExport" style="display:none" onclick="exportSummaryExcel()">Excel</button>
+                        <button class="btn btn-sm" onclick="printWeeklyReport()" title="Друк щотижневої довідки">Друк</button>
+                        <button class="btn btn-sm" onclick="exportWeeklyDocx()" title="Експорт в Word">Word</button>
+                        <button class="btn btn-sm" onclick="exportWeeklyPdf()" title="Експорт в PDF">PDF</button>
                     </div>
                 </div>
 

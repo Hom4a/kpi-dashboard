@@ -38,6 +38,9 @@ import { loadSummaryIndicators, loadSummaryWeekly, loadSummaryWeeklyNotes, loadB
 import { renderSummaryDashboard } from './summary/render-summary.js';
 import { initWeeklyEntry } from './summary/weekly-entry.js';
 import { exportSummaryExcel } from './summary/export-summary.js';
+import { printWeeklyReport, printMonthlyReport } from './summary/print-summary.js';
+import { exportWeeklyDocx, exportMonthlyDocx } from './summary/export-docx.js';
+import { exportWeeklyPdf, exportMonthlyPdf } from './summary/export-pdf.js';
 // Wood Accounting modules (ЕОД)
 import { setReceptionData, setSalesData } from './wood-accounting/state-wood.js';
 import { loadReceptionData, loadSalesData, clearReceptionData, clearSalesData } from './wood-accounting/db-wood.js';
@@ -342,6 +345,12 @@ window.openDashboardsPage = () => { switchPage('builder'); initDashboardList($('
 window.openApiSystemPage = () => { switchPage('api-system'); renderApiSystemPage(); };
 window.openGisPage = () => { switchPage('gis'); renderGisMap(); };
 window.exportSummaryExcel = exportSummaryExcel;
+window.printWeeklyReport = printWeeklyReport;
+window.printMonthlyReport = printMonthlyReport;
+window.exportWeeklyDocx = exportWeeklyDocx;
+window.exportMonthlyDocx = exportMonthlyDocx;
+window.exportWeeklyPdf = exportWeeklyPdf;
+window.exportMonthlyPdf = exportMonthlyPdf;
 window.openGisAdmin = openGisAdmin;
 window.closeGisAdmin = closeGisAdmin;
 window.saveGisAdmin = saveGisAdmin;
