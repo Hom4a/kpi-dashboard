@@ -9,3 +9,6 @@ export function setSummaryIndicators(v) { summaryIndicators = v; }
 export function setSummaryWeekly(v) { summaryWeekly = v; }
 export function setSummaryWeeklyNotes(v) { summaryWeeklyNotes = v; }
 export function setSummaryFilterState(v) { summaryFilterState = v; }
+
+export let summaryBlockComments = [];
+export function setSummaryBlockComments(v) { summaryBlockComments = v; }

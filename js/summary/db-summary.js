@@ -183,6 +183,70 @@ export async function clearSummaryIndicators() {
     await sb.from('summary_upload_history').delete().eq('data_type', 'monthly_indicators');
 }
 
+// ===== Block Comments =====
+
+export async function loadBlockComments(reportType, reportDate, year, month) {
+    let q = sb.from('summary_block_comments').select('*').eq('report_type', reportType);
+    if (reportType === 'weekly' && reportDate) q = q.eq('report_date', reportDate);
+    if (reportType === 'monthly') { q = q.eq('report_year', year).eq('report_month', month); }
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data || [];
+}
+
+export async function saveBlockComment({ reportType, reportDate, reportYear, reportMonth, blockId, content }) {
+    const { data: { session } } = await sb.auth.getSession();
+    const row = {
+        report_type: reportType,
+        block_id: blockId,
+        content,
+        created_by: session?.user?.id || null,
+        updated_at: new Date().toISOString()
+    };
+    if (reportType === 'weekly') row.report_date = reportDate;
+    if (reportType === 'monthly') { row.report_year = reportYear; row.report_month = reportMonth; }
+
+    const { error } = await sb.from('summary_block_comments').upsert(row, {
+        onConflict: reportType === 'weekly'
+            ? 'report_type,report_date,block_id'
+            : 'report_type,report_year,report_month,block_id'
+    });
+    if (error) throw new Error(error.message);
+}
+
+export async function deleteBlockComment(id) {
+    const { error } = await sb.from('summary_block_comments').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+}
+
+// ===== Indicator History (for infographic modal) =====
+
+export async function loadWeeklyIndicatorHistory(section, indicatorName, limit = 20) {
+    const { data, error } = await sb.from('summary_weekly')
+        .select('*')
+        .eq('section', section)
+        .eq('indicator_name', indicatorName)
+        .order('report_date', { ascending: false })
+        .limit(limit);
+    if (error) throw new Error(error.message);
+    return (data || []).reverse();
+}
+
+export async function loadMonthlyIndicatorHistory(indicatorName, subType = 'value', limit = 60) {
+    let q = sb.from('summary_indicators')
+        .select('*')
+        .eq('indicator_name', indicatorName)
+        .eq('sub_type', subType)
+        .order('year', { ascending: true })
+        .order('month', { ascending: true })
+        .limit(limit);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data || [];
+}
+
+// ===== Clear =====
+
 export async function clearSummaryWeekly() {
     const { error } = await sb.from('summary_weekly').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (error) throw new Error(error.message);

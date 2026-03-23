@@ -2,8 +2,10 @@
 import { $, fmt, show, hide, themeColor } from '../utils.js';
 import { charts } from '../state.js';
 import { kill, freshCanvas, makeGrad } from '../charts-common.js';
-import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState } from './state-summary.js';
+import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState, summaryBlockComments } from './state-summary.js';
 import { initCollapsible, drawEnhancedSparkline } from '../ui-helpers.js';
+import { WEEKLY_BLOCKS } from './block-map.js';
+import { saveBlockComment } from './db-summary.js';
 
 const MO = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 
@@ -195,8 +197,9 @@ function renderWeeklyBriefing() {
     const sub = $('summaryWeeklyDate');
     if (sub) sub.textContent = `Станом на ${formatDate(latestDate)}`;
 
-    const latestNotes = summaryWeeklyNotes.filter(n => n.report_date === latestDate);
-    renderWeeklyNotes(latestNotes);
+    // Notes now rendered inside weekly blocks (Block I)
+    const notesBlock = $('summaryNotesBlock');
+    if (notesBlock) notesBlock.style.display = 'none';
 
     // KPI table with badges
     const tbody = $('tblBodyWeekly');
@@ -209,10 +212,12 @@ function renderWeeklyBriefing() {
 
     tbody.innerHTML = kpiData.map(r => {
         const delta = r.value_delta;
+        const prev = r.value_previous;
         const deltaStr = delta != null ? (delta >= 0 ? `+${fmtNum(delta)}` : fmtNum(delta)) : '—';
         let badgeCls = 'badge-flat';
         if (delta != null) {
-            if (delta > 0) badgeCls = 'badge-up';
+            if (prev === 0 || prev == null) badgeCls = 'badge-orange';
+            else if (delta > 0) badgeCls = 'badge-up';
             else if (delta < 0) badgeCls = 'badge-down';
         }
         return `<tr>
@@ -268,43 +273,15 @@ function renderWeeklyNotes(notes) {
     container.innerHTML = html;
 }
 
-// ===== Section Tabs — Card Pills with Counts =====
-
-const SECTION_CATEGORIES = [
-    {
-        id: 'operations', label: 'Операційна',
-        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
-        sections: ['harvesting', 'sales', 'contracts']
-    },
-    {
-        id: 'forest', label: 'Ліси та земля',
-        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V8M5 12l7-8 7 8"/><path d="M8 22h8"/></svg>',
-        sections: ['forest_protection', 'certification', 'land_self_forested', 'land_reforestation', 'land_reserves']
-    },
-    {
-        id: 'security', label: 'Безпека',
-        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
-        sections: ['raids', 'mru_raids', 'demining', 'zsu']
-    },
-    {
-        id: 'finance', label: 'Фінанси',
-        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
-        sections: ['finance', 'personnel', 'procurement']
-    },
-    {
-        id: 'legal', label: 'Правові',
-        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8l-8 8M8 8l8 8"/></svg>',
-        sections: ['legal']
-    }
-];
+// ===== Weekly Blocks — 13+1 TZ Structure =====
 
 const SECTION_LABELS = {
-    forest_protection: 'Охорона лісу', raids: 'Рейди', mru_raids: 'Спільні рейди',
-    demining: 'Розмінування', certification: 'Сертифікація',
-    land_self_forested: 'Самозалісені', land_reforestation: 'Лісорозведення',
-    land_reserves: 'Запас', harvesting: 'Заготівля', contracts: 'Договори',
+    kpi: 'КРІ', forest_protection: 'Незаконні рубки', raids: 'Рейдова робота',
+    mru_raids: 'Спільні рейди з МРУ', demining: 'Розмінування', certification: 'Сертифікація',
+    land_self_forested: 'Самозалісені землі', land_reforestation: 'Лісорозведення',
+    land_reserves: 'Землі запасу', harvesting: 'Заготівля', contracts: 'Договори',
     sales: 'Реалізація', finance: 'Фінанси', personnel: 'Персонал',
-    legal: 'Правові питання', procurement: 'Закупівлі', zsu: 'ЗСУ'
+    legal: 'Правові питання', procurement: 'Закупівлі', zsu: 'Допомога ЗСУ'
 };
 
 function renderWeeklySectionTabs(data, date) {
@@ -315,89 +292,155 @@ function renderWeeklySectionTabs(data, date) {
     if (!availSections.size) { container.style.display = 'none'; return; }
     container.style.display = '';
 
-    const activeCategories = SECTION_CATEGORIES
-        .map(cat => ({ ...cat, sections: cat.sections.filter(s => availSections.has(s)) }))
-        .filter(cat => cat.sections.length);
+    const latestNotes = summaryWeeklyNotes.filter(n => n.report_date === date);
+    const comments = summaryBlockComments.filter(c => c.report_type === 'weekly' && c.report_date === date);
 
-    if (!activeCategories.length) { container.style.display = 'none'; return; }
+    let html = '';
+    for (const block of WEEKLY_BLOCKS) {
+        // Skip blocks with no data and no notes
+        const blockData = data.filter(r => block.sections.includes(r.section));
+        const blockNotes = block.noteTypes
+            ? latestNotes.filter(n => block.noteTypes.includes(n.note_type))
+            : [];
+        const blockComment = comments.find(c => c.block_id === block.id);
 
-    container.innerHTML = `
-        <div class="ws-category-bar"></div>
-        <div class="ws-section-bar"></div>
-        <div class="ws-section-table"></div>
-    `;
+        if (!blockData.length && !blockNotes.length && !block.isText) continue;
 
-    const catBar = container.querySelector('.ws-category-bar');
-    const secBar = container.querySelector('.ws-section-bar');
-    const tableWrap = container.querySelector('.ws-section-table');
+        const isCollapsed = !['I', 'II'].includes(block.id);
 
-    // Category pills with count badges
-    catBar.innerHTML = activeCategories.map((cat, i) => {
-        const count = cat.sections.reduce((sum, s) => sum + data.filter(r => r.section === s).length, 0);
-        return `<button class="ws-cat-pill${i === 0 ? ' active' : ''}" data-cat="${cat.id}">${cat.icon}<span>${cat.label}</span><span class="pill-count">${count}</span></button>`;
-    }).join('');
+        html += `<div class="ws-block" data-block="${block.id}">
+            <div class="ws-block-header" data-collapse-toggle="${block.id}">
+                <span class="ws-block-roman">${block.roman}.</span>
+                <span class="ws-block-name">${block.name}</span>
+                <span class="ws-block-count">${blockData.length ? blockData.length : ''}</span>
+                <span class="ws-block-chevron">${isCollapsed ? '\u25B6' : '\u25BC'}</span>
+            </div>
+            <div class="ws-block-body" id="wsBlock_${block.id}" style="${isCollapsed ? 'display:none' : ''}">`;
 
-    function showCategory(catId) {
-        const cat = activeCategories.find(c => c.id === catId);
-        if (!cat) return;
+        // Text blocks (I, XIV) — show notes
+        if (block.isText && block.noteTypes) {
+            if (blockNotes.length) {
+                html += renderBlockNotes(blockNotes);
+            } else {
+                html += '<div class="ws-block-empty">Немає текстових даних</div>';
+            }
+        }
 
-        catBar.querySelectorAll('.ws-cat-pill').forEach(b => b.classList.toggle('active', b.dataset.cat === catId));
+        // Data blocks — show tables per section
+        if (block.sections.length) {
+            for (const sec of block.sections) {
+                const sData = data.filter(r => r.section === sec);
+                if (!sData.length) continue;
 
-        secBar.innerHTML = cat.sections.map((s, i) =>
-            `<button class="ws-sec-tab${i === 0 ? ' active' : ''}" data-ws="${s}">${SECTION_LABELS[s] || s}</button>`
-        ).join('');
-
-        secBar.querySelectorAll('.ws-sec-tab').forEach(btn => {
-            btn.onclick = () => {
-                secBar.querySelectorAll('.ws-sec-tab').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                showSectionData(btn.dataset.ws);
-            };
-        });
-
-        showSectionData(cat.sections[0]);
-    }
-
-    function showSectionData(section) {
-        const sData = data.filter(r => r.section === section);
-        const hasCurrent = sData.some(r => r.value_current != null);
-        const hasPrevious = sData.some(r => r.value_previous != null);
-        const hasYtd = sData.some(r => r.value_ytd != null);
-        const hasDelta = sData.some(r => r.value_delta != null);
-
-        let cols = ['Показник'];
-        if (hasCurrent) cols.push('За тиждень');
-        if (hasPrevious) cols.push('Попередній');
-        if (hasYtd) cols.push('З поч. року');
-        if (hasDelta) cols.push('\u0394');
-
-        // Fade animation
-        tableWrap.style.animation = 'none';
-        tableWrap.offsetHeight; // reflow
-        tableWrap.style.animation = 'wsFadeIn .15s ease';
-
-        tableWrap.innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
-            sData.map(r => {
-                let cells = `<td>${r.indicator_name}</td>`;
-                if (hasCurrent) cells += `<td>${r.value_text || fmtNum(r.value_current)}</td>`;
-                if (hasPrevious) cells += `<td>${fmtNum(r.value_previous)}</td>`;
-                if (hasYtd) cells += `<td>${fmtNum(r.value_ytd)}</td>`;
-                if (hasDelta) {
-                    const d = r.value_delta;
-                    let badgeCls = 'badge-flat';
-                    if (d != null) { if (d > 0) badgeCls = 'badge-up'; else if (d < 0) badgeCls = 'badge-down'; }
-                    cells += `<td>${d != null ? `<span class="summary-delta-badge ${badgeCls}">${d >= 0 ? '+' : ''}${fmtNum(d)}</span>` : '\u2014'}</td>`;
+                if (block.sections.length > 1) {
+                    html += `<div class="ws-subsection-label">${SECTION_LABELS[sec] || sec}</div>`;
                 }
-                return `<tr>${cells}</tr>`;
-            }).join('')
-        }</tbody></table></div>`;
+                html += renderSectionTable(sData);
+            }
+        }
+
+        // Comment area
+        html += renderBlockCommentArea(block.id, date, blockComment);
+
+        html += `</div></div>`;
     }
 
-    catBar.querySelectorAll('.ws-cat-pill').forEach(btn => {
-        btn.onclick = () => showCategory(btn.dataset.cat);
+    container.innerHTML = html;
+
+    // Wire collapse toggles
+    container.querySelectorAll('.ws-block-header[data-collapse-toggle]').forEach(hdr => {
+        hdr.style.cursor = 'pointer';
+        hdr.onclick = () => {
+            const blockId = hdr.dataset.collapseToggle;
+            const body = container.querySelector(`#wsBlock_${blockId}`);
+            const chevron = hdr.querySelector('.ws-block-chevron');
+            if (!body) return;
+            const isHidden = body.style.display === 'none';
+            body.style.display = isHidden ? '' : 'none';
+            if (chevron) chevron.textContent = isHidden ? '\u25BC' : '\u25B6';
+        };
     });
 
-    showCategory(activeCategories[0].id);
+    // Wire comment save buttons
+    container.querySelectorAll('.ws-comment-save').forEach(btn => {
+        btn.onclick = async () => {
+            const blockId = btn.dataset.block;
+            const textarea = container.querySelector(`#wsComment_${blockId}`);
+            if (!textarea) return;
+            const content = textarea.value.trim();
+            if (!content) return;
+            btn.disabled = true;
+            btn.textContent = 'Збереження...';
+            try {
+                await saveBlockComment({ reportType: 'weekly', reportDate: date, blockId, content });
+                btn.textContent = 'Збережено';
+                setTimeout(() => { btn.textContent = 'Зберегти'; btn.disabled = false; }, 1500);
+            } catch (e) {
+                btn.textContent = 'Помилка';
+                setTimeout(() => { btn.textContent = 'Зберегти'; btn.disabled = false; }, 2000);
+            }
+        };
+    });
+}
+
+function renderBlockNotes(notes) {
+    const typeConfig = {
+        general: { label: 'Загальна оцінка', cls: 'summary-alert-info' },
+        events: { label: 'Ключові події', cls: 'summary-alert-neutral' },
+        positive: { label: 'Позитивна динаміка', cls: 'summary-alert-success' },
+        negative: { label: 'Негативна / ризикова', cls: 'summary-alert-danger' },
+        decisions: { label: 'Питання для рішення', cls: 'summary-alert-warning' },
+        other: { label: 'Інша інформація', cls: 'summary-alert-neutral' }
+    };
+    return notes.map(n => {
+        const cfg = typeConfig[n.note_type] || { label: n.note_type, cls: 'summary-alert-neutral' };
+        return `<div class="summary-alert ${cfg.cls}"><div>
+            <div class="note-label">${cfg.label}</div>
+            <div class="note-text">${n.content.replace(/\n/g, '<br>')}</div>
+        </div></div>`;
+    }).join('');
+}
+
+function renderSectionTable(sData) {
+    const hasCurrent = sData.some(r => r.value_current != null);
+    const hasPrevious = sData.some(r => r.value_previous != null);
+    const hasYtd = sData.some(r => r.value_ytd != null);
+    const hasDelta = sData.some(r => r.value_delta != null);
+
+    let cols = ['Показник'];
+    if (hasCurrent) cols.push('За тиждень');
+    if (hasPrevious) cols.push('Попередній');
+    if (hasYtd) cols.push('З поч. року');
+    if (hasDelta) cols.push('\u0394');
+
+    return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
+        sData.map(r => {
+            let cells = `<td>${r.indicator_name}</td>`;
+            if (hasCurrent) cells += `<td>${r.value_text || fmtNum(r.value_current)}</td>`;
+            if (hasPrevious) cells += `<td>${fmtNum(r.value_previous)}</td>`;
+            if (hasYtd) cells += `<td>${fmtNum(r.value_ytd)}</td>`;
+            if (hasDelta) {
+                const d = r.value_delta;
+                const prev = r.value_previous;
+                let badgeCls = 'badge-flat';
+                if (d != null) {
+                    if (prev === 0 || prev == null) badgeCls = 'badge-orange';
+                    else if (d > 0) badgeCls = 'badge-up';
+                    else if (d < 0) badgeCls = 'badge-down';
+                }
+                cells += `<td>${d != null ? `<span class="summary-delta-badge ${badgeCls}">${d >= 0 ? '+' : ''}${fmtNum(d)}</span>` : '\u2014'}</td>`;
+            }
+            return `<tr>${cells}</tr>`;
+        }).join('')
+    }</tbody></table></div>`;
+}
+
+function renderBlockCommentArea(blockId, date, existing) {
+    const val = existing ? existing.content.replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
+    return `<div class="ws-block-comment">
+        <textarea id="wsComment_${blockId}" class="ws-comment-input" placeholder="Коментар до блоку..." rows="2">${val}</textarea>
+        <button class="ws-comment-save btn-sm" data-block="${blockId}">Зберегти</button>
+    </div>`;
 }
 
 // ===== Group Toggle Tabs =====
@@ -501,6 +544,10 @@ function renderPivotTable(year, group) {
                             else if (diff < -0.05) cls = 'cell-down';
                             if (diff > 0.1) badge = `<span class="pivot-badge-up">+${(diff*100).toFixed(0)}%</span>`;
                             else if (diff < -0.1) badge = `<span class="pivot-badge-down">${(diff*100).toFixed(0)}%</span>`;
+                        } else if (prev && prev.value_numeric === 0 && rec.value_numeric !== 0) {
+                            cls = 'cell-orange';
+                            const abs = rec.value_numeric > 0 ? `+${fmtNum(rec.value_numeric)}` : fmtNum(rec.value_numeric);
+                            badge = `<span class="pivot-badge-orange">${abs}</span>`;
                         }
                         cells.push(`<td class="${cls}" data-col="${m-1}">${fmtNum(rec.value_numeric)}${badge}</td>`);
                         yearTotal += rec.value_numeric; yearCount++;

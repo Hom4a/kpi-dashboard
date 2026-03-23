@@ -33,8 +33,8 @@ import { fetchNbuRate } from './market/nbu-api.js';
 import { populateMarketFilters, applyMarketFilter, initMarketFilterEvents, setRenderMarketCallback } from './market/filters-market.js';
 import { renderMarketDashboard } from './market/render-market.js';
 // Summary modules
-import { setSummaryIndicators, setSummaryWeekly, setSummaryWeeklyNotes } from './summary/state-summary.js';
-import { loadSummaryIndicators, loadSummaryWeekly, loadSummaryWeeklyNotes, clearSummaryIndicators, clearSummaryWeekly } from './summary/db-summary.js';
+import { setSummaryIndicators, setSummaryWeekly, setSummaryWeeklyNotes, setSummaryBlockComments } from './summary/state-summary.js';
+import { loadSummaryIndicators, loadSummaryWeekly, loadSummaryWeeklyNotes, loadBlockComments, clearSummaryIndicators, clearSummaryWeekly } from './summary/db-summary.js';
 import { renderSummaryDashboard } from './summary/render-summary.js';
 import { initWeeklyEntry } from './summary/weekly-entry.js';
 import { exportSummaryExcel } from './summary/export-summary.js';
@@ -210,13 +210,15 @@ async function loadMarketDataAndRender() {
 // ===== Load & Render Summary =====
 async function loadSummaryDataAndRender() {
     try {
-        const [indicators, weekly, notes] = await Promise.all([
-            loadSummaryIndicators(), loadSummaryWeekly(), loadSummaryWeeklyNotes()
+        const [indicators, weekly, notes, comments] = await Promise.all([
+            loadSummaryIndicators(), loadSummaryWeekly(), loadSummaryWeeklyNotes(),
+            loadBlockComments('weekly').catch(() => [])
         ]);
         console.log('Summary loaded:', indicators.length, 'indicators,', weekly.length, 'weekly,', notes.length, 'notes');
         setSummaryIndicators(indicators);
         setSummaryWeekly(weekly);
         setSummaryWeeklyNotes(notes);
+        setSummaryBlockComments(comments);
         if (indicators.length || weekly.length) {
             hide('empty'); $('dash').style.display = 'block';
         }
