@@ -112,12 +112,12 @@ export async function exportWeeklyDocx(reportDate) {
             const hasCur = sData.some(r => r.value_current != null);
             const hasPrev = sData.some(r => r.value_previous != null);
             const hasYtd = sData.some(r => r.value_ytd != null);
-            const hasDelta = sData.some(r => r.value_delta != null);
+            const hasDelta = hasCur && hasPrev;
 
             const header = ['Показник'];
-            if (hasCur) header.push('За тиждень');
-            if (hasDelta) header.push('Δ');
-            if (hasPrev) header.push('Попер. тиждень');
+            if (hasCur) header.push('За звітний тиждень');
+            if (hasDelta) header.push('%Δ до попер.тиж.');
+            if (hasPrev) header.push('Попередній тиждень');
             if (hasYtd) header.push('З поч. року');
 
             const rows = [makeTableRow(header, true)];
@@ -125,8 +125,15 @@ export async function exportWeeklyDocx(reportDate) {
                 const cells = [r.indicator_name];
                 if (hasCur) cells.push(r.value_text || fN(r.value_current));
                 if (hasDelta) {
-                    const d = r.value_delta;
-                    cells.push(d != null ? { text: `${d >= 0 ? '+' : ''}${fN(d)}`, color: d > 0 ? '2E7D32' : d < 0 ? 'C62828' : 'E67E22' } : '—');
+                    const cur = r.value_current, prev = r.value_previous;
+                    if (cur != null && prev != null && prev !== 0) {
+                        const pct = Math.round(((cur - prev) / Math.abs(prev)) * 1000) / 10;
+                        cells.push({ text: `${pct >= 0 ? '+' : ''}${pct}%`, color: pct > 0 ? '2E7D32' : pct < 0 ? 'C62828' : '666666' });
+                    } else if (cur != null && prev === 0) {
+                        cells.push({ text: `${cur > 0 ? '+' : ''}${fN(cur)}`, color: 'E67E22' });
+                    } else {
+                        cells.push('—');
+                    }
                 }
                 if (hasPrev) cells.push(fN(r.value_previous));
                 if (hasYtd) cells.push(fN(r.value_ytd));

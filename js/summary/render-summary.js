@@ -366,6 +366,16 @@ function renderWeeklySectionTabs(data, date) {
             } else {
                 html += '<div class="ws-block-empty">Немає текстових даних</div>';
             }
+            // Sub-blocks (e.g., "Питання для рішення" structured table)
+            if (block.subBlocks) {
+                for (const sub of block.subBlocks) {
+                    html += `<div class="ws-subsection-label">${sub.name}</div>`;
+                    if (sub.isStructured) {
+                        const subNotes = latestNotes.filter(n => n.note_type === sub.noteType);
+                        html += renderStructuredDecisions(sub, subNotes, date);
+                    }
+                }
+            }
         }
 
         // Pre-comment area (Block XI — two comments: before + after table)
@@ -459,31 +469,76 @@ function renderBlockNotes(notes) {
     }).join('');
 }
 
+// Column key → header label mapping
+const COL_LABELS = {
+    indicator: 'Показник', unit: 'од.вим.', current: 'За звітний тиждень',
+    delta_pct: '%Δ до попер.тиж.', previous: 'Попередній тиждень',
+    ytd: 'З поч. року', total: 'Весь період', value: 'Значення',
+    delta_yoy_pct: '%Δ до попер.року', yoy: 'Аналог. період поп. року',
+    area: 'Площа, тис. га', count: 'Надлісництва', area_mln: 'Площа, млн.га', share: 'Частка, %'
+};
+
 function renderSectionTable(sData, blockColumns) {
-    const hasCurrent = sData.some(r => r.value_current != null);
-    const hasPrevious = sData.some(r => r.value_previous != null);
-    const hasYtd = sData.some(r => r.value_ytd != null);
-    const hasDelta = hasCurrent && hasPrevious;
     const section = sData[0]?.section || '';
 
     // Use block-level column config if provided, else auto-detect
-    let cols = ['Показник'];
-    if (hasCurrent) cols.push('За звітний тиждень');
-    if (hasDelta) cols.push('%Δ до попер.тиж.');
-    if (hasPrevious) cols.push('Попередній тиждень');
-    if (hasYtd) cols.push('З поч. року');
+    let colKeys;
+    if (blockColumns && blockColumns.length) {
+        colKeys = blockColumns;
+    } else {
+        colKeys = ['indicator'];
+        if (sData.some(r => r.value_current != null)) { colKeys.push('current'); colKeys.push('delta_pct'); }
+        if (sData.some(r => r.value_previous != null)) colKeys.push('previous');
+        if (sData.some(r => r.value_ytd != null)) colKeys.push('ytd');
+    }
+
+    const cols = colKeys.map(k => COL_LABELS[k] || k);
 
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
         sData.map(r => {
             const delta = calcDeltaPct(r.value_current, r.value_previous);
-            let cells = `<td>${r.indicator_name}</td>`;
-            if (hasCurrent) cells += `<td>${r.value_text || fmtNum(r.value_current)}</td>`;
-            if (hasDelta) cells += `<td><span class="summary-delta-badge ${delta.badgeCls}">${delta.display}</span></td>`;
-            if (hasPrevious) cells += `<td>${fmtNum(r.value_previous)}</td>`;
-            if (hasYtd) cells += `<td>${fmtNum(r.value_ytd)}</td>`;
+            const cellMap = {
+                indicator: r.indicator_name,
+                unit: r.unit || '',
+                current: r.value_text || fmtNum(r.value_current),
+                delta_pct: `<span class="summary-delta-badge ${delta.badgeCls}">${delta.display}</span>`,
+                previous: fmtNum(r.value_previous),
+                ytd: fmtNum(r.value_ytd),
+                total: fmtNum(r.value_total),
+                value: r.value_text || fmtNum(r.value_current),
+                delta_yoy_pct: r.value_yoy != null ? calcDeltaPct(r.value_ytd, r.value_yoy).display : '—',
+                yoy: fmtNum(r.value_yoy),
+                area: fmtNum(r.value_current),
+                count: fmtNum(r.value_current),
+                area_mln: fmtNum(r.value_current),
+                share: r.value_delta != null ? fmtNum(r.value_delta) + '%' : '—'
+            };
+            const cells = colKeys.map(k => `<td>${cellMap[k] ?? '—'}</td>`).join('');
             return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">${cells}</tr>`;
         }).join('')
     }</tbody></table></div>`;
+}
+
+function renderStructuredDecisions(subBlock, notes, date) {
+    const cols = subBlock.structuredColumns;
+    let rows = '';
+    if (notes.length) {
+        // Parse structured content: each note line is a row, pipe-separated
+        for (const n of notes) {
+            const lines = n.content.split('\n').filter(l => l.trim());
+            for (const line of lines) {
+                const parts = line.split('|').map(s => s.trim());
+                rows += `<tr>${cols.map((_, i) => `<td>${parts[i] || ''}</td>`).join('')}</tr>`;
+            }
+        }
+    }
+    if (!rows) {
+        rows = `<tr>${cols.map(() => '<td></td>').join('')}</tr>`;
+    }
+    return `<div class="tbl-wrap"><table class="tbl">
+        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+    </table></div>`;
 }
 
 function renderBlockCommentArea(blockId, date, existing) {

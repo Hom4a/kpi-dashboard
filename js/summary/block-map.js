@@ -5,7 +5,12 @@ export const WEEKLY_BLOCKS = [
     {
         id: 'I', roman: 'I', name: 'Загальна інформація',
         sections: [], isText: true,
-        noteTypes: ['general', 'events', 'positive', 'negative', 'decisions']
+        noteTypes: ['general', 'events', 'positive', 'negative'],
+        subBlocks: [
+            { id: 'I_decisions', name: 'Питання, що потребують управлінського рішення',
+              noteType: 'decisions', isStructured: true,
+              structuredColumns: ['Питання', 'Суть', 'Пропозиція', 'Адресат', 'Строк'] }
+        ]
     },
     { id: 'II',   roman: 'II',   name: 'Ключові показники (КРІ)',    sections: ['kpi'],
       columns: ['indicator', 'unit', 'current', 'delta_pct'] },

@@ -58,27 +58,37 @@ function buildWeeklyBlockHtml(block, data, notes, comment) {
         const hasCur = sData.some(r => r.value_current != null);
         const hasPrev = sData.some(r => r.value_previous != null);
         const hasYtd = sData.some(r => r.value_ytd != null);
-        const hasDelta = sData.some(r => r.value_delta != null);
+        const hasDelta = hasCur && hasPrev;
 
+        const th = 'border:1px solid #ccc;padding:3px 5px;background:#f0f0f0';
         html += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin:4px 0"><thead><tr>';
-        html += '<th style="border:1px solid #ccc;padding:3px 5px;background:#f0f0f0;text-align:left">Показник</th>';
-        if (hasCur) html += '<th style="border:1px solid #ccc;padding:3px 5px;background:#f0f0f0">За тиждень</th>';
-        if (hasDelta) html += '<th style="border:1px solid #ccc;padding:3px 5px;background:#f0f0f0">Δ</th>';
-        if (hasPrev) html += '<th style="border:1px solid #ccc;padding:3px 5px;background:#f0f0f0">Попер.</th>';
-        if (hasYtd) html += '<th style="border:1px solid #ccc;padding:3px 5px;background:#f0f0f0">З поч. року</th>';
+        html += `<th style="${th};text-align:left">Показник</th>`;
+        if (hasCur) html += `<th style="${th}">За звітний тиждень</th>`;
+        if (hasDelta) html += `<th style="${th}">%Δ до попер.тиж.</th>`;
+        if (hasPrev) html += `<th style="${th}">Попередній тиждень</th>`;
+        if (hasYtd) html += `<th style="${th}">З поч. року</th>`;
         html += '</tr></thead><tbody>';
 
+        const td = 'border:1px solid #ccc;padding:3px 5px';
         for (const r of sData) {
             html += '<tr>';
-            html += `<td style="border:1px solid #ccc;padding:3px 5px">${r.indicator_name}</td>`;
-            if (hasCur) html += `<td style="border:1px solid #ccc;padding:3px 5px;text-align:right">${r.value_text || fN(r.value_current)}</td>`;
+            html += `<td style="${td}">${r.indicator_name}</td>`;
+            if (hasCur) html += `<td style="${td};text-align:right">${r.value_text || fN(r.value_current)}</td>`;
             if (hasDelta) {
-                const d = r.value_delta;
-                const color = d > 0 ? '#2e7d32' : d < 0 ? '#c62828' : '#E67E22';
-                html += `<td style="border:1px solid #ccc;padding:3px 5px;text-align:right;color:${d != null ? color : '#999'}">${d != null ? `${d>=0?'+':''}${fN(d)}` : '—'}</td>`;
+                const cur = r.value_current, prev = r.value_previous;
+                let text = '—', color = '#999';
+                if (cur != null && prev != null && prev !== 0) {
+                    const pct = Math.round(((cur - prev) / Math.abs(prev)) * 1000) / 10;
+                    text = `${pct >= 0 ? '+' : ''}${pct}%`;
+                    color = pct > 0 ? '#2e7d32' : pct < 0 ? '#c62828' : '#666';
+                } else if (cur != null && prev === 0) {
+                    text = `${cur > 0 ? '+' : ''}${fN(cur)}`;
+                    color = '#E67E22';
+                }
+                html += `<td style="${td};text-align:right;color:${color}">${text}</td>`;
             }
-            if (hasPrev) html += `<td style="border:1px solid #ccc;padding:3px 5px;text-align:right">${fN(r.value_previous)}</td>`;
-            if (hasYtd) html += `<td style="border:1px solid #ccc;padding:3px 5px;text-align:right">${fN(r.value_ytd)}</td>`;
+            if (hasPrev) html += `<td style="${td};text-align:right">${fN(r.value_previous)}</td>`;
+            if (hasYtd) html += `<td style="${td};text-align:right">${fN(r.value_ytd)}</td>`;
             html += '</tr>';
         }
         html += '</tbody></table>';
