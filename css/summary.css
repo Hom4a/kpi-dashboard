@@ -201,6 +201,23 @@
     color: var(--primary); font-weight: 600;
 }
 
+/* ===== Tab Bar: Monthly / Weekly ===== */
+.summary-tab-bar {
+    display: flex; gap: 4px; margin-bottom: 20px;
+    padding: 4px; border-radius: 12px;
+    background: var(--glass); border: 1px solid var(--border);
+}
+.summary-tab {
+    flex: 1; padding: 10px 16px; border: none; border-radius: 10px;
+    background: transparent; color: var(--text2); font-size: 13px;
+    font-weight: 500; cursor: pointer; transition: all .2s;
+}
+.summary-tab:hover { background: rgba(74,157,111,.08); color: var(--text1); }
+.summary-tab.active {
+    background: var(--primary); color: #fff; font-weight: 600;
+    box-shadow: 0 2px 8px rgba(74,157,111,.3);
+}
+
 /* ===== Filter Bar for Pivot ===== */
 .summary-filter-bar {
     display: flex; align-items: center; gap: 8px;

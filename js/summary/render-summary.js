@@ -4,7 +4,7 @@ import { charts } from '../state.js';
 import { kill, freshCanvas, makeGrad } from '../charts-common.js';
 import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState, summaryBlockComments } from './state-summary.js';
 import { initCollapsible, drawEnhancedSparkline } from '../ui-helpers.js';
-import { WEEKLY_BLOCKS } from './block-map.js';
+import { WEEKLY_BLOCKS, MONTHLY_BLOCKS } from './block-map.js';
 import { saveBlockComment } from './db-summary.js';
 import { openWeeklyIndicatorModal, openMonthlyIndicatorModal } from './infographic-modal.js';
 
@@ -16,6 +16,8 @@ const GROUP_COLORS = {
 
 // ===== Main Render =====
 
+let _activeTab = 'monthly';
+
 export function renderSummaryDashboard() {
     if (!summaryIndicators.length && !summaryWeekly.length) {
         show('summaryEmptyState');
@@ -25,20 +27,44 @@ export function renderSummaryDashboard() {
     hide('summaryEmptyState');
     $('summaryContent').style.display = '';
 
+    initTabBar();
+
     const years = [...new Set(summaryIndicators.map(r => r.year))].sort();
     const selYear = summaryFilterState.year || (years.length ? years[years.length - 1] : new Date().getFullYear());
     const selGroup = summaryFilterState.group || 'all';
 
+    // Monthly tab
     populateYearSelect(years, selYear);
     renderKpiCards(selYear);
-    renderWeeklyBriefing();
     renderGroupTabs(selGroup);
     renderPivotTable(selYear, selGroup);
     setupTzToggle(selYear);
     renderYearlySummary(years);
     renderCharts(selYear);
+
+    // Weekly tab
+    renderWeeklyBriefing();
+
     initCollapsible('#pageSummary');
     updateDataDate(selYear);
+}
+
+function initTabBar() {
+    const bar = $('summaryTabBar');
+    if (!bar || bar.dataset.wired) return;
+    bar.dataset.wired = '1';
+
+    bar.querySelectorAll('.summary-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            bar.querySelectorAll('.summary-tab').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            _activeTab = btn.dataset.tab;
+            const monthly = $('summaryMonthlyTab');
+            const weekly = $('summaryWeeklyTab');
+            if (monthly) monthly.style.display = _activeTab === 'monthly' ? '' : 'none';
+            if (weekly) weekly.style.display = _activeTab === 'weekly' ? '' : 'none';
+        });
+    });
 }
 
 // ===== Data Date indicator =====
@@ -624,35 +650,11 @@ function renderPivotTable(year, group) {
     }
 }
 
-// ===== TZ Toggle (pivot ↔ TZ format) =====
+// ===== TZ Report (always visible on monthly tab) =====
 
 function setupTzToggle(year) {
-    const btn = $('btnTzToggle');
-    if (!btn || btn._init) return;
-    btn._init = true;
-    let tzMode = false;
-
-    btn.onclick = () => {
-        tzMode = !tzMode;
-        const pivotCard = $('summaryIndicatorsCard');
-        const tzCard = $('summaryTzReport');
-        const groupBar = $('tglSummaryGroup');
-
-        if (tzMode) {
-            if (pivotCard) pivotCard.style.display = 'none';
-            if (tzCard) tzCard.style.display = '';
-            if (groupBar) groupBar.style.display = 'none';
-            btn.classList.add('active');
-            btn.textContent = 'Зведена таблиця';
-            renderMonthlyTzReport(year);
-        } else {
-            if (pivotCard) pivotCard.style.display = '';
-            if (tzCard) tzCard.style.display = 'none';
-            if (groupBar) groupBar.style.display = '';
-            btn.classList.remove('active');
-            btn.textContent = 'ТЗ довідка';
-        }
-    };
+    // Always render TZ monthly report
+    renderMonthlyTzReport(year);
 }
 
 // ===== Monthly TZ Format — Years comparison =====
@@ -686,12 +688,12 @@ function renderMonthlyTzReport(year, month) {
             <th>Показник</th>
             ${showYears.map(y => `<th>${y} рік</th>`).join('')}
             <th>${MO[month - 1]} ${year}</th>
-            <th>Δ%</th>
+            <th>%Δ до попер.місяця</th>
         </tr>`;
     }
 
     // Build rows grouped by MONTHLY_BLOCKS
-    const { MONTHLY_BLOCKS } = await_import_blocks();
+    // MONTHLY_BLOCKS imported from block-map.js
     const GROUP_LABELS_M = { finance: 'Фінансові показники', revenue: 'Доходи та реалізація', production: 'Виробництво', forestry: 'Лісове господарство' };
 
     const allData = summaryIndicators.filter(r => r.sub_type === 'value');
@@ -760,16 +762,7 @@ function renderMonthlyTzReport(year, month) {
     });
 }
 
-// Sync import for MONTHLY_BLOCKS (already imported at top via block-map.js)
-function await_import_blocks() {
-    // MONTHLY_BLOCKS is statically available from block-map.js
-    return { MONTHLY_BLOCKS: [
-        { id: 'M1', name: 'Фінансові показники', groups: ['finance'] },
-        { id: 'M2', name: 'Доходи та реалізація', groups: ['revenue'] },
-        { id: 'M3', name: 'Виробництво та лісове господарство', groups: ['production', 'forestry'] },
-        { id: 'M_TEXT', name: 'Текстовий коментар', isText: true }
-    ]};
-}
+// MONTHLY_BLOCKS now imported from block-map.js (top-level import)
 
 // ===== Yearly Summary — Enhanced =====
 

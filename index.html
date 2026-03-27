@@ -678,39 +678,21 @@
                     </div>
                     <div style="display:flex;gap:8px;align-items:center">
                         <label class="btn btn-sm">Завантажити<input type="file" class="page-upload" accept=".xlsx,.xls,.docx" data-expected="summary_indicators,summary_weekly"></label>
-                        <button class="btn btn-sm" id="btnSummaryExport" style="display:none" onclick="exportSummaryExcel()">Excel</button>
-                        <button class="btn btn-sm" onclick="printWeeklyReport()" title="Друк щотижневої довідки">Друк</button>
-                        <button class="btn btn-sm" onclick="exportWeeklyDocx()" title="Експорт в Word">Word</button>
-                        <button class="btn btn-sm" onclick="exportWeeklyPdf()" title="Експорт в PDF">PDF</button>
+                        <button class="btn btn-sm" id="btnSummaryPrint" onclick="window._summaryPrint()" title="Друк">Друк</button>
+                        <button class="btn btn-sm" id="btnSummaryWord" onclick="window._summaryDocx()" title="Word">Word</button>
+                        <button class="btn btn-sm" id="btnSummaryPdf" onclick="window._summaryPdf()" title="PDF">PDF</button>
                     </div>
                 </div>
 
-                <!-- Section: KPI cards -->
-                <div class="section-divider" data-collapse="summaryKpiSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><h4>Ключові показники</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
-                <div id="summaryKpiSection">
-                    <div class="kpi-grid" id="kpiGridSummary"></div>
+                <!-- Tab toggle: Monthly / Weekly -->
+                <div class="summary-tab-bar" id="summaryTabBar">
+                    <button class="summary-tab active" data-tab="monthly">Щомісячна інформація</button>
+                    <button class="summary-tab" data-tab="weekly">Щотижнева інформація</button>
                 </div>
 
-                <!-- Section: Weekly briefing -->
-                <div class="section-divider" data-collapse="summaryWeeklySection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg><h4>Тижнева довідка</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
-                <div id="summaryWeeklySection">
-                    <div class="glass chart-card" style="margin-bottom:20px" id="summaryWeeklyCard">
-                        <div class="chart-hdr">
-                            <div><h3>Щотижнева довідка</h3><small id="summaryWeeklyDate">Оперативні показники</small></div>
-                        </div>
-                        <div id="summaryNotesBlock" style="margin-bottom:12px;display:none"></div>
-                        <div class="tbl-wrap"><table class="tbl" id="summaryWeeklyTable">
-                            <thead><tr><th>Показник</th><th>За звітний тиждень</th><th>%Δ до попер.тиж.</th><th>Попередній тиждень</th><th>З поч. року</th></tr></thead>
-                            <tbody id="tblBodyWeekly"></tbody>
-                        </table></div>
-                        <div id="summaryWeeklySections" style="margin-top:16px;display:none"></div>
-                    </div>
-                </div>
-
-                <!-- Section: Detailed analytics -->
-                <div class="section-divider" data-collapse="summaryAnalyticsSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg><h4>Детальна аналітика</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
-                <div id="summaryAnalyticsSection">
-                    <!-- Filter bar: group tabs + year selector + fullscreen -->
+                <!-- ====== TAB: Monthly ====== -->
+                <div id="summaryMonthlyTab">
+                    <!-- Filter bar: group tabs + year/month selector -->
                     <div class="summary-filter-bar">
                         <div class="summary-filter-group" id="tglSummaryGroup">
                             <button class="summary-filter-btn active" data-g="all">Всі</button>
@@ -721,7 +703,6 @@
                         </div>
                         <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
                             <select id="summaryYearSelect" class="filter-select" style="width:auto;min-width:80px"></select>
-                            <button class="inf-period-btn" id="btnTzToggle" title="Перемикнути формат">ТЗ довідка</button>
                             <button class="icon-btn" id="btnPivotFullscreen" title="Розгорнути таблицю"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button>
                         </div>
                     </div>
@@ -732,23 +713,29 @@
                             <tbody id="tblBodyIndicators"></tbody>
                         </table></div>
                     </div>
-
                     <!-- Monthly TZ Format — years comparison -->
-                    <div class="glass chart-card" style="margin-bottom:20px;display:none" id="summaryTzReport">
+                    <div class="glass chart-card" style="margin-bottom:20px" id="summaryTzReport">
                         <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
-                            <h4 style="margin:0;font-size:14px;color:var(--text1)">Щомісячна довідка (формат ТЗ)</h4>
+                            <h4 style="margin:0;font-size:14px;color:var(--text1)">Щомісячна довідка</h4>
                             <select id="tzMonthSelect" class="filter-select" style="width:auto;min-width:80px"></select>
                         </div>
                         <div class="tbl-wrap"><table class="tbl">
                             <thead id="tzMonthlyHead"></thead>
                             <tbody id="tblBodyTzMonthly"></tbody>
                         </table></div>
+                        <!-- Monthly text comment block -->
+                        <div class="ws-block-comment" style="margin-top:12px">
+                            <textarea id="wsComment_monthly_text" class="ws-comment-input" placeholder="Текстовий коментар до місячної довідки..." rows="3"></textarea>
+                            <button class="ws-comment-save btn-sm" data-block="monthly_text">Зберегти</button>
+                        </div>
                     </div>
-                </div>
+                    <!-- KPI cards -->
+                    <div class="kpi-grid" id="kpiGridSummary" style="margin-bottom:20px"></div>
+                    <!-- Charts -->
+                    <div id="summaryChartsContainer">
 
-                <!-- Section: Charts -->
-                <div class="section-divider" data-collapse="summaryChartsSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Графіки</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
-                <div id="summaryChartsSection">
+                    <div class="section-divider" data-collapse="summaryChartsSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Графіки</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+                    <div id="summaryChartsSection">
                     <div class="chart-row cols-2">
                         <div class="glass chart-card">
                             <div class="chart-hdr">
@@ -783,16 +770,32 @@
                     </div>
                 </div>
 
-                <!-- Section: Yearly summary -->
-                <div class="section-divider" data-collapse="summaryYearlySection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><h4>Річне зведення</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
-                <div id="summaryYearlySection">
-                    <div class="glass chart-card" style="margin-bottom:20px">
-                        <div class="tbl-wrap"><table class="tbl" id="summaryYearlyTable">
-                            <thead id="summaryYearlyHead"></thead>
-                            <tbody id="tblBodyYearly"></tbody>
-                        </table></div>
+                    <div class="section-divider" data-collapse="summaryYearlySection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><h4>Річне зведення</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+                    <div id="summaryYearlySection">
+                        <div class="glass chart-card" style="margin-bottom:20px">
+                            <div class="tbl-wrap"><table class="tbl" id="summaryYearlyTable">
+                                <thead id="summaryYearlyHead"></thead>
+                                <tbody id="tblBodyYearly"></tbody>
+                            </table></div>
+                        </div>
                     </div>
-                </div>
+                    </div><!-- /summaryChartsContainer -->
+                </div><!-- /summaryMonthlyTab -->
+
+                <!-- ====== TAB: Weekly ====== -->
+                <div id="summaryWeeklyTab" style="display:none">
+                    <div class="glass chart-card" style="margin-bottom:20px" id="summaryWeeklyCard">
+                        <div class="chart-hdr">
+                            <div><h3>Щотижнева довідка</h3><small id="summaryWeeklyDate">Оперативні показники</small></div>
+                        </div>
+                        <div id="summaryNotesBlock" style="margin-bottom:12px;display:none"></div>
+                        <div class="tbl-wrap"><table class="tbl" id="summaryWeeklyTable" style="display:none">
+                            <thead><tr><th>Показник</th><th>За звітний тиждень</th><th>%Δ до попер.тиж.</th><th>Попередній тиждень</th><th>З поч. року</th></tr></thead>
+                            <tbody id="tblBodyWeekly"></tbody>
+                        </table></div>
+                        <div id="summaryWeeklySections" style="margin-top:16px;display:none"></div>
+                    </div>
+                </div><!-- /summaryWeeklyTab -->
             </div>
         </div>
 
