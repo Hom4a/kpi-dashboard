@@ -170,7 +170,8 @@ export async function exportMonthlyPdf(year, month) {
             if (cur?.value_numeric != null && prev?.value_numeric != null && prev.value_numeric !== 0) {
                 const pct = ((cur.value_numeric - prev.value_numeric) / Math.abs(prev.value_numeric) * 100);
                 const color = pct > 0 ? '#2e7d32' : pct < 0 ? '#c62828' : '#000';
-                html += `<td style="border:1px solid #ccc;padding:3px 5px;text-align:right;color:${color};font-weight:bold">${pct>=0?'+':''}${pct.toFixed(0)}%</td>`;
+                const r = Math.round(pct * 10) / 10;
+                html += `<td style="border:1px solid #ccc;padding:3px 5px;text-align:right;color:${color};font-weight:bold">${r>=0?'+':''}${r}%</td>`;
             } else {
                 html += '<td style="border:1px solid #ccc;padding:3px 5px;text-align:right;color:#999">—</td>';
             }

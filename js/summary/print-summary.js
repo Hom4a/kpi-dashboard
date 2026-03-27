@@ -158,7 +158,8 @@ export function printMonthlyReport(year, month) {
             if (cur?.value_numeric != null && prev?.value_numeric != null && prev.value_numeric !== 0) {
                 const pct = ((cur.value_numeric - prev.value_numeric) / Math.abs(prev.value_numeric) * 100);
                 const cls = pct > 0 ? 'print-badge-up' : pct < 0 ? 'print-badge-down' : '';
-                html += `<td><span class="${cls}">${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%</span></td>`;
+                const r = Math.round(pct * 10) / 10;
+                html += `<td><span class="${cls}">${r >= 0 ? '+' : ''}${r}%</span></td>`;
             } else if (cur?.value_numeric != null && prev?.value_numeric === 0) {
                 html += `<td><span class="print-badge-orange">${cur.value_numeric > 0 ? '+' : ''}${fN(cur.value_numeric)}</span></td>`;
             } else {

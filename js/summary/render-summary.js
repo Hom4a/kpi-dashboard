@@ -238,17 +238,13 @@ function renderWeeklyBriefing() {
     const notesBlock = $('summaryNotesBlock');
     if (notesBlock) notesBlock.style.display = 'none';
 
-    // KPI summary table hidden per TZ 3.2 — data shown in Block II
+    // KPI summary table hidden per TZ 3.2 — data shown in Block II only
     const summaryTable = $('summaryWeeklyTable');
     if (summaryTable) summaryTable.style.display = 'none';
 
+    // Skip rendering hidden KPI table (optimization)
     const tbody = $('tblBodyWeekly');
     if (!tbody) return;
-
-    if (!kpiData.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Немає даних</td></tr>';
-        return;
-    }
 
     tbody.innerHTML = kpiData.map(r => {
         const delta = calcDeltaPct(r.value_current, r.value_previous);
@@ -611,8 +607,39 @@ function renderPivotTable(year, group) {
         return `<th data-col="${i}"${isCurrent ? ' class="month-current"' : ''}>${m}</th>`;
     }).join('')}<th>Рік</th></tr>`;
 
-    const prevData = summaryIndicators.filter(r => r.year === year - 1 && r.month > 0);
+    // Previous year data for January comparison (Jan current year vs Dec prev year)
+    const prevYearData = summaryIndicators.filter(r => r.year === year - 1 && r.month === 12);
     const GROUP_LABELS = { finance: 'Фінанси', revenue: 'Доходи', production: 'Продукція', forestry: 'Лісогосподарство' };
+
+    // Helper: get previous month value for month-to-month delta
+    function getPrevMonthVal(name, subType, m) {
+        if (m > 1) {
+            // Same year, previous month
+            const prev = data.find(r => r.indicator_name === name && r.sub_type === subType && r.month === m - 1);
+            return prev?.value_numeric ?? null;
+        } else {
+            // January → compare with December of previous year
+            const prev = prevYearData.find(r => r.indicator_name === name && r.sub_type === subType);
+            return prev?.value_numeric ?? null;
+        }
+    }
+
+    // Helper: render delta badge (month-to-month)
+    function pivotBadge(current, prev) {
+        if (current == null || prev == null) return { cls: '', badge: '' };
+        if (prev === 0) {
+            if (current === 0) return { cls: '', badge: '' };
+            const abs = current > 0 ? `+${fmtNum(current)}` : fmtNum(current);
+            return { cls: 'cell-orange', badge: `<span class="pivot-badge-orange">${abs}</span>` };
+        }
+        const pct = Math.round(((current - prev) / Math.abs(prev)) * 1000) / 10;
+        if (pct === 0) return { cls: '', badge: '' };
+        const cls = pct > 0 ? 'cell-up' : 'cell-down';
+        const badge = pct > 0
+            ? `<span class="pivot-badge-up">+${pct}%</span>`
+            : `<span class="pivot-badge-down">${pct}%</span>`;
+        return { cls, badge };
+    }
 
     tbody.innerHTML = displayRows.map(row => {
         if (row.type === 'group-header') {
@@ -630,7 +657,10 @@ function renderPivotTable(year, group) {
                 if (vol || price) {
                     const vStr = vol && vol.value_numeric != null ? fmtNum(vol.value_numeric) : '\u2014';
                     const pStr = price && price.value_numeric != null ? fmtNum(price.value_numeric) : '\u2014';
-                    cells.push(`<td class="volprice-cell" data-col="${m-1}"><span class="vp-vol">${vStr}</span><span class="vp-sep">/</span><span class="vp-price">${pStr}</span></td>`);
+                    // Delta badge for volume (month-to-month)
+                    const prevVol = vol?.value_numeric != null ? getPrevMonthVal(row.name, 'volume', m) : null;
+                    const { cls, badge } = pivotBadge(vol?.value_numeric, prevVol);
+                    cells.push(`<td class="volprice-cell ${cls}" data-col="${m-1}"><span class="vp-vol">${vStr}</span><span class="vp-sep">/</span><span class="vp-price">${pStr}</span>${badge}</td>`);
                     if (vol && vol.value_numeric != null) { yearTotal += vol.value_numeric; yearCount++; }
                 } else {
                     cells.push(`<td class="cell-empty" data-col="${m-1}">\u2014</td>`);
@@ -641,21 +671,9 @@ function renderPivotTable(year, group) {
                     if (rec.value_text) {
                         cells.push(`<td class="cell-text" data-col="${m-1}">${rec.value_text}</td>`);
                     } else if (rec.value_numeric != null) {
-                        const prev = prevData.find(r => r.indicator_name === row.name && r.sub_type === 'value' && r.month === m);
-                        let cls = '';
-                        let badge = '';
-                        if (prev && prev.value_numeric != null && prev.value_numeric !== 0) {
-                            const diff = (rec.value_numeric - prev.value_numeric) / Math.abs(prev.value_numeric);
-                            if (diff > 0.05) cls = 'cell-up';
-                            else if (diff < -0.05) cls = 'cell-down';
-                            if (diff > 0.1) badge = `<span class="pivot-badge-up">+${(diff*100).toFixed(0)}%</span>`;
-                            else if (diff < -0.1) badge = `<span class="pivot-badge-down">${(diff*100).toFixed(0)}%</span>`;
-                        } else if (prev && prev.value_numeric === 0 && rec.value_numeric !== 0) {
-                            cls = 'cell-orange';
-                            const abs = rec.value_numeric > 0 ? `+${fmtNum(rec.value_numeric)}` : fmtNum(rec.value_numeric);
-                            badge = `<span class="pivot-badge-orange">${abs}</span>`;
-                        }
-                        cells.push(`<td class="${cls}" data-col="${m-1}">${fmtNum(rec.value_numeric)}${badge}</td>`);
+                        const prevVal = getPrevMonthVal(row.name, 'value', m);
+                        const { cls, badge } = pivotBadge(rec.value_numeric, prevVal);
+                        cells.push(`<td class="${cls}" data-col="${m-1}">${fmtNum(rec.value_numeric)}${badge ? ' ' + badge : ''}</td>`);
                         yearTotal += rec.value_numeric; yearCount++;
                     } else {
                         cells.push(`<td class="cell-empty" data-col="${m-1}">\u2014</td>`);
@@ -791,13 +809,13 @@ function renderMonthlyTzReport(year, month) {
                     deltaCls = 'cell-orange';
                     deltaText = `<span class="pivot-badge-orange">${monthRec.value_numeric > 0 ? '+' : ''}${fmtNum(monthRec.value_numeric)}</span>`;
                 } else {
-                    const pct = ((monthRec.value_numeric - prevMonthRec.value_numeric) / Math.abs(prevMonthRec.value_numeric) * 100);
+                    const pct = Math.round(((monthRec.value_numeric - prevMonthRec.value_numeric) / Math.abs(prevMonthRec.value_numeric)) * 1000) / 10;
                     if (pct > 0) {
                         deltaCls = 'cell-up';
-                        deltaText = `<span class="pivot-badge-up">+${pct.toFixed(0)}%</span>`;
+                        deltaText = `<span class="pivot-badge-up">+${pct}%</span>`;
                     } else if (pct < 0) {
                         deltaCls = 'cell-down';
-                        deltaText = `<span class="pivot-badge-down">${pct.toFixed(0)}%</span>`;
+                        deltaText = `<span class="pivot-badge-down">${pct}%</span>`;
                     } else {
                         deltaText = '0%';
                     }
@@ -862,15 +880,15 @@ function renderYearlySummary(years) {
         if (numVals.length >= 2) {
             const first = numVals[0], last = numVals[numVals.length - 1];
             if (first !== 0) {
-                const pct = (last - first) / Math.abs(first) * 100;
+                const pct = Math.round((last - first) / Math.abs(first) * 1000) / 10;
                 if (pct > 5) {
-                    trendHtml = `<span class="trend-badge trend-up">\u2197 +${pct.toFixed(0)}%</span>`;
+                    trendHtml = `<span class="trend-badge trend-up">\u2197 +${pct}%</span>`;
                     rowClass = 'yearly-row-up';
                 } else if (pct < -5) {
-                    trendHtml = `<span class="trend-badge trend-down">\u2198 ${pct.toFixed(0)}%</span>`;
+                    trendHtml = `<span class="trend-badge trend-down">\u2198 ${pct}%</span>`;
                     rowClass = 'yearly-row-down';
                 } else {
-                    trendHtml = `<span class="trend-badge trend-flat">\u2192 ${pct > 0 ? '+' : ''}${pct.toFixed(0)}%</span>`;
+                    trendHtml = `<span class="trend-badge trend-flat">\u2192 ${pct > 0 ? '+' : ''}${pct}%</span>`;
                     rowClass = 'yearly-row-flat';
                 }
             }

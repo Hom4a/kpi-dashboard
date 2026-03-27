@@ -199,7 +199,8 @@ export async function exportMonthlyDocx(year, month) {
 
             if (cur?.value_numeric != null && prev?.value_numeric != null && prev.value_numeric !== 0) {
                 const pct = ((cur.value_numeric - prev.value_numeric) / Math.abs(prev.value_numeric) * 100);
-                cells.push({ text: `${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`, color: pct > 0 ? '2E7D32' : pct < 0 ? 'C62828' : '000000' });
+                const r = Math.round(pct * 10) / 10;
+                cells.push({ text: `${r >= 0 ? '+' : ''}${r}%`, color: pct > 0 ? '2E7D32' : pct < 0 ? 'C62828' : '000000' });
             } else {
                 cells.push('—');
             }
