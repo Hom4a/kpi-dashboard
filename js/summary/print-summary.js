@@ -14,13 +14,16 @@ const SECTION_LABELS = {
     legal: 'Правові питання', procurement: 'Закупівлі', zsu: 'Допомога ЗСУ'
 };
 
-function deltaBadge(d, prev) {
-    if (d == null) return '<span class="print-empty">—</span>';
-    let cls = '';
-    if (prev === 0 || prev == null) cls = 'print-badge-orange';
-    else if (d > 0) cls = 'print-badge-up';
-    else if (d < 0) cls = 'print-badge-down';
-    return `<span class="${cls}">${d >= 0 ? '+' : ''}${fN(d)}</span>`;
+function deltaPctBadge(current, prev) {
+    if (current == null || prev == null) return '—';
+    if (prev === 0) {
+        if (current === 0) return '0%';
+        return `<span class="print-badge-orange">${current > 0 ? '+' : ''}${fN(current)}</span>`;
+    }
+    const pct = ((current - prev) / Math.abs(prev)) * 100;
+    const rounded = Math.round(pct * 10) / 10;
+    const cls = rounded > 0 ? 'print-badge-up' : rounded < 0 ? 'print-badge-down' : '';
+    return `<span class="${cls}">${rounded >= 0 ? '+' : ''}${rounded}%</span>`;
 }
 
 // ===== Weekly Print =====
@@ -37,12 +40,17 @@ export function printWeeklyReport(reportDate) {
     const comments = summaryBlockComments.filter(c => c.report_type === 'weekly' && c.report_date === reportDate);
 
     const d = new Date(reportDate);
-    const dateStr = `${d.getDate()}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+    const day = d.getDay();
+    const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    const fmtD = dt => `${dt.getDate()}.${String(dt.getMonth()+1).padStart(2,'0')}.${dt.getFullYear()}`;
+    const oneJan = new Date(d.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((d - oneJan) / 86400000 + oneJan.getDay() + 1) / 7);
 
     let html = `<div class="print-header">
         <h1>ДП «Ліси України»</h1>
         <h2>Щотижнева інформаційна довідка</h2>
-        <div class="print-period">Станом на ${dateStr}</div>
+        <div class="print-period">За період з ${fmtD(mon)} по ${fmtD(sun)}, тиждень №${weekNum}</div>
     </div>`;
 
     for (const block of WEEKLY_BLOCKS) {
@@ -75,12 +83,12 @@ export function printWeeklyReport(reportDate) {
             const hasCurrent = sData.some(r => r.value_current != null);
             const hasPrev = sData.some(r => r.value_previous != null);
             const hasYtd = sData.some(r => r.value_ytd != null);
-            const hasDelta = sData.some(r => r.value_delta != null);
+            const hasDelta = hasCurrent && hasPrev;
 
             let cols = ['Показник'];
-            if (hasCurrent) cols.push('За тиждень');
-            if (hasDelta) cols.push('Δ');
-            if (hasPrev) cols.push('Попер. тиждень');
+            if (hasCurrent) cols.push('За звітний тиждень');
+            if (hasDelta) cols.push('%Δ до попер.тиж.');
+            if (hasPrev) cols.push('Попередній тиждень');
             if (hasYtd) cols.push('З поч. року');
 
             html += `<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
@@ -88,7 +96,7 @@ export function printWeeklyReport(reportDate) {
                 html += '<tr>';
                 html += `<td>${r.indicator_name}</td>`;
                 if (hasCurrent) html += `<td>${r.value_text || fN(r.value_current)}</td>`;
-                if (hasDelta) html += `<td>${deltaBadge(r.value_delta, r.value_previous)}</td>`;
+                if (hasDelta) html += `<td>${deltaPctBadge(r.value_current, r.value_previous)}</td>`;
                 if (hasPrev) html += `<td>${fN(r.value_previous)}</td>`;
                 if (hasYtd) html += `<td>${fN(r.value_ytd)}</td>`;
                 html += '</tr>';
@@ -130,7 +138,7 @@ export function printMonthlyReport(year, month) {
 
         html += `<div class="print-block">
             <div class="print-block-header">${block.name}</div>
-            <table><thead><tr><th>Показник</th>${showYears.map(y=>`<th>${y}</th>`).join('')}<th>${MO[month-1]} ${year}</th><th>Δ%</th></tr></thead><tbody>`;
+            <table><thead><tr><th>Показник</th>${showYears.map(y=>`<th>${y}</th>`).join('')}<th>${MO[month-1]} ${year}</th><th>%Δ до попер.місяця</th></tr></thead><tbody>`;
 
         for (const name of names) {
             html += '<tr>';

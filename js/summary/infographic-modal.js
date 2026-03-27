@@ -59,7 +59,7 @@ export async function openMonthlyIndicatorModal(indicatorName, group) {
     $('infModalMeta').innerHTML = '';
     renderPeriodButtons('monthly', indicatorName, group);
 
-    await loadAndDrawMonthly(indicatorName, 'value', 'bar');
+    await loadAndDrawMonthlyMonthVsMonth(indicatorName);
 }
 
 function renderMeta(current, prev, delta) {
@@ -102,8 +102,9 @@ function renderPeriodButtons(type, key1, key2) {
             { label: 'Весь період', mode: 'wall' }
         ]
         : [
-            { label: 'По місяцях', mode: 'months' },
-            { label: 'По роках', mode: 'years' }
+            { label: 'Місяць vs місяць', mode: 'month_vs_month' },
+            { label: 'По роках', mode: 'years' },
+            { label: 'YTD порівняння', mode: 'ytd' }
         ];
 
     container.innerHTML = buttons.map((b, i) =>
@@ -118,7 +119,10 @@ function renderPeriodButtons(type, key1, key2) {
                 const limit = btn.dataset.mode === 'w8' ? 8 : btn.dataset.mode === 'w20' ? 20 : 52;
                 await loadAndDrawWeekly(key1, key2, 'line', limit);
             } else {
-                await loadAndDrawMonthly(key1, 'value', btn.dataset.mode === 'years' ? 'bar' : 'line');
+                const mode = btn.dataset.mode;
+                if (mode === 'years') await loadAndDrawMonthlyYears(key1);
+                else if (mode === 'ytd') await loadAndDrawMonthlyYTD(key1);
+                else await loadAndDrawMonthlyMonthVsMonth(key1);
             }
         };
     });
@@ -140,18 +144,81 @@ async function loadAndDrawWeekly(section, indicatorName, chartType, limit = 8) {
     }
 }
 
-async function loadAndDrawMonthly(indicatorName, subType, chartType) {
+const MO_SHORT = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
+
+// Mode 1: Same month across different years (e.g., March 2022 vs March 2023 vs March 2024)
+async function loadAndDrawMonthlyMonthVsMonth(indicatorName) {
     try {
-        const history = await loadMonthlyIndicatorHistory(indicatorName, subType);
+        const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
         if (!history.length) return;
 
-        const MO = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
-        const labels = history.map(r => `${MO[r.month - 1]} ${r.year}`);
-        const values = history.map(r => r.value_numeric);
-        drawChart(labels, values, indicatorName, chartType);
-    } catch (e) {
-        console.error('infographic monthly error:', e);
-    }
+        // Current month (latest data)
+        const curMonth = new Date().getMonth() + 1;
+        const sameMonth = history.filter(r => r.month === curMonth);
+        if (!sameMonth.length) {
+            // Fallback: latest month with data
+            const latestMonth = history.filter(r => r.month > 0).sort((a, b) => b.month - a.month)[0]?.month;
+            if (latestMonth) {
+                const fallback = history.filter(r => r.month === latestMonth);
+                const labels = fallback.map(r => `${MO_SHORT[r.month - 1]} ${r.year}`);
+                drawChart(labels, fallback.map(r => r.value_numeric), indicatorName, 'bar');
+                return;
+            }
+            return;
+        }
+        const labels = sameMonth.map(r => `${MO_SHORT[r.month - 1]} ${r.year}`);
+        drawChart(labels, sameMonth.map(r => r.value_numeric), indicatorName, 'bar');
+    } catch (e) { console.error('infographic month-vs-month error:', e); }
+}
+
+// Mode 2: Annual totals comparison
+async function loadAndDrawMonthlyYears(indicatorName) {
+    try {
+        const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
+        if (!history.length) return;
+
+        // Annual records (month=0) or sum monthly
+        const years = [...new Set(history.map(r => r.year))].sort();
+        const labels = [];
+        const values = [];
+
+        for (const y of years) {
+            const annual = history.find(r => r.year === y && r.month === 0);
+            if (annual) {
+                labels.push(String(y));
+                values.push(annual.value_numeric);
+            } else {
+                const monthly = history.filter(r => r.year === y && r.month > 0);
+                if (monthly.length) {
+                    labels.push(String(y));
+                    values.push(monthly.reduce((s, r) => s + (r.value_numeric || 0), 0));
+                }
+            }
+        }
+        drawChart(labels, values, indicatorName, 'bar');
+    } catch (e) { console.error('infographic years error:', e); }
+}
+
+// Mode 3: YTD (year-to-date) comparison across years
+async function loadAndDrawMonthlyYTD(indicatorName) {
+    try {
+        const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
+        if (!history.length) return;
+
+        const curMonth = new Date().getMonth() + 1;
+        const years = [...new Set(history.map(r => r.year))].sort();
+        const labels = [];
+        const values = [];
+
+        for (const y of years) {
+            const ytdRecords = history.filter(r => r.year === y && r.month > 0 && r.month <= curMonth);
+            if (ytdRecords.length) {
+                labels.push(`${y} (${MO_SHORT[0]}-${MO_SHORT[curMonth - 1]})`);
+                values.push(ytdRecords.reduce((s, r) => s + (r.value_numeric || 0), 0));
+            }
+        }
+        drawChart(labels, values, indicatorName, 'bar');
+    } catch (e) { console.error('infographic YTD error:', e); }
 }
 
 function drawChart(labels, values, label, type) {

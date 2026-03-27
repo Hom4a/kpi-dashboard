@@ -351,6 +351,11 @@ window.exportWeeklyDocx = exportWeeklyDocx;
 window.exportMonthlyDocx = exportMonthlyDocx;
 window.exportWeeklyPdf = exportWeeklyPdf;
 window.exportMonthlyPdf = exportMonthlyPdf;
+// Smart print/export: detect active tab
+function _getActiveTab() { return document.querySelector('.summary-tab.active')?.dataset.tab || 'monthly'; }
+window._summaryPrint = () => _getActiveTab() === 'weekly' ? printWeeklyReport() : printMonthlyReport();
+window._summaryDocx = () => _getActiveTab() === 'weekly' ? exportWeeklyDocx() : exportMonthlyDocx();
+window._summaryPdf = () => _getActiveTab() === 'weekly' ? exportWeeklyPdf() : exportMonthlyPdf();
 window.openGisAdmin = openGisAdmin;
 window.closeGisAdmin = closeGisAdmin;
 window.saveGisAdmin = saveGisAdmin;
