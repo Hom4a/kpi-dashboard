@@ -196,14 +196,26 @@ function renderWeeklyBriefing() {
     const latestData = summaryWeekly.filter(r => r.report_date === latestDate);
     const kpiData = latestData.filter(r => r.section === 'kpi');
 
+    // Format weekly title: "За період з [пн] по [нд], тиждень №N"
     const sub = $('summaryWeeklyDate');
-    if (sub) sub.textContent = `Станом на ${formatDate(latestDate)}`;
+    if (sub) {
+        const d = new Date(latestDate);
+        const day = d.getDay();
+        const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+        const oneJan = new Date(d.getFullYear(), 0, 1);
+        const weekNum = Math.ceil(((d - oneJan) / 86400000 + oneJan.getDay() + 1) / 7);
+        sub.textContent = `За період з ${formatDate(mon.toISOString().slice(0,10))} по ${formatDate(sun.toISOString().slice(0,10))}, тиждень №${weekNum}`;
+    }
 
     // Notes now rendered inside weekly blocks (Block I)
     const notesBlock = $('summaryNotesBlock');
     if (notesBlock) notesBlock.style.display = 'none';
 
-    // KPI table with badges
+    // KPI summary table hidden per TZ 3.2 — data shown in Block II
+    const summaryTable = $('summaryWeeklyTable');
+    if (summaryTable) summaryTable.style.display = 'none';
+
     const tbody = $('tblBodyWeekly');
     if (!tbody) return;
 
@@ -213,21 +225,13 @@ function renderWeeklyBriefing() {
     }
 
     tbody.innerHTML = kpiData.map(r => {
-        const delta = r.value_delta;
-        const prev = r.value_previous;
-        const deltaStr = delta != null ? (delta >= 0 ? `+${fmtNum(delta)}` : fmtNum(delta)) : '—';
-        let badgeCls = 'badge-flat';
-        if (delta != null) {
-            if (prev === 0 || prev == null) badgeCls = 'badge-orange';
-            else if (delta > 0) badgeCls = 'badge-up';
-            else if (delta < 0) badgeCls = 'badge-down';
-        }
-        return `<tr class="clickable-row" data-section="kpi" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${r.value_delta ?? ''}" style="cursor:pointer">
+        const delta = calcDeltaPct(r.value_current, r.value_previous);
+        return `<tr class="clickable-row" data-section="kpi" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">
             <td><b>${r.indicator_name}</b></td>
             <td>${fmtNum(r.value_current)}</td>
+            <td><span class="summary-delta-badge ${delta.badgeCls}">${delta.display}</span></td>
             <td>${fmtNum(r.value_previous)}</td>
             <td>${fmtNum(r.value_ytd)}</td>
-            <td>${delta != null ? `<span class="summary-delta-badge ${badgeCls}">${deltaStr}</span>` : '—'}</td>
         </tr>`;
     }).join('');
 
@@ -338,6 +342,12 @@ function renderWeeklySectionTabs(data, date) {
             }
         }
 
+        // Pre-comment area (Block XI — two comments: before + after table)
+        if (block.preComment) {
+            const preComment = comments.find(c => c.block_id === block.id + '_pre');
+            html += renderBlockCommentArea(block.id + '_pre', date, preComment);
+        }
+
         // Data blocks — show tables per section
         if (block.sections.length) {
             for (const sec of block.sections) {
@@ -347,7 +357,7 @@ function renderWeeklySectionTabs(data, date) {
                 if (block.sections.length > 1) {
                     html += `<div class="ws-subsection-label">${SECTION_LABELS[sec] || sec}</div>`;
                 }
-                html += renderSectionTable(sData);
+                html += renderSectionTable(sData, block.columns);
             }
         }
 
@@ -423,37 +433,29 @@ function renderBlockNotes(notes) {
     }).join('');
 }
 
-function renderSectionTable(sData) {
+function renderSectionTable(sData, blockColumns) {
     const hasCurrent = sData.some(r => r.value_current != null);
     const hasPrevious = sData.some(r => r.value_previous != null);
     const hasYtd = sData.some(r => r.value_ytd != null);
-    const hasDelta = sData.some(r => r.value_delta != null);
+    const hasDelta = hasCurrent && hasPrevious;
     const section = sData[0]?.section || '';
 
+    // Use block-level column config if provided, else auto-detect
     let cols = ['Показник'];
-    if (hasCurrent) cols.push('За тиждень');
-    if (hasPrevious) cols.push('Попередній');
+    if (hasCurrent) cols.push('За звітний тиждень');
+    if (hasDelta) cols.push('%Δ до попер.тиж.');
+    if (hasPrevious) cols.push('Попередній тиждень');
     if (hasYtd) cols.push('З поч. року');
-    if (hasDelta) cols.push('\u0394');
 
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
         sData.map(r => {
+            const delta = calcDeltaPct(r.value_current, r.value_previous);
             let cells = `<td>${r.indicator_name}</td>`;
             if (hasCurrent) cells += `<td>${r.value_text || fmtNum(r.value_current)}</td>`;
+            if (hasDelta) cells += `<td><span class="summary-delta-badge ${delta.badgeCls}">${delta.display}</span></td>`;
             if (hasPrevious) cells += `<td>${fmtNum(r.value_previous)}</td>`;
             if (hasYtd) cells += `<td>${fmtNum(r.value_ytd)}</td>`;
-            if (hasDelta) {
-                const d = r.value_delta;
-                const prev = r.value_previous;
-                let badgeCls = 'badge-flat';
-                if (d != null) {
-                    if (prev === 0 || prev == null) badgeCls = 'badge-orange';
-                    else if (d > 0) badgeCls = 'badge-up';
-                    else if (d < 0) badgeCls = 'badge-down';
-                }
-                cells += `<td>${d != null ? `<span class="summary-delta-badge ${badgeCls}">${d >= 0 ? '+' : ''}${fmtNum(d)}</span>` : '\u2014'}</td>`;
-            }
-            return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${r.value_delta ?? ''}" style="cursor:pointer">${cells}</tr>`;
+            return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">${cells}</tr>`;
         }).join('')
     }</tbody></table></div>`;
 }
@@ -1035,6 +1037,27 @@ function renderPriceChart(year) {
 }
 
 // ===== Helpers =====
+
+/**
+ * Calculate %Δ between current and previous values
+ * Returns { pct, display, badgeCls }
+ */
+function calcDeltaPct(current, prev) {
+    if (current == null || prev == null) return { pct: null, display: '—', badgeCls: 'badge-flat' };
+    if (prev === 0) {
+        // Can't divide by 0 — show absolute change with orange badge
+        if (current === 0) return { pct: 0, display: '0%', badgeCls: 'badge-flat' };
+        return { pct: null, display: current > 0 ? `+${fmtNum(current)}` : fmtNum(current), badgeCls: 'badge-orange' };
+    }
+    const pct = ((current - prev) / Math.abs(prev)) * 100;
+    const rounded = Math.round(pct * 10) / 10;
+    const sign = rounded >= 0 ? '+' : '';
+    return {
+        pct: rounded,
+        display: `${sign}${rounded}%`,
+        badgeCls: rounded > 0 ? 'badge-up' : rounded < 0 ? 'badge-down' : 'badge-flat'
+    };
+}
 
 function fmtNum(v) {
     if (v == null) return '\u2014';
