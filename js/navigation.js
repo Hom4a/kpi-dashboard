@@ -59,6 +59,11 @@ export function switchPage(page) {
         Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} });
     });
 
+    // Lazy data load: ensure data is loaded for this page
+    if (window._ensureDataLoaded) {
+        window._ensureDataLoaded(page);
+    }
+
     // Invalidate Leaflet map when GIS page becomes visible
     if (page === 'gis') {
         import('./gis/render-gis.js').then(m => {

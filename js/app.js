@@ -274,16 +274,56 @@ async function syncProzorro(force = false) {
 setThemeRenderAll(renderAll);
 setFilterRenderAll(renderAll);
 setModalsRenderAll(renderAll);
+// Track which modules have loaded their data
+const _dataLoaded = {};
+
+// Lazy data loader: loads data for a page only on first access
+async function ensureDataLoaded(page) {
+    if (_dataLoaded[page]) return;
+    _dataLoaded[page] = true;
+    switch (page) {
+        case 'volumes': case 'finance': await loadAndRender(); showRoleButtons(); break;
+        case 'forest': await loadForestDataAndRender(); break;
+        case 'harvesting': await loadHarvestingDataAndRender(); break;
+        case 'market': await loadMarketDataAndRender(); break;
+        case 'summary': await loadSummaryDataAndRender(); break;
+        case 'wood-accounting': await loadWoodDataAndRender(); break;
+        case 'executive': await renderExecutiveDashboard(); break;
+        case 'gis':
+            const offices = await loadRegionalOffices().catch(() => []);
+            setRegionalOffices(offices);
+            break;
+    }
+}
+
+// Export for navigation.js
+window._ensureDataLoaded = ensureDataLoaded;
+
 setAuthLoadAndRender(async () => {
-    // Load regional offices in parallel with data
-    const officesPromise = loadRegionalOffices().then(o => setRegionalOffices(o)).catch(e => console.warn('Regional offices not loaded (table may not exist):', e.message));
-    await Promise.all([loadAndRender(), loadForestDataAndRender(), loadHarvestingDataAndRender(), loadMarketDataAndRender(), loadSummaryDataAndRender(), loadWoodDataAndRender(), officesPromise]);
+    // At startup: load ONLY Summary (most used page) + Volumes (for Executive)
+    await Promise.all([
+        loadSummaryDataAndRender().then(() => { _dataLoaded.summary = true; }),
+        loadAndRender().then(() => { _dataLoaded.volumes = true; _dataLoaded.finance = true; showRoleButtons(); })
+    ]);
+    _dataLoaded.executive = true;
     await renderExecutiveDashboard();
-    showRoleButtons();
     initDataEntry();
     initDashboardList($('builderContent'));
     renderApiSystemPage();
-    // ProZorro sync (non-blocking background)
+
+    // Load remaining data in background (non-blocking)
+    Promise.all([
+        loadForestDataAndRender().then(() => { _dataLoaded.forest = true; }),
+        loadHarvestingDataAndRender().then(() => { _dataLoaded.harvesting = true; }),
+        loadMarketDataAndRender().then(() => { _dataLoaded.market = true; }),
+        loadWoodDataAndRender().then(() => { _dataLoaded['wood-accounting'] = true; }),
+        loadRegionalOffices().then(o => { setRegionalOffices(o); _dataLoaded.gis = true; }).catch(() => {})
+    ]).then(() => {
+        // Re-render executive with full data
+        renderExecutiveDashboard();
+    }).catch(e => console.warn('Background data load:', e.message));
+
+    // ProZorro sync (non-blocking)
     syncProzorro().catch(e => console.warn('ProZorro bg sync:', e.message));
     // Start Realtime subscriptions
     startRealtime({
