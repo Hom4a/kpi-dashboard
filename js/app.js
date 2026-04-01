@@ -306,10 +306,10 @@ setAuthLoadAndRender(async () => {
         loadAndRender().then(() => { _dataLoaded.volumes = true; _dataLoaded.finance = true; showRoleButtons(); })
     ]);
     _dataLoaded.executive = true;
-    await renderExecutiveDashboard();
-    initDataEntry();
-    initDashboardList($('builderContent'));
-    renderApiSystemPage();
+    try { await renderExecutiveDashboard(); } catch(e) { console.error('Executive render error:', e); }
+    try { initDataEntry(); } catch(e) { console.error('DataEntry init error:', e); }
+    try { initDashboardList($('builderContent')); } catch(e) { console.error('DashboardList init error:', e); }
+    try { renderApiSystemPage(); } catch(e) { console.error('ApiSystem render error:', e); }
 
     // Load remaining data in background (non-blocking)
     Promise.all([
