@@ -4,6 +4,7 @@ export default defineConfig({
   base: '/kpi-dashboard/',
   root: '.',
   build: {
+    modulePreload: false,
     outDir: 'dist',
     sourcemap: true,
     rollupOptions: {

@@ -144,27 +144,23 @@ export async function showAppForUser(user) {
     try {
         showKpiSkeletons('kpiGrid', 6);
 
-        // Use cached profile immediately so UI doesn't flash as 'viewer'
+        // Use cached profile IMMEDIATELY — don't wait for DB (cold start can be 5-8s)
         const cached = getCachedProfile();
-        if (cached) setCurrentProfile(cached);
-
-        // Fetch fresh profile from DB (pass user.id directly, retries built-in)
-        const freshProfile = await withTimeout(getCurrentProfile(user.id), 15000, null);
-        if (freshProfile) {
-            setCurrentProfile(freshProfile);
-        } else if (cached) {
-            // Fresh fetch failed but cache exists — use cache, warn user
-            console.warn('Profile: using cached profile (fresh fetch failed)');
-        } else {
-            // Last resort: use role from user_metadata (set during signup)
-            const metaRole = user.user_metadata?.role;
-            if (metaRole) {
-                console.warn('Profile: using role from user_metadata:', metaRole);
-                setCurrentProfile({ id: user.id, role: metaRole, full_name: user.user_metadata?.full_name || '' });
-            } else {
-                toast('Не вдалося завантажити профіль. Оновіть сторінку.', true);
-            }
+        const metaRole = user.user_metadata?.role;
+        if (cached) {
+            setCurrentProfile(cached);
+        } else if (metaRole) {
+            setCurrentProfile({ id: user.id, role: metaRole, full_name: user.user_metadata?.full_name || '' });
         }
+
+        // Fetch fresh profile in BACKGROUND (non-blocking)
+        withTimeout(getCurrentProfile(user.id), 5000, null).then(freshProfile => {
+            if (freshProfile) {
+                setCurrentProfile(freshProfile);
+            } else if (!cached && !metaRole) {
+                console.warn('Profile: no fresh, no cache, no metadata');
+            }
+        }).catch(() => {});
 
         const p = currentProfile;
         const role = p ? p.role : 'viewer';
@@ -199,7 +195,7 @@ export async function showAppForUser(user) {
         // Always load all data sources (not just when KPI count > 0)
         if (_loadAndRenderFn) {
             try {
-                await withTimeout(_loadAndRenderFn(), 20000, null);
+                await withTimeout(_loadAndRenderFn(), 12000, null);
             } catch(dataErr) {
                 console.error('Data loading error (non-fatal):', dataErr);
             }
