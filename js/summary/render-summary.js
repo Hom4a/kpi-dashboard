@@ -34,14 +34,16 @@ export function renderSummaryDashboard() {
     const selYear = summaryFilterState.year || (years.length ? years[years.length - 1] : new Date().getFullYear());
     const selGroup = summaryFilterState.group || 'all';
 
-    // Monthly tab — new format from "Дод 1 до ТЗ"
     populateYearSelect(years, selYear);
-    const monthlyContainer = $('monthlyReportContainer');
-    if (monthlyContainer) renderMonthlyReport(monthlyContainer, selYear);
-    renderCharts(selYear);
 
-    // Weekly tab
-    renderWeeklyBriefing();
+    // Lazy tab render — only render active tab
+    if (_activeTab === 'monthly') {
+        const monthlyContainer = $('monthlyReportContainer');
+        if (monthlyContainer) renderMonthlyReport(monthlyContainer, selYear);
+        renderCharts(selYear);
+    } else {
+        renderWeeklyBriefing();
+    }
 
     initCollapsible('#pageSummary');
     updateDataDate(selYear);
@@ -61,6 +63,8 @@ function initTabBar() {
             const weekly = $('summaryWeeklyTab');
             if (monthly) monthly.style.display = _activeTab === 'monthly' ? '' : 'none';
             if (weekly) weekly.style.display = _activeTab === 'weekly' ? '' : 'none';
+            // Lazy render: render tab content on switch
+            renderSummaryDashboard();
         });
     });
 }

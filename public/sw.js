@@ -1,7 +1,7 @@
 // ===== KPI Dashboard — Service Worker =====
 // Cache-First for static assets, Network-First for API data
 
-const CACHE_NAME = 'kpi-dashboard-v6';
+const CACHE_NAME = 'kpi-dashboard-v7';
 const API_CACHE = 'kpi-api-v1';
 
 // Static assets to pre-cache on install
