@@ -21,7 +21,10 @@ export function initIndicatorModal() {
             <button id="infModalClose" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2)">&times;</button>
         </div>
         <div id="infModalMeta" style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap"></div>
-        <div id="infModalPeriod" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <div id="infModalPeriod" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+            <select id="infModalMonthSelect" class="filter-select" style="width:auto;min-width:100px;display:none"></select>
+        </div>
         <div style="position:relative;height:280px">
             <canvas id="infModalChart"></canvas>
         </div>
@@ -43,6 +46,10 @@ export async function openWeeklyIndicatorModal(section, indicatorName, currentVa
     const overlay = $(MODAL_ID);
     overlay.classList.add('on');
 
+    // Hide month selector for weekly
+    const monthSel = $('infModalMonthSelect');
+    if (monthSel) monthSel.style.display = 'none';
+
     $('infModalTitle').textContent = indicatorName;
     renderMeta(currentVal, prevVal, delta);
     renderPeriodButtons('weekly', section, indicatorName);
@@ -50,15 +57,40 @@ export async function openWeeklyIndicatorModal(section, indicatorName, currentVa
     await loadAndDrawWeekly(section, indicatorName, 'line');
 }
 
+let _currentIndicator = '';
+let _selectedMonth = null;
+
 export async function openMonthlyIndicatorModal(indicatorName, group) {
     initIndicatorModal();
     const overlay = $(MODAL_ID);
     overlay.classList.add('on');
+    _currentIndicator = indicatorName;
 
     $('infModalTitle').textContent = indicatorName;
     $('infModalMeta').innerHTML = '';
-    renderPeriodButtons('monthly', indicatorName, group);
 
+    // Populate month selector from available data
+    const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
+    const availMonths = [...new Set(history.filter(r => r.month > 0).map(r => r.month))].sort((a, b) => a - b);
+    _selectedMonth = availMonths.length ? availMonths[availMonths.length - 1] : new Date().getMonth() + 1;
+
+    const monthSel = $('infModalMonthSelect');
+    if (monthSel) {
+        monthSel.style.display = '';
+        monthSel.innerHTML = availMonths.map(m =>
+            `<option value="${m}"${m === _selectedMonth ? ' selected' : ''}>${MO_SHORT[m - 1]}</option>`
+        ).join('');
+        monthSel.onchange = async () => {
+            _selectedMonth = parseInt(monthSel.value);
+            const activeBtn = document.querySelector('#infModalPeriod .inf-period-btn.active');
+            const mode = activeBtn?.dataset.mode || 'month_vs_month';
+            if (mode === 'years') await loadAndDrawMonthlyYears(_currentIndicator);
+            else if (mode === 'ytd') await loadAndDrawMonthlyYTD(_currentIndicator);
+            else await loadAndDrawMonthlyMonthVsMonth(_currentIndicator);
+        };
+    }
+
+    renderPeriodButtons('monthly', indicatorName, group);
     await loadAndDrawMonthlyMonthVsMonth(indicatorName);
 }
 
@@ -146,26 +178,20 @@ async function loadAndDrawWeekly(section, indicatorName, chartType, limit = 8) {
 
 const MO_SHORT = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 
-// Mode 1: Same month across different years (e.g., March 2022 vs March 2023 vs March 2024)
+// Mode 1: Same month across different years (e.g., Feb 2023 vs Feb 2024 vs Feb 2025)
 async function loadAndDrawMonthlyMonthVsMonth(indicatorName) {
     try {
         const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
         if (!history.length) return;
 
-        // Current month (latest data)
-        const curMonth = new Date().getMonth() + 1;
-        const sameMonth = history.filter(r => r.month === curMonth);
-        if (!sameMonth.length) {
-            // Fallback: latest month with data
-            const latestMonth = history.filter(r => r.month > 0).sort((a, b) => b.month - a.month)[0]?.month;
-            if (latestMonth) {
-                const fallback = history.filter(r => r.month === latestMonth);
-                const labels = fallback.map(r => `${MO_SHORT[r.month - 1]} ${r.year}`);
-                drawChart(labels, fallback.map(r => r.value_numeric), indicatorName, 'bar');
-                return;
-            }
-            return;
-        }
+        const targetMonth = _selectedMonth || (() => {
+            const avail = history.filter(r => r.month > 0).sort((a, b) => b.month - a.month);
+            return avail.length ? avail[0].month : 1;
+        })();
+
+        const sameMonth = history.filter(r => r.month === targetMonth).sort((a, b) => a.year - b.year);
+        if (!sameMonth.length) return;
+
         const labels = sameMonth.map(r => `${MO_SHORT[r.month - 1]} ${r.year}`);
         drawChart(labels, sameMonth.map(r => r.value_numeric), indicatorName, 'bar');
     } catch (e) { console.error('infographic month-vs-month error:', e); }
@@ -205,15 +231,18 @@ async function loadAndDrawMonthlyYTD(indicatorName) {
         const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
         if (!history.length) return;
 
-        const curMonth = new Date().getMonth() + 1;
+        const upToMonth = _selectedMonth || (() => {
+            const avail = history.filter(r => r.month > 0).sort((a, b) => b.month - a.month);
+            return avail.length ? avail[0].month : 1;
+        })();
         const years = [...new Set(history.map(r => r.year))].sort();
         const labels = [];
         const values = [];
 
         for (const y of years) {
-            const ytdRecords = history.filter(r => r.year === y && r.month > 0 && r.month <= curMonth);
+            const ytdRecords = history.filter(r => r.year === y && r.month > 0 && r.month <= upToMonth);
             if (ytdRecords.length) {
-                labels.push(`${y} (${MO_SHORT[0]}-${MO_SHORT[curMonth - 1]})`);
+                labels.push(`${y} (${MO_SHORT[0]}-${MO_SHORT[upToMonth - 1]})`);
                 values.push(ytdRecords.reduce((s, r) => s + (r.value_numeric || 0), 0));
             }
         }
