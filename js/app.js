@@ -289,6 +289,9 @@ async function ensureDataLoaded(page) {
         case 'summary': await loadSummaryDataAndRender(); break;
         case 'wood-accounting': await loadWoodDataAndRender(); break;
         case 'executive': await renderExecutiveDashboard(); break;
+        case 'data-entry': await initDataEntry(); break;
+        case 'api-system': renderApiSystemPage(); break;
+        case 'builder': initDashboardList($('builderContent')); break;
         case 'gis':
             const offices = await loadRegionalOffices().catch(() => []);
             setRegionalOffices(offices);
@@ -307,9 +310,9 @@ setAuthLoadAndRender(async () => {
     ]);
     _dataLoaded.executive = true;
     try { await renderExecutiveDashboard(); } catch(e) { console.error('Executive render error:', e); }
-    try { initDataEntry(); } catch(e) { console.error('DataEntry init error:', e); }
-    try { initDashboardList($('builderContent')); } catch(e) { console.error('DashboardList init error:', e); }
-    try { renderApiSystemPage(); } catch(e) { console.error('ApiSystem render error:', e); }
+    try { await initDataEntry(); _dataLoaded['data-entry'] = true; } catch(e) { console.error('DataEntry init error:', e); }
+    try { initDashboardList($('builderContent')); _dataLoaded.builder = true; } catch(e) { console.error('DashboardList init error:', e); }
+    try { renderApiSystemPage(); _dataLoaded['api-system'] = true; } catch(e) { console.error('ApiSystem render error:', e); }
 
     // Load remaining data in background (non-blocking)
     Promise.all([
