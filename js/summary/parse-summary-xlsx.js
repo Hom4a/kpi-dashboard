@@ -189,16 +189,18 @@ export function parseSummaryXlsx(wb) {
         const yearColumns = []; // { col, year }
         for (let c = 1; c < headerRow.length; c++) {
             const h = String(headerRow[c] || '').trim();
-            const m = h.match(/(20\d{2})\s*(рік|р\.)?/i);
-            if (m) {
-                yearColumns.push({ col: c, year: parseInt(m[1]) });
-            }
-            // Also handle "січень 2026" → specific month, store as month=1
+            // Check month pattern FIRST ("лютий 2026") before year pattern ("2026 рік")
+            const monthNames = ['січень','лютий','березень','квітень','травень','червень','липень','серпень','вересень','жовтень','листопад','грудень'];
             const monthMatch = h.match(/(січень|лютий|березень|квітень|травень|червень|липень|серпень|вересень|жовтень|листопад|грудень)\s*(20\d{2})/i);
-            if (monthMatch && !m) {
-                const monthNames = ['січень','лютий','березень','квітень','травень','червень','липень','серпень','вересень','жовтень','листопад','грудень'];
+            if (monthMatch) {
                 const mi = monthNames.indexOf(monthMatch[1].toLowerCase()) + 1;
                 yearColumns.push({ col: c, year: parseInt(monthMatch[2]), month: mi });
+            } else {
+                // Year-only pattern ("2026 рік", "2025", etc.)
+                const m = h.match(/(20\d{2})\s*(рік|р\.)?/i);
+                if (m) {
+                    yearColumns.push({ col: c, year: parseInt(m[1]) });
+                }
             }
         }
 
