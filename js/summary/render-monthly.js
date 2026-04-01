@@ -197,15 +197,27 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             });
         }
 
-        // Annual values
+        // Annual values — for current year: SUM all monthly records (cumulative)
         let cells = `<td class="ind-name">${displayName}</td>`;
         for (const y of showYears) {
             const ann = rows.find(r => r.year === y && r.month === 0);
-            const val = ann?.value_numeric;
-            cells += `<td>${val != null ? fN(val) : (ann?.value_text || '—')}</td>`;
+            if (y === year) {
+                // Current year: sum all available months (accumulation)
+                const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
+                if (monthlyRecords.length) {
+                    const ytd = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                    cells += `<td><b>${fN(ytd)}</b></td>`;
+                } else {
+                    cells += `<td>${ann?.value_numeric != null ? fN(ann.value_numeric) : (ann?.value_text || '—')}</td>`;
+                }
+            } else {
+                // Past years: use annual record (month=0)
+                const val = ann?.value_numeric;
+                cells += `<td>${val != null ? fN(val) : (ann?.value_text || '—')}</td>`;
+            }
         }
 
-        // Selected month value
+        // Selected month value + delta vs previous month
         const monthRec = rows.find(r => r.year === year && r.month === month);
         const prevMonthRec = rows.find(r => r.year === year && r.month === month - 1);
         const curVal = monthRec?.value_numeric;
@@ -264,8 +276,20 @@ function renderSalaryTable(showYears, year, month, allData) {
         const rows = salaryRows.filter(r => r.indicator_name === name);
         let cells = `<td class="ind-name">${name}</td>`;
         for (const y of showYears) {
-            const ann = rows.find(r => r.year === y && r.month === 0);
-            cells += `<td>${ann?.value_numeric != null ? fN(ann.value_numeric) : '—'}</td>`;
+            if (y === year) {
+                // Current year: average of available months (for salary — average, not sum)
+                const monthlyRecs = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
+                if (monthlyRecs.length) {
+                    const avg = monthlyRecs.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecs.length;
+                    cells += `<td><b>${fN(avg)}</b></td>`;
+                } else {
+                    const ann = rows.find(r => r.year === y && r.month === 0);
+                    cells += `<td>${ann?.value_numeric != null ? fN(ann.value_numeric) : '—'}</td>`;
+                }
+            } else {
+                const ann = rows.find(r => r.year === y && r.month === 0);
+                cells += `<td>${ann?.value_numeric != null ? fN(ann.value_numeric) : '—'}</td>`;
+            }
         }
         const cur = rows.find(r => r.year === year && r.month === month);
         const prev = rows.find(r => r.year === year && r.month === month - 1);
