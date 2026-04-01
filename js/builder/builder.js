@@ -1,5 +1,6 @@
 // ===== Dashboard Builder — Gridstack integration =====
 import { $, toast, showLoader } from '../utils.js';
+import { loadGridStack } from '../lazy-libs.js';
 import { WIDGET_TYPES, WIDGET_CATEGORIES } from './widget-catalog.js';
 import { renderWidget, destroyWidgetChart } from './widget-renderer.js';
 import { renderConfigPanel, setOnConfigChanged } from './widget-config-panel.js';
@@ -13,7 +14,8 @@ let _onBuilderDone = null;
 
 export function setOnBuilderDone(fn) { _onBuilderDone = fn; }
 
-export function openBuilder(dashboard, container) {
+export async function openBuilder(dashboard, container) {
+    await loadGridStack();
     _currentDashboard = dashboard;
     _widgets = [];
     _selectedWidgetId = null;

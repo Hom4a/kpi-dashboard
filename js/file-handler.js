@@ -2,6 +2,7 @@
 import { $, showLoader, toast } from './utils.js';
 import { currentProfile } from './state.js';
 import { UPLOAD_ROLES } from './auth.js';
+import { loadXLSX } from './lazy-libs.js';
 import { parseKpiFile } from './parse-kpi.js';
 import { saveRecords } from './db-kpi.js';
 import { parsePricesFile } from './forest/parse-prices.js';
@@ -98,6 +99,7 @@ export async function handleFile(file, expectedType = null) {
             return;
         }
 
+        await loadXLSX();
         const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
         const fileType = detectFileType(wb, file.name);
 

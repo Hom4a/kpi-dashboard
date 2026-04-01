@@ -1,6 +1,7 @@
 // ===== GIS Map Renderer =====
 // Interactive Leaflet map showing oblast-level polygons colored by regional office
 import { fmt } from '../utils.js';
+import { loadLeaflet } from '../lazy-libs.js';
 import { pricesData, inventoryData } from '../forest/state-forest.js';
 import { planFactData, zsuData } from '../harvesting/state-harvesting.js';
 import { OFFICES_GEOJSON, getOblastsGeoJSON, getOfficeCenters, getBranchToOffice, fuzzyMatchBranch, getOfficeOblasts } from './gis-data.js';
@@ -14,9 +15,18 @@ let _loBordersLayer = null;
 let _labelMarkers = [];
 let _selectedOffice = null;
 
-export function renderGisMap() {
+export async function renderGisMap() {
     const container = document.getElementById('gisMap');
     if (!container) return;
+
+    // Lazy-load Leaflet + CSS
+    await loadLeaflet();
+    if (!document.querySelector('link[href*="leaflet.css"]')) {
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(css);
+    }
 
     const metrics = buildRegionMetrics();
     setGisMetrics(metrics);
