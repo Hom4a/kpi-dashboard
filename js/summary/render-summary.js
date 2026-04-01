@@ -7,6 +7,7 @@ import { initCollapsible, drawEnhancedSparkline } from '../ui-helpers.js';
 import { WEEKLY_BLOCKS, MONTHLY_BLOCKS } from './block-map.js';
 import { saveBlockComment } from './db-summary.js';
 import { openWeeklyIndicatorModal, openMonthlyIndicatorModal } from './infographic-modal.js';
+import { renderMonthlyReport } from './render-monthly.js';
 
 const MO = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 
@@ -33,13 +34,10 @@ export function renderSummaryDashboard() {
     const selYear = summaryFilterState.year || (years.length ? years[years.length - 1] : new Date().getFullYear());
     const selGroup = summaryFilterState.group || 'all';
 
-    // Monthly tab
+    // Monthly tab — new format from "Дод 1 до ТЗ"
     populateYearSelect(years, selYear);
-    renderKpiCards(selYear);
-    renderGroupTabs(selGroup);
-    renderPivotTable(selYear, selGroup);
-    setupTzToggle(selYear);
-    renderYearlySummary(years);
+    const monthlyContainer = $('monthlyReportContainer');
+    if (monthlyContainer) renderMonthlyReport(monthlyContainer, selYear);
     renderCharts(selYear);
 
     // Weekly tab

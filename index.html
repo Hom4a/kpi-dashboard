@@ -692,45 +692,14 @@
 
                 <!-- ====== TAB: Monthly ====== -->
                 <div id="summaryMonthlyTab">
-                    <!-- Filter bar: group tabs + year/month selector -->
+                    <!-- Year selector -->
                     <div class="summary-filter-bar">
-                        <div class="summary-filter-group" id="tglSummaryGroup">
-                            <button class="summary-filter-btn active" data-g="all">Всі</button>
-                            <button class="summary-filter-btn" data-g="finance"><span class="filter-dot" style="background:#2196f3"></span>Фінанси</button>
-                            <button class="summary-filter-btn" data-g="revenue"><span class="filter-dot" style="background:#4caf50"></span>Доходи</button>
-                            <button class="summary-filter-btn" data-g="production"><span class="filter-dot" style="background:#ff9800"></span>Продукція</button>
-                            <button class="summary-filter-btn" data-g="forestry"><span class="filter-dot" style="background:#9c27b0"></span>Лісогосп.</button>
-                        </div>
-                        <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+                        <div style="display:flex;gap:8px;align-items:center">
                             <select id="summaryYearSelect" class="filter-select" style="width:auto;min-width:80px"></select>
-                            <button class="icon-btn" id="btnPivotFullscreen" title="Розгорнути таблицю"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button>
                         </div>
                     </div>
-                    <!-- Monthly indicators pivot table -->
-                    <div class="glass chart-card" style="margin-bottom:20px" id="summaryIndicatorsCard">
-                        <div class="tbl-wrap"><table class="tbl" id="summaryIndicatorsTable">
-                            <thead id="summaryIndicatorsHead"></thead>
-                            <tbody id="tblBodyIndicators"></tbody>
-                        </table></div>
-                    </div>
-                    <!-- Monthly TZ Format — years comparison -->
-                    <div class="glass chart-card" style="margin-bottom:20px" id="summaryTzReport">
-                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
-                            <h4 style="margin:0;font-size:14px;color:var(--text1)">Щомісячна довідка</h4>
-                            <select id="tzMonthSelect" class="filter-select" style="width:auto;min-width:80px"></select>
-                        </div>
-                        <div class="tbl-wrap"><table class="tbl">
-                            <thead id="tzMonthlyHead"></thead>
-                            <tbody id="tblBodyTzMonthly"></tbody>
-                        </table></div>
-                        <!-- Monthly text comment block -->
-                        <div class="ws-block-comment" style="margin-top:12px">
-                            <textarea id="wsComment_monthly_text" class="ws-comment-input" placeholder="Текстовий коментар до місячної довідки..." rows="3"></textarea>
-                            <button class="ws-comment-save btn-sm" data-block="monthly_text">Зберегти</button>
-                        </div>
-                    </div>
-                    <!-- KPI cards -->
-                    <div class="kpi-grid" id="kpiGridSummary" style="margin-bottom:20px"></div>
+                    <!-- Monthly report tables (rendered by render-monthly.js) -->
+                    <div id="monthlyReportContainer"></div>
                     <!-- Charts -->
                     <div id="summaryChartsContainer">
 
