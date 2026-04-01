@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: '/kpi-dashboard/',
   root: '.',
   build: {
     outDir: 'dist',

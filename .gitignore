@@ -7,3 +7,4 @@ dist/
 scripts/config.ini
 scripts/exports/
 scripts/eod-sync.log
+dist/
