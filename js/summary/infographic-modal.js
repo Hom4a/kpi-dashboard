@@ -280,6 +280,7 @@ function drawChart(labels, values, label, type) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: { padding: { top: 28 } },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -294,8 +295,63 @@ function drawChart(labels, values, label, type) {
             },
             scales: {
                 x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6b7280', maxRotation: 45 } },
-                y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { font: { size: 10 }, color: '#6b7280' } }
+                y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { font: { size: 10 }, color: '#6b7280' }, grace: '15%' }
             }
-        }
+        },
+        plugins: [{
+            id: 'deltaLabels',
+            afterDatasetsDraw(chart) {
+                if (chart.config.type !== 'bar') return;
+                const { ctx: c, data, scales: { x, y } } = chart;
+                const vals = data.datasets[0]?.data;
+                if (!vals) return;
+                const font = 'Inter,system-ui,sans-serif';
+                const fmtN = v => Math.abs(v) >= 100
+                    ? v.toLocaleString('uk-UA', { maximumFractionDigits: 1 })
+                    : v.toLocaleString('uk-UA', { maximumFractionDigits: 2 });
+
+                c.save();
+                vals.forEach((val, i) => {
+                    if (val == null) return;
+                    const xP = x.getPixelForValue(i);
+                    const yP = y.getPixelForValue(val);
+                    const valStr = fmtN(val);
+
+                    if (i === 0) {
+                        c.font = `bold 11px ${font}`;
+                        c.fillStyle = '#d1d5db';
+                        c.textAlign = 'center';
+                        c.fillText(valStr, xP, yP - 10);
+                    } else {
+                        const prev = vals[i - 1];
+                        let deltaStr = '', deltaCol = '#d1d5db';
+                        if (prev != null && prev !== 0) {
+                            const pct = Math.round(((val - prev) / Math.abs(prev)) * 1000) / 10;
+                            deltaStr = ` (${pct >= 0 ? '+' : ''}${pct}%)`;
+                            deltaCol = pct > 0 ? '#4A9D6F' : pct < 0 ? '#E74C3C' : '#E67E22';
+                        } else if (prev === 0) {
+                            deltaStr = ' (n/a)';
+                            deltaCol = '#E67E22';
+                        }
+                        c.font = `bold 11px ${font}`;
+                        const vW = c.measureText(valStr).width;
+                        c.font = `10px ${font}`;
+                        const dW = deltaStr ? c.measureText(deltaStr).width : 0;
+                        const startX = xP - (vW + dW) / 2;
+
+                        c.font = `bold 11px ${font}`;
+                        c.fillStyle = '#d1d5db';
+                        c.textAlign = 'left';
+                        c.fillText(valStr, startX, yP - 10);
+                        if (deltaStr) {
+                            c.font = `10px ${font}`;
+                            c.fillStyle = deltaCol;
+                            c.fillText(deltaStr, startX + vW, yP - 10);
+                        }
+                    }
+                });
+                c.restore();
+            }
+        }]
     });
 }

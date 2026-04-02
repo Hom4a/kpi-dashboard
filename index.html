@@ -698,36 +698,36 @@
                     <!-- Charts -->
                     <div id="summaryChartsContainer">
 
-                    <div class="section-divider" data-collapse="summaryChartsSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Графіки</h4><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+                    <div class="section-divider" data-collapse="summaryChartsSection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Графіки</h4><button class="icon-btn chart-manage-btn" title="Налаштувати блоки"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><button class="section-toggle" aria-label="Згорнути"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button></div>
                     <div id="summaryChartsSection">
                     <div class="chart-row cols-2">
-                        <div class="glass chart-card">
+                        <div class="glass chart-card" data-chart-block="revenue">
                             <div class="chart-hdr">
                                 <div><h3>Динаміка доходів</h3><small>Помісячно, млн грн</small></div>
-                                <div class="chart-hdr-actions"><span class="chart-stat" id="statRevenue"></span><button class="icon-btn" title="Повний екран" onclick="this.closest('.chart-card').classList.toggle('fullscreen')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button></div>
+                                <div class="chart-hdr-actions"><span class="chart-stat" id="statRevenue"></span><button class="icon-btn chart-vis-toggle" data-block="revenue" title="Сховати блок"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="icon-btn" title="Повний екран" onclick="this.closest('.chart-card').classList.toggle('fullscreen')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button></div>
                             </div>
                             <div class="chart-wrap medium" id="wrapSummaryRevenue"><canvas id="cSummaryRevenue"></canvas></div>
                         </div>
-                        <div class="glass chart-card">
+                        <div class="glass chart-card" data-chart-block="payroll">
                             <div class="chart-hdr">
                                 <div><h3>ФОП та чисельність</h3><small>Помісячна динаміка</small></div>
-                                <div class="chart-hdr-actions"><span class="chart-stat" id="statPayroll"></span><button class="icon-btn" title="Повний екран" onclick="this.closest('.chart-card').classList.toggle('fullscreen')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button></div>
+                                <div class="chart-hdr-actions"><span class="chart-stat" id="statPayroll"></span><button class="icon-btn chart-vis-toggle" data-block="payroll" title="Сховати блок"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="icon-btn" title="Повний екран" onclick="this.closest('.chart-card').classList.toggle('fullscreen')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button></div>
                             </div>
                             <div class="chart-wrap medium" id="wrapSummaryPayroll"><canvas id="cSummaryPayroll"></canvas></div>
                         </div>
                     </div>
                     <div class="chart-row cols-2">
-                        <div class="glass chart-card">
+                        <div class="glass chart-card" data-chart-block="production">
                             <div class="chart-hdr">
                                 <div><h3>Лісопродукція по породах</h3><small>Обсяги, тис. м³</small></div>
-                                <div class="chart-hdr-actions"><span class="chart-stat" id="statProduction"></span><button class="icon-btn" title="Повний екран" onclick="this.closest('.chart-card').classList.toggle('fullscreen')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button></div>
+                                <div class="chart-hdr-actions"><span class="chart-stat" id="statProduction"></span><button class="icon-btn chart-vis-toggle" data-block="production" title="Сховати блок"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="icon-btn" title="Повний екран" onclick="this.closest('.chart-card').classList.toggle('fullscreen')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button></div>
                             </div>
                             <div class="chart-wrap medium" id="wrapSummaryProduction"><canvas id="cSummaryProduction"></canvas></div>
                         </div>
-                        <div class="glass chart-card">
+                        <div class="glass chart-card" data-chart-block="yoy">
                             <div class="chart-hdr">
                                 <div><h3>Ціни реалізації по породах</h3><small>грн/м³</small></div>
-                                <div class="chart-hdr-actions"><button class="icon-btn" title="Повний екран" onclick="this.closest('.chart-card').classList.toggle('fullscreen')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button></div>
+                                <div class="chart-hdr-actions"><button class="icon-btn chart-vis-toggle" data-block="yoy" title="Сховати блок"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="icon-btn" title="Повний екран" onclick="this.closest('.chart-card').classList.toggle('fullscreen')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button></div>
                             </div>
                             <div class="chart-wrap medium" id="wrapSummaryYoy"><canvas id="cSummaryYoy"></canvas></div>
                         </div>

@@ -1,6 +1,6 @@
 // ===== Summary Page Rendering — Redesigned =====
 import { $, fmt, show, hide, themeColor } from '../utils.js';
-import { charts } from '../state.js';
+import { charts, currentProfile } from '../state.js';
 import { kill, freshCanvas, makeGrad } from '../charts-common.js';
 import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState, summaryBlockComments } from './state-summary.js';
 import { initCollapsible, drawEnhancedSparkline } from '../ui-helpers.js';
@@ -41,6 +41,7 @@ export function renderSummaryDashboard() {
         const monthlyContainer = $('monthlyReportContainer');
         if (monthlyContainer) renderMonthlyReport(monthlyContainer, selYear);
         renderCharts(selYear);
+        initChartBlockToggles();
     } else {
         renderWeeklyBriefing();
     }
@@ -938,10 +939,110 @@ function drawMiniSparkline(canvas, data) {
 // ===== Charts — Enhanced =====
 
 function renderCharts(year) {
-    renderRevenueChart(year);
-    renderPayrollChart(year);
-    renderProductionChart(year);
-    renderPriceChart(year);
+    const vis = loadBlockVisibility();
+    if (vis.revenue !== false) renderRevenueChart(year);
+    if (vis.payroll !== false) renderPayrollChart(year);
+    if (vis.production !== false) renderProductionChart(year);
+    if (vis.yoy !== false) renderPriceChart(year);
+}
+
+// ===== Chart Block Visibility =====
+
+const CHART_BLOCKS = [
+    { key: 'revenue', label: 'Динаміка доходів' },
+    { key: 'payroll', label: 'ФОП та чисельність' },
+    { key: 'production', label: 'Лісопродукція по породах' },
+    { key: 'yoy', label: 'Ціни реалізації по породах' }
+];
+
+const EYE_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+function getVisibilityKey() {
+    return `kpi_chart_visibility_${currentProfile?.id || 'anon'}`;
+}
+
+function loadBlockVisibility() {
+    try { const r = localStorage.getItem(getVisibilityKey()); return r ? JSON.parse(r) : {}; }
+    catch { return {}; }
+}
+
+function saveBlockVisibility(vis) {
+    localStorage.setItem(getVisibilityKey(), JSON.stringify(vis));
+}
+
+function applyBlockVisibility() {
+    const vis = loadBlockVisibility();
+    CHART_BLOCKS.forEach(({ key }) => {
+        const card = document.querySelector(`[data-chart-block="${key}"]`);
+        if (!card) return;
+        const hidden = vis[key] === false;
+        card.style.display = hidden ? 'none' : '';
+        const btn = card.querySelector('.chart-vis-toggle');
+        if (btn) {
+            btn.title = hidden ? 'Показати блок' : 'Сховати блок';
+            btn.innerHTML = hidden ? EYE_OFF_SVG : EYE_SVG;
+        }
+    });
+}
+
+function initChartBlockToggles() {
+    document.querySelectorAll('.chart-vis-toggle').forEach(btn => {
+        if (btn._visInit) return;
+        btn._visInit = true;
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const key = btn.dataset.block;
+            const vis = loadBlockVisibility();
+            vis[key] = vis[key] === false ? true : false;
+            saveBlockVisibility(vis);
+            applyBlockVisibility();
+        });
+    });
+
+    const gearBtn = document.querySelector('.chart-manage-btn');
+    if (gearBtn && !gearBtn._visInit) {
+        gearBtn._visInit = true;
+        gearBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            showBlockManagePopup(gearBtn);
+        });
+    }
+
+    applyBlockVisibility();
+}
+
+function showBlockManagePopup(anchor) {
+    const existing = document.querySelector('.chart-manage-popup');
+    if (existing) { existing.remove(); return; }
+
+    const vis = loadBlockVisibility();
+    const popup = document.createElement('div');
+    popup.className = 'chart-manage-popup';
+    popup.innerHTML = `<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text)">Видимість блоків</div>` +
+        CHART_BLOCKS.map(({ key, label }) =>
+            `<label class="chart-manage-label"><input type="checkbox" data-block="${key}" ${vis[key] !== false ? 'checked' : ''}> ${label}</label>`
+        ).join('');
+
+    anchor.parentElement.style.position = 'relative';
+    anchor.parentElement.appendChild(popup);
+
+    popup.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const v = loadBlockVisibility();
+            v[cb.dataset.block] = cb.checked;
+            saveBlockVisibility(v);
+            applyBlockVisibility();
+        });
+    });
+
+    const close = ev => {
+        if (!popup.contains(ev.target) && ev.target !== anchor && !anchor.contains(ev.target)) {
+            popup.remove();
+            document.removeEventListener('click', close);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', close), 0);
 }
 
 function getMonthlyData(pattern, group, year, subType = 'value') {
