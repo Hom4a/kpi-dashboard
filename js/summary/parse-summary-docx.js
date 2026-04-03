@@ -30,6 +30,7 @@ const NOTE_PATTERNS = [
     { type: 'positive', pattern: /позитивна/i },
     { type: 'negative', pattern: /негативна|ризикова/i },
     { type: 'decisions', pattern: /питання.*рішення|управлінськ/i },
+    { type: 'other', pattern: /виконання протокольних|[ХX][ІI]V[\.\s]/i },
 ];
 
 /**
@@ -222,8 +223,8 @@ function extractNotes(doc, ns) {
                 if (after) currentContent.push(after);
             }
         } else if (currentType) {
-            // Stop collecting when we hit a table or a new Roman numeral section
-            if (/^[ІIVX]+\.\s/.test(fullText) || /^ІІ\.|^ІІІ\.|^IV\.|^V\.|^VI\./i.test(fullText)) {
+            // Stop collecting when we hit a new Roman numeral section (Latin + Cyrillic)
+            if (/^[ІIVXХX]+\.\s/.test(fullText) || /^[ІIVXХX]+\./i.test(fullText)) {
                 if (currentContent.length) {
                     notes.push({ note_type: currentType, content: currentContent.join('\n').trim() });
                 }
