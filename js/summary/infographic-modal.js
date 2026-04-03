@@ -54,7 +54,7 @@ export async function openWeeklyIndicatorModal(section, indicatorName, currentVa
     renderMeta(currentVal, prevVal, delta);
     renderPeriodButtons('weekly', section, indicatorName);
 
-    await loadAndDrawWeekly(section, indicatorName, 'line');
+    await loadAndDrawWeeklyCompare(section, indicatorName);
 }
 
 let _currentIndicator = '';
@@ -129,6 +129,7 @@ function renderPeriodButtons(type, key1, key2) {
 
     const buttons = type === 'weekly'
         ? [
+            { label: 'Порівняння', mode: 'compare' },
             { label: 'Останні 8 тижнів', mode: 'w8' },
             { label: 'Останні 20 тижнів', mode: 'w20' },
             { label: 'Весь період', mode: 'wall' }
@@ -148,6 +149,10 @@ function renderPeriodButtons(type, key1, key2) {
             container.querySelectorAll('.inf-period-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             if (type === 'weekly') {
+                if (btn.dataset.mode === 'compare') {
+                    await loadAndDrawWeeklyCompare(key1, key2);
+                    return;
+                }
                 const limit = btn.dataset.mode === 'w8' ? 8 : btn.dataset.mode === 'w20' ? 20 : 52;
                 await loadAndDrawWeekly(key1, key2, 'line', limit);
             } else {
@@ -160,17 +165,41 @@ function renderPeriodButtons(type, key1, key2) {
     });
 }
 
+async function loadAndDrawWeeklyCompare(section, indicatorName) {
+    try {
+        const history = await loadWeeklyIndicatorHistory(section, indicatorName, 1);
+        if (!history.length) return;
+        const r = history[0];
+        drawChart(['Попередній тиждень', 'Поточний тиждень'],
+            [r.value_previous, r.value_current], indicatorName, 'bar');
+    } catch (e) { console.error('infographic weekly compare error:', e); }
+}
+
 async function loadAndDrawWeekly(section, indicatorName, chartType, limit = 8) {
     try {
         const history = await loadWeeklyIndicatorHistory(section, indicatorName, limit);
         if (!history.length) return;
 
-        const labels = history.map(r => {
-            const d = new Date(r.report_date);
-            return `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
-        });
-        const values = history.map(r => r.value_current);
-        drawChart(labels, values, indicatorName, chartType);
+        const labels = [];
+        const values = [];
+
+        // Prepend virtual point from first record's value_previous
+        const first = history[0];
+        if (first.value_previous != null) {
+            const d = new Date(first.report_date + 'T12:00:00');
+            d.setDate(d.getDate() - 7);
+            labels.push(`${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}`);
+            values.push(first.value_previous);
+        }
+
+        for (const r of history) {
+            const d = new Date(r.report_date + 'T12:00:00');
+            labels.push(`${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}`);
+            values.push(r.value_current);
+        }
+
+        const type = values.length <= 3 ? 'bar' : chartType;
+        drawChart(labels, values, indicatorName, type);
     } catch (e) {
         console.error('infographic weekly error:', e);
     }

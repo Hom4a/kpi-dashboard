@@ -444,12 +444,44 @@ function renderWeeklySectionTabs(data, date) {
             btn.textContent = 'Збереження...';
             try {
                 await saveBlockComment({ reportType: 'weekly', reportDate: date, blockId, content });
-                btn.textContent = 'Збережено';
-                setTimeout(() => { btn.textContent = 'Зберегти'; btn.disabled = false; }, 1500);
+                // Show saved text, hide editor
+                const display = container.querySelector(`#wsCommentText_${blockId}`);
+                const editor = container.querySelector(`#wsCommentEdit_${blockId}`);
+                if (display && editor) {
+                    const escaped = content.replace(/</g, '&lt;');
+                    display.innerHTML = `<div class="ws-comment-content">${escaped.replace(/\n/g, '<br>')}</div><button class="ws-comment-edit btn-sm" data-block="${blockId}">Редагувати</button>`;
+                    display.style.display = '';
+                    editor.style.display = 'none';
+                    wireEditBtn(display.querySelector('.ws-comment-edit'), container);
+                }
+                btn.textContent = 'Зберегти'; btn.disabled = false;
             } catch (e) {
                 btn.textContent = 'Помилка';
                 setTimeout(() => { btn.textContent = 'Зберегти'; btn.disabled = false; }, 2000);
             }
+        };
+    });
+
+    // Wire edit buttons (show editor, hide display)
+    function wireEditBtn(btn, cont) {
+        if (!btn) return;
+        btn.onclick = () => {
+            const blockId = btn.dataset.block;
+            const display = cont.querySelector(`#wsCommentText_${blockId}`);
+            const editor = cont.querySelector(`#wsCommentEdit_${blockId}`);
+            if (display) display.style.display = 'none';
+            if (editor) editor.style.display = '';
+        };
+    }
+    container.querySelectorAll('.ws-comment-edit').forEach(btn => wireEditBtn(btn, container));
+
+    // Wire cancel buttons (hide editor, show display)
+    container.querySelectorAll('.ws-comment-cancel').forEach(btn => {
+        btn.onclick = () => {
+            const blockId = btn.dataset.block;
+            const display = container.querySelector(`#wsCommentText_${blockId}`);
+            const editor = container.querySelector(`#wsCommentEdit_${blockId}`);
+            if (display && display.innerHTML.trim()) { display.style.display = ''; editor.style.display = 'none'; }
         };
     });
 }
@@ -545,10 +577,33 @@ function renderStructuredDecisions(subBlock, notes, date) {
 }
 
 function renderBlockCommentArea(blockId, date, existing) {
-    const val = existing ? existing.content.replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
-    return `<div class="ws-block-comment">
-        <textarea id="wsComment_${blockId}" class="ws-comment-input" placeholder="Коментар до блоку..." rows="2">${val}</textarea>
-        <button class="ws-comment-save btn-sm" data-block="${blockId}">Зберегти</button>
+    const val = existing?.content || '';
+    const escaped = val.replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+    if (val) {
+        return `<div class="ws-block-comment-area" data-block="${blockId}">
+            <div class="ws-comment-display" id="wsCommentText_${blockId}">
+                <div class="ws-comment-content">${escaped.replace(/\n/g, '<br>')}</div>
+                <button class="ws-comment-edit btn-sm" data-block="${blockId}">Редагувати</button>
+            </div>
+            <div class="ws-comment-editor" id="wsCommentEdit_${blockId}" style="display:none">
+                <textarea id="wsComment_${blockId}" class="ws-comment-input" rows="2">${escaped}</textarea>
+                <div class="ws-comment-actions">
+                    <button class="ws-comment-save btn-sm" data-block="${blockId}">Зберегти</button>
+                    <button class="ws-comment-cancel btn-sm" data-block="${blockId}">Скасувати</button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    return `<div class="ws-block-comment-area" data-block="${blockId}">
+        <div class="ws-comment-display" id="wsCommentText_${blockId}" style="display:none"></div>
+        <div class="ws-comment-editor" id="wsCommentEdit_${blockId}">
+            <textarea id="wsComment_${blockId}" class="ws-comment-input" placeholder="Коментар до блоку..." rows="2"></textarea>
+            <div class="ws-comment-actions">
+                <button class="ws-comment-save btn-sm" data-block="${blockId}">Зберегти</button>
+            </div>
+        </div>
     </div>`;
 }
 
