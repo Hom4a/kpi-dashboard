@@ -5,7 +5,7 @@ import { kill, freshCanvas, makeGrad } from '../charts-common.js';
 import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState, summaryBlockComments, selectedWeeklyDate, setSelectedWeeklyDate } from './state-summary.js';
 import { initCollapsible, drawEnhancedSparkline } from '../ui-helpers.js';
 import { WEEKLY_BLOCKS, MONTHLY_BLOCKS } from './block-map.js';
-import { saveBlockComment } from './db-summary.js';
+import { saveBlockComment, deleteBlockComment } from './db-summary.js';
 import { openWeeklyIndicatorModal, openMonthlyIndicatorModal } from './infographic-modal.js';
 import { renderMonthlyReport } from './render-monthly.js';
 
@@ -454,10 +454,12 @@ function renderWeeklySectionTabs(data, date) {
                 const editor = container.querySelector(`#wsCommentEdit_${blockId}`);
                 if (display && editor) {
                     const escaped = content.replace(/</g, '&lt;');
-                    display.innerHTML = `<div class="ws-comment-content">${escaped.replace(/\n/g, '<br>')}</div><button class="ws-comment-edit btn-sm" data-block="${blockId}">Редагувати</button>`;
+                    const savedId = (summaryBlockComments.find(c => c.report_type === 'weekly' && c.report_date === date && c.block_id === blockId))?.id || '';
+                    display.innerHTML = `<div class="ws-comment-content">${escaped.replace(/\n/g, '<br>')}</div><div class="ws-comment-toolbar"><button class="ws-comment-edit btn-sm" data-block="${blockId}">Редагувати</button><button class="ws-comment-delete btn-sm" data-block="${blockId}" data-id="${savedId}">Видалити</button></div>`;
                     display.style.display = '';
                     editor.style.display = 'none';
                     wireEditBtn(display.querySelector('.ws-comment-edit'), container);
+                    wireDeleteBtn(display.querySelector('.ws-comment-delete'), container, date);
                 }
                 btn.textContent = 'Зберегти'; btn.disabled = false;
             } catch (e) {
@@ -490,6 +492,152 @@ function renderWeeklySectionTabs(data, date) {
             if (display && display.innerHTML.trim()) { display.style.display = ''; editor.style.display = 'none'; }
         };
     });
+
+    // Wire delete buttons
+    function wireDeleteBtn(btn, cont, reportDate) {
+        if (!btn) return;
+        btn.onclick = async () => {
+            const blockId = btn.dataset.block;
+            const commentId = btn.dataset.id;
+            if (!confirm('Видалити коментар?')) return;
+            try {
+                if (commentId) await deleteBlockComment(commentId);
+                // Remove from local state
+                const idx = summaryBlockComments.findIndex(c => c.block_id === blockId && c.report_date === reportDate);
+                if (idx >= 0) summaryBlockComments.splice(idx, 1);
+                // Show empty editor, hide display
+                const display = cont.querySelector(`#wsCommentText_${blockId}`);
+                const editor = cont.querySelector(`#wsCommentEdit_${blockId}`);
+                if (display) { display.innerHTML = ''; display.style.display = 'none'; }
+                if (editor) {
+                    editor.style.display = '';
+                    const textarea = editor.querySelector('textarea');
+                    if (textarea) textarea.value = '';
+                }
+            } catch (e) { console.error('Delete comment error:', e); }
+        };
+    }
+    container.querySelectorAll('.ws-comment-delete').forEach(btn => wireDeleteBtn(btn, container, date));
+
+    // ===== Cell annotations (row-level markers) =====
+    initCellAnnotations(container, date);
+}
+
+const ANNO_COLORS = [
+    { key: 'green', color: '#4A9D6F', label: 'OK' },
+    { key: 'yellow', color: '#E6A817', label: 'Увага' },
+    { key: 'red', color: '#E74C3C', label: 'Проблема' },
+    { key: 'blue', color: '#3498DB', label: 'Інфо' }
+];
+
+function annoKey(section, indicator) { return `cell|${section}|${indicator}`; }
+
+function initCellAnnotations(container, date) {
+    // Apply existing annotations (dots)
+    const annos = summaryBlockComments.filter(c => c.report_type === 'weekly' && c.report_date === date && c.block_id?.startsWith('cell|'));
+    for (const a of annos) {
+        const parts = a.block_id.split('|');
+        const dot = container.querySelector(`.cell-anno-dot[data-section="${parts[1]}"][data-indicator="${parts[2]}"]`);
+        if (dot) {
+            const clr = a.content?.match(/^#(\w+)\|/) ? a.content.match(/^#(\w+)\|/)[1] : 'blue';
+            const text = a.content?.replace(/^#\w+\|/, '') || a.content;
+            dot.style.background = (ANNO_COLORS.find(c => c.key === clr) || ANNO_COLORS[3]).color;
+            dot.classList.add('has-anno');
+            dot.title = text;
+        }
+    }
+
+    // Right-click on row → annotation popup
+    container.querySelectorAll('.clickable-row').forEach(row => {
+        row.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            const section = row.dataset.section;
+            const indicator = row.dataset.indicator;
+            showAnnoPopup(e.pageX, e.pageY, section, indicator, date, container);
+        });
+    });
+}
+
+function showAnnoPopup(x, y, section, indicator, date, container) {
+    let popup = document.querySelector('.cell-anno-popup');
+    if (popup) popup.remove();
+
+    const key = annoKey(section, indicator);
+    const existing = summaryBlockComments.find(c => c.report_type === 'weekly' && c.report_date === date && c.block_id === key);
+    const existColor = existing?.content?.match(/^#(\w+)\|/) ? existing.content.match(/^#(\w+)\|/)[1] : '';
+    const existText = existing ? (existing.content?.replace(/^#\w+\|/, '') || existing.content) : '';
+
+    popup = document.createElement('div');
+    popup.className = 'cell-anno-popup';
+    popup.innerHTML = `
+        <div class="anno-popup-title">${indicator}</div>
+        <div class="anno-color-row">${ANNO_COLORS.map(c =>
+            `<button class="anno-color-btn${c.key === existColor ? ' active' : ''}" data-color="${c.key}" style="background:${c.color}" title="${c.label}"></button>`
+        ).join('')}</div>
+        <textarea class="anno-text" placeholder="Коментар..." rows="2">${existText}</textarea>
+        <div class="anno-actions">
+            <button class="anno-save btn-sm">Зберегти</button>
+            ${existing ? '<button class="anno-remove btn-sm">Видалити</button>' : ''}
+        </div>`;
+
+    // Position
+    popup.style.left = Math.min(x, window.innerWidth - 280) + 'px';
+    popup.style.top = y + 'px';
+    document.body.appendChild(popup);
+
+    let selectedColor = existColor || '';
+
+    popup.querySelectorAll('.anno-color-btn').forEach(btn => {
+        btn.onclick = () => {
+            popup.querySelectorAll('.anno-color-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedColor = btn.dataset.color;
+        };
+    });
+
+    popup.querySelector('.anno-save').onclick = async () => {
+        const text = popup.querySelector('.anno-text').value.trim();
+        if (!text && !selectedColor) { popup.remove(); return; }
+        const content = selectedColor ? `#${selectedColor}|${text}` : text;
+        try {
+            await saveBlockComment({ reportType: 'weekly', reportDate: date, blockId: key, content });
+            // Update local state
+            const idx = summaryBlockComments.findIndex(c => c.report_type === 'weekly' && c.report_date === date && c.block_id === key);
+            const entry = { report_type: 'weekly', report_date: date, block_id: key, content };
+            if (idx >= 0) summaryBlockComments[idx] = { ...summaryBlockComments[idx], ...entry };
+            else summaryBlockComments.push(entry);
+            // Update dot
+            const dot = container.querySelector(`.cell-anno-dot[data-section="${section}"][data-indicator="${indicator}"]`);
+            if (dot) {
+                const clr = (ANNO_COLORS.find(c => c.key === selectedColor) || ANNO_COLORS[3]).color;
+                dot.style.background = clr;
+                dot.classList.add('has-anno');
+                dot.title = text || selectedColor;
+            }
+        } catch (e) { console.error('Annotation save error:', e); }
+        popup.remove();
+    };
+
+    const removeBtn = popup.querySelector('.anno-remove');
+    if (removeBtn) {
+        removeBtn.onclick = async () => {
+            try {
+                if (existing?.id) await deleteBlockComment(existing.id);
+                const idx = summaryBlockComments.findIndex(c => c.block_id === key && c.report_date === date);
+                if (idx >= 0) summaryBlockComments.splice(idx, 1);
+                const dot = container.querySelector(`.cell-anno-dot[data-section="${section}"][data-indicator="${indicator}"]`);
+                if (dot) { dot.style.background = ''; dot.classList.remove('has-anno'); dot.title = ''; }
+            } catch (e) { console.error('Annotation delete error:', e); }
+            popup.remove();
+        };
+    }
+
+    // Close on outside click
+    setTimeout(() => {
+        const close = ev => { if (!popup.contains(ev.target)) { popup.remove(); document.removeEventListener('mousedown', close); } };
+        document.addEventListener('mousedown', close);
+    }, 0);
 }
 
 function renderBlockNotes(notes) {
@@ -554,8 +702,12 @@ function renderSectionTable(sData, blockColumns) {
                 area_mln: fmtNum(r.value_current),
                 share: r.value_delta != null ? fmtNum(r.value_delta) + '%' : '—'
             };
-            const cells = colKeys.map(k => `<td>${cellMap[k] ?? '—'}</td>`).join('');
-            return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">${cells}</tr>`;
+            const cellsArr = colKeys.map((k, ci) => {
+                let val = cellMap[k] ?? '—';
+                if (ci === 0) val = `<span class="cell-text">${val}</span><span class="cell-anno-dot" data-section="${section}" data-indicator="${r.indicator_name}"></span>`;
+                return `<td>${val}</td>`;
+            });
+            return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">${cellsArr.join('')}</tr>`;
         }).join('')
     }</tbody></table></div>`;
 }
@@ -585,12 +737,16 @@ function renderStructuredDecisions(subBlock, notes, date) {
 function renderBlockCommentArea(blockId, date, existing) {
     const val = existing?.content || '';
     const escaped = val.replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const existingId = existing?.id || '';
 
     if (val) {
         return `<div class="ws-block-comment-area" data-block="${blockId}">
             <div class="ws-comment-display" id="wsCommentText_${blockId}">
                 <div class="ws-comment-content">${escaped.replace(/\n/g, '<br>')}</div>
-                <button class="ws-comment-edit btn-sm" data-block="${blockId}">Редагувати</button>
+                <div class="ws-comment-toolbar">
+                    <button class="ws-comment-edit btn-sm" data-block="${blockId}">Редагувати</button>
+                    <button class="ws-comment-delete btn-sm" data-block="${blockId}" data-id="${existingId}">Видалити</button>
+                </div>
             </div>
             <div class="ws-comment-editor" id="wsCommentEdit_${blockId}" style="display:none">
                 <textarea id="wsComment_${blockId}" class="ws-comment-input" rows="2">${escaped}</textarea>

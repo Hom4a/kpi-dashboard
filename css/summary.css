@@ -190,6 +190,48 @@
     cursor: pointer; font-family: inherit; transition: all .2s;
 }
 .ws-comment-edit:hover, .ws-comment-cancel:hover { background: rgba(255,255,255,.05); }
+.ws-comment-delete {
+    padding: 4px 10px; font-size: 11px; border: 1px solid var(--border);
+    border-radius: 6px; background: transparent; color: #E74C3C;
+    cursor: pointer; font-family: inherit; transition: all .2s;
+}
+.ws-comment-delete:hover { background: rgba(231,76,60,.1); }
+.ws-comment-toolbar { display: flex; gap: 6px; margin-top: 4px; }
+
+/* Cell annotation dot */
+.cell-anno-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-left: 6px; vertical-align: middle; opacity: 0; transition: opacity .15s;
+}
+.cell-anno-dot.has-anno { opacity: 1; }
+tr:hover .cell-anno-dot:not(.has-anno) { opacity: .3; background: var(--text2); }
+.cell-text { vertical-align: middle; }
+
+/* Cell annotation popup */
+.cell-anno-popup {
+    position: fixed; z-index: 500; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 16px; box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    width: 260px; font-size: 12px;
+}
+.anno-popup-title { font-weight: 600; font-size: 11px; color: var(--text2); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.anno-color-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.anno-color-btn {
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; transition: all .15s;
+}
+.anno-color-btn:hover { transform: scale(1.15); }
+.anno-color-btn.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.3); }
+.anno-text {
+    width: 100%; resize: vertical; font-size: 11px; font-family: inherit;
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg2); color: var(--text1); min-height: 32px; box-sizing: border-box;
+}
+.anno-text:focus { border-color: var(--primary); outline: none; }
+.anno-actions { display: flex; gap: 6px; margin-top: 8px; }
+.anno-save { padding: 4px 12px; border: 1px solid var(--primary); border-radius: 6px; background: transparent; color: var(--primary); font-size: 11px; cursor: pointer; font-family: inherit; }
+.anno-save:hover { background: rgba(74,157,111,.1); }
+.anno-remove { padding: 4px 12px; border: 1px solid #E74C3C; border-radius: 6px; background: transparent; color: #E74C3C; font-size: 11px; cursor: pointer; font-family: inherit; }
+.anno-remove:hover { background: rgba(231,76,60,.1); }
 
 /* Orange badge for zero-baseline comparison */
 .summary-delta-badge.badge-orange {
