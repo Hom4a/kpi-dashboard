@@ -371,6 +371,9 @@ function renderWeeklySectionTabs(data, date) {
     const latestNotes = summaryWeeklyNotes.filter(n => n.report_date === date);
     const comments = summaryBlockComments.filter(c => c.report_type === 'weekly' && c.report_date === date);
 
+    const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX'];
+    let visibleIdx = 0;
+
     let html = '';
     for (const block of WEEKLY_BLOCKS) {
         // Skip blocks with no data and no notes
@@ -382,11 +385,12 @@ function renderWeeklySectionTabs(data, date) {
 
         if (!blockData.length && !blockNotes.length && !block.isText) continue;
 
+        const roman = ROMAN[visibleIdx++] || String(visibleIdx);
         const isCollapsed = !['I', 'II'].includes(block.id);
 
         html += `<div class="ws-block" data-block="${block.id}">
             <div class="ws-block-header" data-collapse-toggle="${block.id}">
-                <span class="ws-block-roman">${block.roman}.</span>
+                <span class="ws-block-roman">${roman}.</span>
                 <span class="ws-block-name">${block.name}</span>
                 <span class="ws-block-count">${blockData.length ? blockData.length : ''}</span>
                 <span class="ws-block-chevron">${isCollapsed ? '\u25B6' : '\u25BC'}</span>
