@@ -3,6 +3,7 @@ import { $, fmt } from '../utils.js';
 import { summaryIndicators, summaryFilterState, summaryBlockComments } from './state-summary.js';
 import { saveBlockComment } from './db-summary.js';
 import { openMonthlyIndicatorModal } from './infographic-modal.js';
+import { initCellAnnotations } from './cell-annotations.js';
 
 const MO = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
             'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
@@ -150,6 +151,8 @@ export function renderMonthlyReport(container, year, month) {
     wireCollapse(container);
     wireRowClicks(container);
     wireCommentSaves(container, year, month);
+    const reportDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    initCellAnnotations(container, 'monthly', reportDate, { year, month });
 }
 
 function getLatestMonth(year) {
@@ -228,6 +231,8 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
         cells += `<td><b>${curVal != null ? fN(curVal) : (monthRec?.value_text || '—')}</b></td>`;
         cells += `<td class="${deltaCls(curVal, prevVal)}">${deltaBadge(curVal, prevVal) || '—'}</td>`;
 
+        cells = cells.replace(/^<td>/, `<td><span class="cell-text">`);
+        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name}"></span></td>`);
         html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
     }
 
@@ -300,6 +305,8 @@ function renderSalaryTable(showYears, year, month, allData) {
         const prevVal = prev?.value_numeric;
         cells += `<td><b>${curVal != null ? fN(curVal) : '—'}</b></td>`;
         cells += `<td class="${deltaCls(curVal, prevVal)}">${deltaBadge(curVal, prevVal) || '—'}</td>`;
+        cells = cells.replace(/^<td>/, `<td><span class="cell-text">`);
+        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name}"></span></td>`);
         html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
     }
 
