@@ -149,10 +149,21 @@
 .ws-block-count:empty { display: none; }
 .ws-block-chevron { font-size: 10px; color: var(--text3); transition: transform .2s; }
 .ws-block-body { padding: 12px 16px; }
-.ws-block-body .tbl td { color: var(--text) !important; font-size: 13px; }
-.ws-block-body .tbl td:first-child { font-weight: 600; color: var(--text) !important; }
-.ws-block-body .tbl th { font-size: 11px; color: var(--text2) !important; text-transform: uppercase; letter-spacing: .04em; }
-.ws-block-body .tbl tr:hover td { background: rgba(74,157,111,.06); }
+/* Weekly table — match monthly visual style */
+.ws-block-body .tbl td { color: var(--text) !important; font-size: 13px; padding: 10px 16px; transition: background .1s; }
+.ws-block-body .tbl td:first-child {
+    font-weight: 600; color: var(--text) !important;
+    position: sticky; left: 0; background: var(--bg); z-index: 1;
+    max-width: 300px; white-space: normal;
+    border-right: 1px solid var(--border);
+}
+.ws-block-body .tbl th {
+    font-size: 11px; color: var(--text2) !important; text-transform: uppercase;
+    letter-spacing: .04em; padding: 8px 16px; border-bottom: 2px solid var(--border);
+}
+.ws-block-body .tbl tr { transition: background .1s; }
+.ws-block-body .tbl tr:hover td { background: rgba(74,157,111,.08) !important; }
+.ws-block-body .tbl tr:hover td:first-child { background: rgba(74,157,111,.12) !important; color: var(--primary) !important; }
 .ws-block-empty { color: var(--text3); font-size: 12px; font-style: italic; padding: 8px 0; }
 .ws-subsection-label {
     font-size: 12px; font-weight: 600; color: var(--text2);
