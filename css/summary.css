@@ -149,6 +149,9 @@
 .ws-block-count:empty { display: none; }
 .ws-block-chevron { font-size: 10px; color: var(--text3); transition: transform .2s; }
 .ws-block-body { padding: 12px 16px; }
+.ws-block-body .tbl td { color: var(--text); font-size: 13px; }
+.ws-block-body .tbl td:first-child { font-weight: 500; }
+.ws-block-body .tbl th { font-size: 11px; }
 .ws-block-empty { color: var(--text3); font-size: 12px; font-style: italic; padding: 8px 0; }
 .ws-subsection-label {
     font-size: 12px; font-weight: 600; color: var(--text2);
