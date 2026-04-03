@@ -162,9 +162,13 @@ function extractReportDate(doc, ns) {
     }
     const cleaned = allText.replace(/\s+/g, ' ');
 
-    // Priority 1: "станом на DD.MM.YY(YY)"
+    // Priority 1: "станом на DD.MM.YY(YY)" — date is AFTER the reporting period, subtract 1 day
     const mStanom = cleaned.match(/станом\s+на\s+(\d{2})\s*\.\s*(\d{2})\s*\.\s*(\d{2,4})/i);
-    if (mStanom) return `${normalizeYear(mStanom[3])}-${mStanom[2]}-${mStanom[1]}`;
+    if (mStanom) {
+        const d = new Date(`${normalizeYear(mStanom[3])}-${mStanom[2]}-${mStanom[1]}T12:00:00`);
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().slice(0, 10);
+    }
 
     // Priority 2: "по DD.MM.YY(YY)" (end of date range — take the last date)
     const mRange = cleaned.match(/по\s+(\d{2})\s*\.\s*(\d{2})\s*\.\s*(\d{2,4})/i);

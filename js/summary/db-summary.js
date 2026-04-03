@@ -261,3 +261,16 @@ export async function clearSummaryWeekly() {
     await sb.from('summary_weekly_notes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await sb.from('summary_upload_history').delete().eq('data_type', 'weekly_briefing');
 }
+
+export async function deleteWeeklyByDate(reportDate) {
+    const { error } = await sb.from('summary_weekly').delete().eq('report_date', reportDate);
+    if (error) throw new Error(error.message);
+    await sb.from('summary_weekly_notes').delete().eq('report_date', reportDate);
+    await sb.from('summary_block_comments').delete().eq('report_type', 'weekly').eq('report_date', reportDate);
+}
+
+export async function deleteMonthlyByMonth(year, month) {
+    const { error } = await sb.from('summary_indicators').delete().eq('year', year).eq('month', month);
+    if (error) throw new Error(error.message);
+    await sb.from('summary_block_comments').delete().eq('report_type', 'monthly').eq('report_date', `${year}-${String(month).padStart(2,'0')}-01`);
+}

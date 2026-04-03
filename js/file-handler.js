@@ -274,7 +274,10 @@ async function handleDocxFile(buffer, fileName) {
         if (!reportDate) {
             const fm = (fileName || '').match(/(\d{2})\.(\d{2})\.(20\d{2})/);
             if (fm) {
-                reportDate = `${fm[3]}-${fm[2]}-${fm[1]}`;
+                // Filename date is "станом на" — subtract 1 day to get actual reporting week
+                const d = new Date(`${fm[3]}-${fm[2]}-${fm[1]}T12:00:00`);
+                d.setDate(d.getDate() - 1);
+                reportDate = d.toISOString().slice(0, 10);
             } else {
                 reportDate = new Date().toISOString().slice(0, 10);
                 toast('Не вдалося визначити дату з документа. Використано поточну дату.', true);

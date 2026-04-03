@@ -296,6 +296,8 @@ tr:hover .cell-anno-dot:not(.has-anno) { opacity: .4; background: var(--text2); 
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
 }
+.weekly-delete-btn { opacity: .5; transition: opacity .2s; color: #E74C3C !important; }
+.weekly-delete-btn:hover { opacity: 1; }
 .monthly-table-block {
     background: var(--glass); border: 1px solid var(--border);
     border-radius: 12px; margin-bottom: 16px; overflow: hidden;

@@ -1,7 +1,7 @@
 // ===== Monthly Report — "Дод 1 до ТЗ" format =====
 import { $, fmt } from '../utils.js';
 import { summaryIndicators, summaryFilterState, summaryBlockComments } from './state-summary.js';
-import { saveBlockComment } from './db-summary.js';
+import { saveBlockComment, deleteMonthlyByMonth } from './db-summary.js';
 import { openMonthlyIndicatorModal } from './infographic-modal.js';
 import { initCellAnnotations } from './cell-annotations.js';
 
@@ -127,9 +127,11 @@ export function renderMonthlyReport(container, year, month) {
         ${MO.map((m, i) => `<option value="${i + 1}"${i + 1 === month ? ' selected' : ''}>${m}</option>`).join('')}
     </select>`;
 
+    const trashBtn = `<button id="monthlyDeleteBtn" class="icon-btn weekly-delete-btn" title="Видалити дані за ${MO[month-1]} ${year}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>`;
+
     let html = `<div class="monthly-report-header">
         <h3 style="margin:0;font-size:15px;color:var(--text1)">Основні показники діяльності ДП «Ліси України»</h3>
-        <div style="display:flex;gap:8px;align-items:center">${monthSelectHtml}</div>
+        <div style="display:flex;gap:8px;align-items:center">${monthSelectHtml}${trashBtn}</div>
     </div>`;
 
     // Table 1: Main indicators
@@ -153,6 +155,20 @@ export function renderMonthlyReport(container, year, month) {
     wireCommentSaves(container, year, month);
     const reportDate = `${year}-${String(month).padStart(2, '0')}-01`;
     initCellAnnotations(container, 'monthly', reportDate, { year, month });
+
+    // Wire monthly delete button
+    const delBtn = container.querySelector('#monthlyDeleteBtn');
+    if (delBtn) {
+        delBtn.onclick = async () => {
+            if (!confirm(`Видалити дані за ${MO[month - 1]} ${year}?`)) return;
+            try {
+                await deleteMonthlyByMonth(year, month);
+                summaryIndicators.splice(0, summaryIndicators.length,
+                    ...summaryIndicators.filter(r => !(r.year === year && r.month === month)));
+                renderMonthlyReport(container, year);
+            } catch (e) { console.error('Delete month error:', e); }
+        };
+    }
 }
 
 function getLatestMonth(year) {

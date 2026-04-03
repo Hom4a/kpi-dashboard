@@ -5,7 +5,7 @@ import { kill, freshCanvas, makeGrad } from '../charts-common.js';
 import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState, summaryBlockComments, selectedWeeklyDate, setSelectedWeeklyDate } from './state-summary.js';
 import { initCollapsible, drawEnhancedSparkline } from '../ui-helpers.js';
 import { WEEKLY_BLOCKS, MONTHLY_BLOCKS } from './block-map.js';
-import { saveBlockComment, deleteBlockComment } from './db-summary.js';
+import { saveBlockComment, deleteBlockComment, deleteWeeklyByDate } from './db-summary.js';
 import { initCellAnnotations } from './cell-annotations.js';
 import { openWeeklyIndicatorModal, openMonthlyIndicatorModal } from './infographic-modal.js';
 import { renderMonthlyReport } from './render-monthly.js';
@@ -258,6 +258,34 @@ function renderWeeklyBriefing() {
                 renderWeeklyBriefing();
             };
         }
+    }
+
+    // Delete week button
+    let delBtn = $('weeklyDeleteBtn');
+    if (!delBtn) {
+        const selParent = sel?.parentElement;
+        if (selParent) {
+            delBtn = document.createElement('button');
+            delBtn.id = 'weeklyDeleteBtn';
+            delBtn.className = 'icon-btn weekly-delete-btn';
+            delBtn.title = 'Видалити цей тиждень';
+            delBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+            selParent.appendChild(delBtn);
+        }
+    }
+    if (delBtn) {
+        delBtn.onclick = async () => {
+            const { monday, sunday, weekNum } = getWeekInfo(activeDate);
+            if (!confirm(`Видалити тиждень №${weekNum} (${fmtDD(monday)} — ${fmtDDFull(sunday)})?`)) return;
+            try {
+                await deleteWeeklyByDate(activeDate);
+                // Remove from local state
+                summaryWeekly.splice(0, summaryWeekly.length, ...summaryWeekly.filter(r => r.report_date !== activeDate));
+                summaryWeeklyNotes.splice(0, summaryWeeklyNotes.length, ...summaryWeeklyNotes.filter(r => r.report_date !== activeDate));
+                setSelectedWeeklyDate(null);
+                renderWeeklyBriefing();
+            } catch (e) { console.error('Delete week error:', e); }
+        };
     }
 
     const activeData = summaryWeekly.filter(r => r.report_date === activeDate);
