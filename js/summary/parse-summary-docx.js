@@ -4,7 +4,7 @@
 
 // Smart table detection by header/data keywords (handles 17, 19+ tables)
 const SECTION_SIGS = [
-    { section: 'kpi',                 header: /попередній тиждень/i,              cols: ['indicator', 'current', 'delta', 'previous', 'ytd'] },
+    { section: 'kpi',                 header: /попередній тиждень/i,              cols: null, detectCols: true },
     { section: 'forest_protection',   data:   /кількість випадків/i,             cols: ['indicator', 'ytd', 'current'] },
     { section: 'raids',               data:   /кількість рейдів(?!.*шт)/i,      cols: ['indicator', 'ytd', 'current'] },
     { section: 'mru_raids',           data:   /кількість рейдів.*шт/i,          cols: ['indicator', 'ytd', 'current'] },
@@ -58,6 +58,29 @@ const NOTE_PATTERNS = [
 ];
 
 /**
+ * Detect KPI table column order from header cells.
+ * Handles: "За тиждень | Попередній тиждень | З початку року | ∆"
+ * or:      "За тиждень | %Δ | Попередній тиждень | З початку року"
+ */
+function detectKpiCols(headerRow, ns) {
+    const headerCells = headerRow.getElementsByTagNameNS(ns, 'tc');
+    const cols = [];
+    for (let ci = 0; ci < headerCells.length; ci++) {
+        const t = getCellText(headerCells[ci], ns).toLowerCase().replace(/\s+/g, ' ');
+        if (t.includes('показник')) cols.push('indicator');
+        else if (t.includes('попередній')) cols.push('previous');
+        else if (t.includes('з початку') || t.includes('з поч')) cols.push('ytd');
+        else if (t.includes('за тиждень') || t.includes('за звітний')) cols.push('current');
+        else if (t.includes('∆') || t.includes('дельта') || t.includes('%')) cols.push('delta');
+        else if (t.includes('план') || t.includes('орієнтир') || t.includes('статус')) cols.push('_skip');
+        else cols.push('current'); // fallback
+    }
+    // Ensure at least indicator + current
+    if (!cols.includes('indicator')) cols.unshift('indicator');
+    return cols;
+}
+
+/**
  * Parse a .docx file buffer into weekly briefing records + notes
  * @param {ArrayBuffer} buffer - the raw .docx file content
  * @returns {Promise<{records: Array, notes: Array, reportDate: string|null}>}
@@ -99,7 +122,14 @@ export async function parseSummaryDocx(buffer) {
             console.log(`DOCX parser: skipping unknown table ${ti}: "${headerText.slice(0, 60)}" / "${firstDataText.slice(0, 60)}"`);
             continue;
         }
-        console.log(`DOCX parser: table ${ti} → ${mapping.section}`);
+        // Dynamic column detection for KPI table (column order varies between docs)
+        let cols = mapping.cols;
+        if (mapping.detectCols) {
+            cols = detectKpiCols(tableRows[0], ns);
+            console.log(`DOCX parser: table ${ti} → ${mapping.section} (auto-cols: ${cols.join(',')})`);
+        } else {
+            console.log(`DOCX parser: table ${ti} → ${mapping.section}`);
+        }
 
         // Skip header row (index 0), parse data rows
         for (let ri = 1; ri < tableRows.length; ri++) {
@@ -107,8 +137,8 @@ export async function parseSummaryDocx(buffer) {
             const values = {};
             let indicatorName = '';
 
-            for (let ci = 0; ci < cells.length && ci < mapping.cols.length; ci++) {
-                const colKey = mapping.cols[ci];
+            for (let ci = 0; ci < cells.length && ci < cols.length; ci++) {
+                const colKey = cols[ci];
                 const text = getCellText(cells[ci], ns);
 
                 if (colKey === 'indicator') {
