@@ -7,7 +7,8 @@ import { getRecordCount, getUploadHistory } from './db-kpi.js';
 import { getPricesCount, getInventoryCount } from './forest/db-forest.js';
 import { getPlanFactCount, getZsuCount } from './harvesting/db-harvesting.js';
 import { getMarketPricesCount } from './market/db-market.js';
-import { getSummaryIndicatorCount, getSummaryWeeklyCount } from './summary/db-summary.js';
+import { getSummaryIndicatorCount, getSummaryWeeklyCount, deleteWeeklyByDate, deleteMonthlyByMonth, loadSummaryWeekly } from './summary/db-summary.js';
+import { summaryIndicators, summaryWeekly, setSelectedWeeklyDate } from './summary/state-summary.js';
 import { PAGE_ACCESS } from './auth.js';
 
 let _renderAllFn = null;
@@ -513,6 +514,81 @@ function dataSection(title, count, lastUpload, clearOnclick, undoOnclick) {
     </div>`;
 }
 
+const MO_SHORT = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
+
+function getWeekInfoDM(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const day = d.getDay();
+    const monday = new Date(d); monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    const thu = new Date(monday); thu.setDate(monday.getDate() + 3);
+    const jan1 = new Date(thu.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((thu - jan1) / 86400000 + 1) / 7);
+    const fD = dt => `${String(dt.getDate()).padStart(2,'0')}.${String(dt.getMonth()+1).padStart(2,'0')}`;
+    return { monday, sunday, weekNum, label: `Тиждень №${weekNum} (${fD(monday)} — ${fD(sunday)}.${sunday.getFullYear()})` };
+}
+
+function weeklyListSection() {
+    const dates = [...new Set(summaryWeekly.map(r => r.report_date))].sort().reverse();
+    if (!dates.length) return '';
+    return `<div class="glass" style="padding:16px">
+        <div style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:8px">Тижневі звіти (по тижнях)</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+            ${dates.map(d => {
+                const { label } = getWeekInfoDM(d);
+                const count = summaryWeekly.filter(r => r.report_date === d).length;
+                return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:6px;background:var(--bg2);font-size:12px">
+                    <span style="color:var(--text)">${label} <span style="color:var(--text3)">(${count} зап.)</span></span>
+                    <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:10px" onclick="window._deleteWeek('${d}')">Видалити</button>
+                </div>`;
+            }).join('')}
+        </div>
+    </div>`;
+}
+
+function monthlyListSection() {
+    const months = [...new Set(summaryIndicators.filter(r => r.month > 0).map(r => `${r.year}-${r.month}`))].sort().reverse();
+    if (!months.length) return '';
+    return `<div class="glass" style="padding:16px">
+        <div style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:8px">Місячні дані (по місяцях)</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+            ${months.map(ym => {
+                const [y, m] = ym.split('-').map(Number);
+                const count = summaryIndicators.filter(r => r.year === y && r.month === m).length;
+                return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:6px;background:var(--bg2);font-size:12px">
+                    <span style="color:var(--text)">${MO_SHORT[m-1]} ${y} <span style="color:var(--text3)">(${count} зап.)</span></span>
+                    <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:10px" onclick="window._deleteMonth(${y},${m})">Видалити</button>
+                </div>`;
+            }).join('')}
+        </div>
+    </div>`;
+}
+
+// Wire global handlers
+window._deleteWeek = async (reportDate) => {
+    const { label } = getWeekInfoDM(reportDate);
+    if (!confirm(`Видалити ${label}?`)) return;
+    try {
+        await deleteWeeklyByDate(reportDate);
+        summaryWeekly.splice(0, summaryWeekly.length, ...summaryWeekly.filter(r => r.report_date !== reportDate));
+        setSelectedWeeklyDate(null);
+        toast(`${label} видалено`);
+        openDataManage(); // refresh
+        if (_renderAllFn) _renderAllFn();
+    } catch (e) { toast('Помилка: ' + e.message, true); }
+};
+
+window._deleteMonth = async (year, month) => {
+    if (!confirm(`Видалити дані за ${MO_SHORT[month-1]} ${year}?`)) return;
+    try {
+        await deleteMonthlyByMonth(year, month);
+        summaryIndicators.splice(0, summaryIndicators.length, ...summaryIndicators.filter(r => !(r.year === year && r.month === month)));
+        toast(`${MO_SHORT[month-1]} ${year} видалено`);
+        openDataManage(); // refresh
+        if (_renderAllFn) _renderAllFn();
+    } catch (e) { toast('Помилка: ' + e.message, true); }
+};
+
 export async function openDataManage() {
     $('dataManageModal').classList.add('on');
     const content = $('dataManageContent');
@@ -537,6 +613,8 @@ export async function openDataManage() {
             ${dataSection('Довідка ЗСУ', zsuCount, zsuHistory[0] || null, 'clearZsu()')}
             ${dataSection('Зведені показники (xlsx)', summaryIndCount, null, 'clearSummaryIndicators()')}
             ${dataSection('Щотижневі довідки', summaryWeekCount, null, 'clearSummaryWeekly()')}
+            ${weeklyListSection()}
+            ${monthlyListSection()}
         </div>`;
     } catch(e) {
         content.innerHTML = `<p style="color:var(--rose);font-size:12px">Помилка: ${e.message}</p>`;
