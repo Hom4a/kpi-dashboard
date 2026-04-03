@@ -143,30 +143,36 @@ function parseNumericValue(text) {
  * Extract report date from document content
  * Looks for patterns like "02.03.2026" in the first few paragraphs
  */
+function normalizeYear(y) {
+    return y.length === 2 ? '20' + y : y;
+}
+
 function extractReportDate(doc, ns) {
+    // Collect all text from first 30 paragraphs into one string
     const paragraphs = doc.getElementsByTagNameNS(ns, 'p');
-    // Scan first 30 paragraphs (title/header area)
+    let allText = '';
     for (let i = 0; i < Math.min(30, paragraphs.length); i++) {
         const texts = paragraphs[i].getElementsByTagNameNS(ns, 't');
-        let fullText = '';
+        let pText = '';
         for (let j = 0; j < texts.length; j++) {
-            fullText += texts[j].textContent || '';
+            pText += texts[j].textContent || '';
         }
-
-        const cleaned = fullText.replace(/\s+/g, ' ');
-
-        // Priority 1: "станом на DD.MM.YYYY"
-        const mStanom = cleaned.match(/станом\s+на\s+(\d{2})\s*\.\s*(\d{2})\s*\.\s*(20\d{2})/i);
-        if (mStanom) return `${mStanom[3]}-${mStanom[2]}-${mStanom[1]}`;
-
-        // Priority 2: "по DD.MM.YYYY" (end of date range)
-        const mRange = cleaned.match(/по\s+(\d{2})\s*\.\s*(\d{2})\s*\.\s*(20\d{2})/i);
-        if (mRange) return `${mRange[3]}-${mRange[2]}-${mRange[1]}`;
-
-        // Priority 3: any DD.MM.YYYY pattern
-        const m = cleaned.match(/(\d{2})\s*\.\s*(\d{2})\s*\.\s*(20\d{2})/);
-        if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+        allText += pText + ' ';
     }
+    const cleaned = allText.replace(/\s+/g, ' ');
+
+    // Priority 1: "станом на DD.MM.YY(YY)"
+    const mStanom = cleaned.match(/станом\s+на\s+(\d{2})\s*\.\s*(\d{2})\s*\.\s*(\d{2,4})/i);
+    if (mStanom) return `${normalizeYear(mStanom[3])}-${mStanom[2]}-${mStanom[1]}`;
+
+    // Priority 2: "по DD.MM.YY(YY)" (end of date range — take the last date)
+    const mRange = cleaned.match(/по\s+(\d{2})\s*\.\s*(\d{2})\s*\.\s*(\d{2,4})/i);
+    if (mRange) return `${normalizeYear(mRange[3])}-${mRange[2]}-${mRange[1]}`;
+
+    // Priority 3: any DD.MM.YY(YY) pattern
+    const m = cleaned.match(/(\d{2})\s*\.\s*(\d{2})\s*\.\s*(\d{2,4})/);
+    if (m) return `${normalizeYear(m[3])}-${m[2]}-${m[1]}`;
+
     return null;
 }
 
