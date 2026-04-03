@@ -135,13 +135,14 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
     return { added, updated, total: upsertCount, notes: notesCount };
 }
 
-export async function loadSummaryWeekly(limit = 4) {
-    // Load the latest N weeks of data
+export async function loadSummaryWeekly(limit = 0) {
+    // Load ALL weeks (no limit by default) for full accumulation
     const { data: dates, error: dErr } = await sb.from('summary_weekly')
         .select('report_date')
         .order('report_date', { ascending: false });
     if (dErr) throw new Error(dErr.message);
-    const uniqueDates = [...new Set((dates || []).map(d => d.report_date))].slice(0, limit);
+    let uniqueDates = [...new Set((dates || []).map(d => d.report_date))];
+    if (limit > 0) uniqueDates = uniqueDates.slice(0, limit);
     if (!uniqueDates.length) return [];
 
     const all = [];
@@ -159,7 +160,7 @@ export async function loadSummaryWeeklyNotes(reportDate = null) {
     if (reportDate) {
         q = q.eq('report_date', reportDate);
     } else {
-        q = q.order('report_date', { ascending: false }).limit(20);
+        q = q.order('report_date', { ascending: false });
     }
     const { data, error } = await q;
     if (error) throw new Error(error.message);
