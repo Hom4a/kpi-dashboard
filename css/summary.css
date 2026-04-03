@@ -392,7 +392,7 @@ tr:hover .cell-anno-dot:not(.has-anno) { opacity: .4; background: var(--text2); 
 .cell-up { background: rgba(76,175,80,.1); color: #2e7d32; }
 .cell-down { background: rgba(244,67,54,.08); color: #c62828; }
 .cell-orange { background: rgba(245,166,35,.1); color: #E67E22; }
-.cell-text { color: var(--text3); font-style: italic; font-size: 12px; }
+.cell-text { vertical-align: middle; }
 .cell-empty { color: var(--text3); opacity: .5; }
 .cell-year { background: var(--glass); font-size: 13px; }
 
