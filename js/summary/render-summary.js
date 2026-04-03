@@ -547,15 +547,13 @@ function initCellAnnotations(container, date) {
         }
     }
 
-    // Right-click on row → annotation popup
-    container.querySelectorAll('.clickable-row').forEach(row => {
-        row.addEventListener('contextmenu', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            const section = row.dataset.section;
-            const indicator = row.dataset.indicator;
-            showAnnoPopup(e.pageX, e.pageY, section, indicator, date, container);
-        });
+    // Right-click on row → annotation popup (use event delegation for collapsed blocks)
+    container.addEventListener('contextmenu', e => {
+        const row = e.target.closest('.clickable-row');
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        showAnnoPopup(e.clientX, e.clientY, row.dataset.section, row.dataset.indicator, date, container);
     });
 }
 
