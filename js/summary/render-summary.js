@@ -290,6 +290,20 @@ function renderWeeklyBriefing() {
 
     const activeData = summaryWeekly.filter(r => r.report_date === activeDate);
 
+    // Enrich with previous week data: find previous date and merge value_previous
+    const dateIdx = dates.indexOf(activeDate);
+    const prevDate = dateIdx < dates.length - 1 ? dates[dateIdx + 1] : null;
+    if (prevDate) {
+        const prevData = summaryWeekly.filter(r => r.report_date === prevDate);
+        for (const r of activeData) {
+            if (r.value_previous != null) continue; // KPI already has previous from parser
+            const prev = prevData.find(p => p.section === r.section && p.indicator_name === r.indicator_name);
+            if (prev?.value_current != null) {
+                r._prev_from_history = prev.value_current;
+            }
+        }
+    }
+
     // Format weekly title
     const sub = $('summaryWeeklyDate');
     if (sub) {
@@ -603,9 +617,11 @@ function renderSectionTable(sData, blockColumns) {
 
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
         sData.map(r => {
-            const delta = calcDeltaPct(r.value_current, r.value_previous);
-            // For finance: delta is stored directly in value_delta, not calculated from previous
-            const directDelta = r.value_delta != null;
+            // Use parser previous, or cross-week previous, or direct delta
+            const prevVal = r.value_previous ?? r._prev_from_history ?? null;
+            const delta = calcDeltaPct(r.value_current, prevVal);
+            // For finance: delta stored directly in value_delta
+            const directDelta = r.value_delta != null && prevVal == null;
             const deltaDisplay = delta.display !== '—' ? delta
                 : directDelta ? { display: fmtNum(r.value_delta), badgeCls: r.value_delta > 0 ? 'badge-up' : r.value_delta < 0 ? 'badge-down' : '' }
                 : delta;
@@ -614,7 +630,7 @@ function renderSectionTable(sData, blockColumns) {
                 unit: r.unit || '',
                 current: r.value_text || fmtNum(r.value_current),
                 delta_pct: `<span class="summary-delta-badge ${deltaDisplay.badgeCls}">${deltaDisplay.display}</span>`,
-                previous: fmtNum(r.value_previous),
+                previous: fmtNum(prevVal),
                 ytd: fmtNum(r.value_ytd),
                 total: fmtNum(r.value_text) || fmtNum(r.value_ytd),
                 value: r.value_text || fmtNum(r.value_current),
@@ -630,7 +646,7 @@ function renderSectionTable(sData, blockColumns) {
                 if (ci === 0) val = `<span class="cell-text">${val}</span><span class="cell-anno-dot" data-section="${section}" data-indicator="${r.indicator_name}"></span>`;
                 return `<td>${val}</td>`;
             });
-            return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">${cellsArr.join('')}</tr>`;
+            return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${prevVal ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">${cellsArr.join('')}</tr>`;
         }).join('')
     }</tbody></table></div>`;
 }
