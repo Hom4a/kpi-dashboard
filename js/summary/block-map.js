@@ -13,7 +13,7 @@ export const WEEKLY_BLOCKS = [
         ]
     },
     { id: 'II',   roman: 'II',   name: 'Ключові показники (КРІ)',    sections: ['kpi'],
-      columns: ['indicator', 'unit', 'current', 'delta_pct'] },
+      columns: ['indicator', 'current', 'delta_pct', 'previous', 'ytd'] },
     { id: 'III',  roman: 'III',  name: 'Охорона та захист лісів',     sections: ['forest_protection', 'raids', 'mru_raids'],
       columns: ['indicator', 'unit', 'current', 'delta_pct', 'previous', 'ytd'] },
     { id: 'IV',   roman: 'IV',   name: 'Розмінування лісових земель', sections: ['demining'],

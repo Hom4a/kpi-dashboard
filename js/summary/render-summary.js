@@ -2,7 +2,7 @@
 import { $, fmt, show, hide, themeColor } from '../utils.js';
 import { charts, currentProfile } from '../state.js';
 import { kill, freshCanvas, makeGrad } from '../charts-common.js';
-import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState, summaryBlockComments } from './state-summary.js';
+import { summaryIndicators, summaryWeekly, summaryWeeklyNotes, summaryFilterState, setSummaryFilterState, summaryBlockComments, selectedWeeklyDate, setSelectedWeeklyDate } from './state-summary.js';
 import { initCollapsible, drawEnhancedSparkline } from '../ui-helpers.js';
 import { WEEKLY_BLOCKS, MONTHLY_BLOCKS } from './block-map.js';
 import { saveBlockComment } from './db-summary.js';
@@ -213,6 +213,22 @@ function renderKpiCards(year) {
 
 // ===== Weekly Briefing — Alert Style =====
 
+// ISO week info helper
+function getWeekInfo(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const day = d.getDay();
+    const monday = new Date(d); monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    // ISO week: Thursday-based
+    const thu = new Date(monday); thu.setDate(monday.getDate() + 3);
+    const jan1 = new Date(thu.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((thu - jan1) / 86400000 + 1) / 7);
+    return { monday, sunday, weekNum };
+}
+
+function fmtDD(d) { return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`; }
+function fmtDDFull(d) { return `${fmtDD(d)}.${d.getFullYear()}`; }
+
 function renderWeeklyBriefing() {
     const card = $('summaryWeeklyCard');
     if (!card) return;
@@ -221,56 +237,44 @@ function renderWeeklyBriefing() {
     card.style.display = '';
 
     const dates = [...new Set(summaryWeekly.map(r => r.report_date))].sort().reverse();
-    const latestDate = dates[0];
-    const latestData = summaryWeekly.filter(r => r.report_date === latestDate);
-    const kpiData = latestData.filter(r => r.section === 'kpi');
 
-    // Format weekly title: "За період з [пн] по [нд], тиждень №N"
-    const sub = $('summaryWeeklyDate');
-    if (sub) {
-        const d = new Date(latestDate);
-        const day = d.getDay();
-        const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-        const oneJan = new Date(d.getFullYear(), 0, 1);
-        const weekNum = Math.ceil(((d - oneJan) / 86400000 + oneJan.getDay() + 1) / 7);
-        sub.textContent = `За період з ${formatDate(mon.toISOString().slice(0,10))} по ${formatDate(sun.toISOString().slice(0,10))}, тиждень №${weekNum}`;
+    // Use selected date or default to latest
+    const activeDate = selectedWeeklyDate && dates.includes(selectedWeeklyDate)
+        ? selectedWeeklyDate : dates[0];
+    if (!selectedWeeklyDate) setSelectedWeeklyDate(activeDate);
+
+    // Populate week selector dropdown
+    const sel = $('weeklyDateSelect');
+    if (sel) {
+        sel.innerHTML = dates.map(d => {
+            const { monday, sunday, weekNum } = getWeekInfo(d);
+            return `<option value="${d}" ${d === activeDate ? 'selected' : ''}>Тиждень №${weekNum} (${fmtDD(monday)} — ${fmtDDFull(sunday)})</option>`;
+        }).join('');
+        if (!sel._wired) {
+            sel._wired = true;
+            sel.onchange = () => {
+                setSelectedWeeklyDate(sel.value);
+                renderWeeklyBriefing();
+            };
+        }
     }
 
-    // Notes now rendered inside weekly blocks (Block I)
+    const activeData = summaryWeekly.filter(r => r.report_date === activeDate);
+
+    // Format weekly title
+    const sub = $('summaryWeeklyDate');
+    if (sub) {
+        const { monday, sunday, weekNum } = getWeekInfo(activeDate);
+        sub.textContent = `За період з ${formatDate(monday.toISOString().slice(0,10))} по ${formatDate(sunday.toISOString().slice(0,10))}, тиждень №${weekNum}`;
+    }
+
+    // Notes + KPI summary table hidden — data shown in blocks
     const notesBlock = $('summaryNotesBlock');
     if (notesBlock) notesBlock.style.display = 'none';
-
-    // KPI summary table hidden per TZ 3.2 — data shown in Block II only
     const summaryTable = $('summaryWeeklyTable');
     if (summaryTable) summaryTable.style.display = 'none';
 
-    // Skip rendering hidden KPI table (optimization)
-    const tbody = $('tblBodyWeekly');
-    if (!tbody) return;
-
-    tbody.innerHTML = kpiData.map(r => {
-        const delta = calcDeltaPct(r.value_current, r.value_previous);
-        return `<tr class="clickable-row" data-section="kpi" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${r.value_previous ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">
-            <td><b>${r.indicator_name}</b></td>
-            <td>${fmtNum(r.value_current)}</td>
-            <td><span class="summary-delta-badge ${delta.badgeCls}">${delta.display}</span></td>
-            <td>${fmtNum(r.value_previous)}</td>
-            <td>${fmtNum(r.value_ytd)}</td>
-        </tr>`;
-    }).join('');
-
-    // Click on KPI row → infographic modal
-    tbody.querySelectorAll('.clickable-row').forEach(row => {
-        row.onclick = () => openWeeklyIndicatorModal(
-            row.dataset.section, row.dataset.indicator,
-            parseFloat(row.dataset.current) || null,
-            parseFloat(row.dataset.prev) || null,
-            parseFloat(row.dataset.delta) || null
-        );
-    });
-
-    renderWeeklySectionTabs(latestData, latestDate);
+    renderWeeklySectionTabs(activeData, activeDate);
 }
 
 function renderWeeklyNotes(notes) {

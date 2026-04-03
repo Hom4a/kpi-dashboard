@@ -4,7 +4,7 @@
 
 // Table index → section mapping (matches WEEKLY_SECTIONS keys in weekly-entry.js)
 const TABLE_MAP = [
-    { index: 0, section: 'kpi', cols: ['indicator', 'current', 'previous', 'ytd', 'delta'] },
+    { index: 0, section: 'kpi', cols: ['indicator', 'current', 'delta', 'previous', 'ytd'] },
     { index: 1, section: 'forest_protection', cols: ['indicator', 'ytd', 'current'] },
     { index: 2, section: 'raids', cols: ['indicator', 'ytd', 'current'] },
     { index: 3, section: 'mru_raids', cols: ['indicator', 'ytd', 'current'] },
@@ -145,21 +145,27 @@ function parseNumericValue(text) {
  */
 function extractReportDate(doc, ns) {
     const paragraphs = doc.getElementsByTagNameNS(ns, 'p');
-    for (let i = 0; i < Math.min(15, paragraphs.length); i++) {
+    // Scan first 30 paragraphs (title/header area)
+    for (let i = 0; i < Math.min(30, paragraphs.length); i++) {
         const texts = paragraphs[i].getElementsByTagNameNS(ns, 't');
         let fullText = '';
         for (let j = 0; j < texts.length; j++) {
             fullText += texts[j].textContent || '';
         }
 
-        // Remove internal spaces that may appear between date parts (e.g., "02 .03 .2026")
         const cleaned = fullText.replace(/\s+/g, ' ');
 
-        // Match date patterns: DD.MM.YYYY (with optional spaces around dots)
+        // Priority 1: "станом на DD.MM.YYYY"
+        const mStanom = cleaned.match(/станом\s+на\s+(\d{2})\s*\.\s*(\d{2})\s*\.\s*(20\d{2})/i);
+        if (mStanom) return `${mStanom[3]}-${mStanom[2]}-${mStanom[1]}`;
+
+        // Priority 2: "по DD.MM.YYYY" (end of date range)
+        const mRange = cleaned.match(/по\s+(\d{2})\s*\.\s*(\d{2})\s*\.\s*(20\d{2})/i);
+        if (mRange) return `${mRange[3]}-${mRange[2]}-${mRange[1]}`;
+
+        // Priority 3: any DD.MM.YYYY pattern
         const m = cleaned.match(/(\d{2})\s*\.\s*(\d{2})\s*\.\s*(20\d{2})/);
-        if (m) {
-            return `${m[3]}-${m[2]}-${m[1]}`; // ISO format
-        }
+        if (m) return `${m[3]}-${m[2]}-${m[1]}`;
     }
     return null;
 }

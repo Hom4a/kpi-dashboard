@@ -12,3 +12,6 @@ export function setSummaryFilterState(v) { summaryFilterState = v; }
 
 export let summaryBlockComments = [];
 export function setSummaryBlockComments(v) { summaryBlockComments = v; }
+
+export let selectedWeeklyDate = null;
+export function setSelectedWeeklyDate(v) { selectedWeeklyDate = v; }

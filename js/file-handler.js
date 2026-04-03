@@ -273,7 +273,12 @@ async function handleDocxFile(buffer, fileName) {
         let reportDate = parsed.reportDate;
         if (!reportDate) {
             const fm = (fileName || '').match(/(\d{2})\.(\d{2})\.(20\d{2})/);
-            reportDate = fm ? `${fm[3]}-${fm[2]}-${fm[1]}` : new Date().toISOString().slice(0, 10);
+            if (fm) {
+                reportDate = `${fm[3]}-${fm[2]}-${fm[1]}`;
+            } else {
+                reportDate = new Date().toISOString().slice(0, 10);
+                toast('Не вдалося визначити дату з документа. Використано поточну дату.', true);
+            }
         }
         const result = await saveSummaryWeekly(parsed.records, parsed.notes, reportDate, fileName);
         if (result.added === 0 && result.updated === 0) {
