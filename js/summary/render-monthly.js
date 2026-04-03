@@ -250,13 +250,15 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
 }
 
 function renderSalaryTable(showYears, year, month, allData) {
-    const salaryRows = allData.filter(r =>
-        r.indicator_group === 'salary_by_branch' ||
-        r.indicator_name.toLowerCase().includes('філія') ||
-        r.indicator_name.toLowerCase().includes('лісовий офіс') ||
-        r.indicator_name.toLowerCase().includes('навчальний центр') ||
-        r.indicator_name.toLowerCase().includes('репродуктивні')
-    );
+    // Filter: only branch salary rows, exclude the header/total row
+    const EXCLUDE_SALARY = ['середня з/п по філіях', 'середня заробітна плата штатного'];
+    const salaryRows = allData.filter(r => {
+        const lower = r.indicator_name.toLowerCase();
+        if (EXCLUDE_SALARY.some(ex => lower.includes(ex))) return false;
+        return r.indicator_group === 'salary_by_branch' ||
+            lower.includes('філія') || lower.includes('лісовий офіс') ||
+            lower.includes('навчальний центр') || lower.includes('репродуктивні');
+    });
 
     const branchNames = [...new Set(salaryRows.map(r => r.indicator_name))].sort();
     if (!branchNames.length) return '';
@@ -309,6 +311,32 @@ function renderSalaryTable(showYears, year, month, allData) {
         cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name}"></span></td>`);
         html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
     }
+
+    // Average row (company-wide)
+    let avgCells = `<td class="ind-name"><b>Середня по підприємству</b></td>`;
+    for (const y of showYears) {
+        const vals = branchNames.map(n => {
+            const r = salaryRows.find(r => r.indicator_name === n && r.year === y && r.month === 0);
+            return r?.value_numeric;
+        }).filter(v => v != null);
+        if (vals.length) {
+            const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+            avgCells += `<td><b>${fN(avg)}</b></td>`;
+        } else avgCells += `<td>—</td>`;
+    }
+    const curVals = branchNames.map(n => {
+        const r = salaryRows.find(r => r.indicator_name === n && r.year === year && r.month === month);
+        return r?.value_numeric;
+    }).filter(v => v != null);
+    const prevVals = branchNames.map(n => {
+        const r = salaryRows.find(r => r.indicator_name === n && r.year === year && r.month === month - 1);
+        return r?.value_numeric;
+    }).filter(v => v != null);
+    const avgCur = curVals.length ? curVals.reduce((s, v) => s + v, 0) / curVals.length : null;
+    const avgPrev = prevVals.length ? prevVals.reduce((s, v) => s + v, 0) / prevVals.length : null;
+    avgCells += `<td><b>${avgCur != null ? fN(avgCur) : '—'}</b></td>`;
+    avgCells += `<td class="${deltaCls(avgCur, avgPrev)}">${deltaBadge(avgCur, avgPrev) || '—'}</td>`;
+    html += `<tr class="salary-avg-row" style="border-top:2px solid var(--primary);font-weight:600">${avgCells}</tr>`;
 
     html += `</tbody></table></div>`;
 
