@@ -604,14 +604,19 @@ function renderSectionTable(sData, blockColumns) {
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
         sData.map(r => {
             const delta = calcDeltaPct(r.value_current, r.value_previous);
+            // For finance: delta is stored directly in value_delta, not calculated from previous
+            const directDelta = r.value_delta != null;
+            const deltaDisplay = delta.display !== '—' ? delta
+                : directDelta ? { display: fmtNum(r.value_delta), badgeCls: r.value_delta > 0 ? 'badge-up' : r.value_delta < 0 ? 'badge-down' : '' }
+                : delta;
             const cellMap = {
                 indicator: r.indicator_name,
                 unit: r.unit || '',
                 current: r.value_text || fmtNum(r.value_current),
-                delta_pct: `<span class="summary-delta-badge ${delta.badgeCls}">${delta.display}</span>`,
+                delta_pct: `<span class="summary-delta-badge ${deltaDisplay.badgeCls}">${deltaDisplay.display}</span>`,
                 previous: fmtNum(r.value_previous),
                 ytd: fmtNum(r.value_ytd),
-                total: fmtNum(r.value_total),
+                total: fmtNum(r.value_text) || fmtNum(r.value_ytd),
                 value: r.value_text || fmtNum(r.value_current),
                 delta_yoy_pct: r.value_yoy != null ? calcDeltaPct(r.value_ytd, r.value_yoy).display : '—',
                 yoy: fmtNum(r.value_yoy),
