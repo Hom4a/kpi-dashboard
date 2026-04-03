@@ -444,6 +444,11 @@ function renderWeeklySectionTabs(data, date) {
             btn.textContent = 'Збереження...';
             try {
                 await saveBlockComment({ reportType: 'weekly', reportDate: date, blockId, content });
+                // Update local state so comment persists across tab switches
+                const idx = summaryBlockComments.findIndex(c => c.report_type === 'weekly' && c.report_date === date && c.block_id === blockId);
+                const entry = { report_type: 'weekly', report_date: date, block_id: blockId, content };
+                if (idx >= 0) summaryBlockComments[idx] = { ...summaryBlockComments[idx], ...entry };
+                else summaryBlockComments.push(entry);
                 // Show saved text, hide editor
                 const display = container.querySelector(`#wsCommentText_${blockId}`);
                 const editor = container.querySelector(`#wsCommentEdit_${blockId}`);
@@ -456,6 +461,7 @@ function renderWeeklySectionTabs(data, date) {
                 }
                 btn.textContent = 'Зберегти'; btn.disabled = false;
             } catch (e) {
+                console.error('Comment save error:', e);
                 btn.textContent = 'Помилка';
                 setTimeout(() => { btn.textContent = 'Зберегти'; btn.disabled = false; }, 2000);
             }

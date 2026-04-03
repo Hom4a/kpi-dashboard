@@ -196,22 +196,30 @@ export async function loadBlockComments(reportType, reportDate, year, month) {
 
 export async function saveBlockComment({ reportType, reportDate, reportYear, reportMonth, blockId, content }) {
     const { data: { session } } = await sb.auth.getSession();
-    const row = {
-        report_type: reportType,
-        block_id: blockId,
-        content,
-        created_by: session?.user?.id || null,
-        updated_at: new Date().toISOString()
-    };
-    if (reportType === 'weekly') row.report_date = reportDate;
-    if (reportType === 'monthly') { row.report_year = reportYear; row.report_month = reportMonth; }
 
-    const { error } = await sb.from('summary_block_comments').upsert(row, {
-        onConflict: reportType === 'weekly'
-            ? 'report_type,report_date,block_id'
-            : 'report_type,report_year,report_month,block_id'
-    });
-    if (error) throw new Error(error.message);
+    // Find existing comment (partial unique index doesn't work with Supabase upsert)
+    let q = sb.from('summary_block_comments').select('id')
+        .eq('report_type', reportType).eq('block_id', blockId);
+    if (reportType === 'weekly') q = q.eq('report_date', reportDate);
+    if (reportType === 'monthly') q = q.eq('report_year', reportYear).eq('report_month', reportMonth);
+    const { data: existing } = await q.maybeSingle();
+
+    if (existing) {
+        const { error } = await sb.from('summary_block_comments')
+            .update({ content, updated_at: new Date().toISOString() })
+            .eq('id', existing.id);
+        if (error) throw new Error(error.message);
+    } else {
+        const row = {
+            report_type: reportType, block_id: blockId, content,
+            created_by: session?.user?.id || null,
+            updated_at: new Date().toISOString()
+        };
+        if (reportType === 'weekly') row.report_date = reportDate;
+        if (reportType === 'monthly') { row.report_year = reportYear; row.report_month = reportMonth; }
+        const { error } = await sb.from('summary_block_comments').insert(row);
+        if (error) throw new Error(error.message);
+    }
 }
 
 export async function deleteBlockComment(id) {
