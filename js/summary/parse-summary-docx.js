@@ -184,6 +184,15 @@ function extractReportDate(doc, ns) {
 /**
  * Extract text notes (загальна оцінка, ключові події, etc.) from paragraphs
  */
+function isInsideTable(el) {
+    let node = el.parentNode;
+    while (node) {
+        if (node.localName === 'tbl') return true;
+        node = node.parentNode;
+    }
+    return false;
+}
+
 function extractNotes(doc, ns) {
     const paragraphs = doc.getElementsByTagNameNS(ns, 'p');
     const notes = [];
@@ -191,6 +200,9 @@ function extractNotes(doc, ns) {
     let currentContent = [];
 
     for (let i = 0; i < paragraphs.length; i++) {
+        // Skip paragraphs inside tables — they contain data, not notes
+        if (isInsideTable(paragraphs[i])) continue;
+
         const texts = paragraphs[i].getElementsByTagNameNS(ns, 't');
         let fullText = '';
         for (let j = 0; j < texts.length; j++) {
@@ -219,12 +231,17 @@ function extractNotes(doc, ns) {
             currentType = matchedType;
             currentContent = [];
 
-            // If the header line itself contains content after the label, capture it
-            // e.g., "Загальна оцінка тижня: позитивна динаміка..."
-            const colonIdx = fullText.indexOf(':');
-            if (colonIdx >= 0) {
-                const after = fullText.substring(colonIdx + 1).trim();
-                if (after) currentContent.push(after);
+            // For section XIV ('other'), capture full paragraph text (minus the Roman numeral header)
+            if (matchedType === 'other') {
+                const cleaned = fullText.replace(/^[ХXІIVX]+\.\s*/i, '').trim();
+                if (cleaned) currentContent.push(cleaned);
+            } else {
+                // For other notes: capture text after colon if present
+                const colonIdx = fullText.indexOf(':');
+                if (colonIdx >= 0) {
+                    const after = fullText.substring(colonIdx + 1).trim();
+                    if (after) currentContent.push(after);
+                }
             }
         } else if (currentType) {
             // Stop collecting when we hit a new Roman numeral section (Latin + Cyrillic)
@@ -234,8 +251,8 @@ function extractNotes(doc, ns) {
                 }
                 currentType = null;
                 currentContent = [];
-            } else if (!isBold || currentContent.length === 0) {
-                // Continue collecting content (skip bold sub-headers if we already have content)
+            } else if (currentType === 'other' || !isBold || currentContent.length === 0) {
+                // Collect all content; for 'other' (XIV) — include bold sub-headers too
                 currentContent.push(fullText);
             }
         }
