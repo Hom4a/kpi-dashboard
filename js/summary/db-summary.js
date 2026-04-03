@@ -75,42 +75,47 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
         }
         const unique = [...dedup.values()];
         upsertCount = unique.length;
-        const rows = unique.map(r => ({
-            upload_batch_id: batchId,
-            report_date: reportDate,
-            section: r.section,
-            indicator_name: r.indicator_name,
-            value_current: r.value_current,
-            value_previous: r.value_previous,
-            value_ytd: r.value_ytd,
-            value_delta: r.value_delta,
-            value_text: r.value_text || null,
-            unit: r.unit || null,
-            uploaded_by: userId
-        }));
-        for (let i = 0; i < rows.length; i += BATCH) {
-            const { error } = await sb.from('summary_weekly')
-                .upsert(rows.slice(i, i + BATCH), { onConflict: 'report_date,section,indicator_name' });
-            if (error) throw new Error(error.message);
+
+        // Insert/update one by one to avoid partial-index upsert issues
+        for (const r of unique) {
+            const row = {
+                upload_batch_id: batchId, report_date: reportDate,
+                section: r.section, indicator_name: r.indicator_name,
+                value_current: r.value_current, value_previous: r.value_previous,
+                value_ytd: r.value_ytd, value_delta: r.value_delta,
+                value_text: r.value_text || null, unit: r.unit || null,
+                uploaded_by: userId
+            };
+            const { data: existing } = await sb.from('summary_weekly').select('id')
+                .eq('report_date', reportDate).eq('section', r.section).eq('indicator_name', r.indicator_name)
+                .maybeSingle();
+            if (existing) {
+                await sb.from('summary_weekly').update(row).eq('id', existing.id);
+            } else {
+                const { error } = await sb.from('summary_weekly').insert(row);
+                if (error) console.warn('Insert skip:', r.section, r.indicator_name, error.message);
+            }
         }
     }
 
-    // Upsert text notes (preserves existing notes for other types)
+    // Save text notes (deduplicate by note_type, insert/update)
     let notesCount = 0;
     if (notes && notes.length) {
-        const noteRows = notes
-            .filter(n => n.content && n.content.trim())
-            .map(n => ({
-                report_date: reportDate,
-                note_type: n.note_type,
-                content: n.content.trim(),
-                uploaded_by: userId
-            }));
-        notesCount = noteRows.length;
-        if (noteRows.length) {
-            const { error } = await sb.from('summary_weekly_notes')
-                .upsert(noteRows, { onConflict: 'report_date,note_type' });
-            if (error) throw new Error(error.message);
+        const noteDedup = new Map();
+        for (const n of notes) {
+            if (n.content?.trim()) noteDedup.set(n.note_type, n);
+        }
+        for (const [, n] of noteDedup) {
+            notesCount++;
+            const { data: existing } = await sb.from('summary_weekly_notes').select('id')
+                .eq('report_date', reportDate).eq('note_type', n.note_type)
+                .maybeSingle();
+            const row = { report_date: reportDate, note_type: n.note_type, content: n.content.trim(), uploaded_by: userId };
+            if (existing) {
+                await sb.from('summary_weekly_notes').update(row).eq('id', existing.id);
+            } else {
+                await sb.from('summary_weekly_notes').insert(row);
+            }
         }
     }
 
