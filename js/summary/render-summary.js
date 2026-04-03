@@ -351,7 +351,9 @@ function renderWeeklyNotes(notes) {
 
 const SECTION_LABELS = {
     kpi: 'КРІ', forest_protection: 'Незаконні рубки', raids: 'Рейдова робота',
-    mru_raids: 'Спільні рейди з МРУ', demining: 'Розмінування', certification: 'Сертифікація',
+    mru_raids: 'Спільні рейди з МРУ', fires: 'Лісові пожежі',
+    forestry_campaign: 'Лісокультурна кампанія',
+    demining: 'Розмінування', certification: 'Сертифікація',
     land_self_forested: 'Самозалісені землі', land_reforestation: 'Лісорозведення',
     land_reserves: 'Землі запасу', harvesting: 'Заготівля', contracts: 'Договори',
     sales: 'Реалізація', finance: 'Фінанси', personnel: 'Персонал',

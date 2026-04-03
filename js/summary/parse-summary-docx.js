@@ -2,26 +2,50 @@
 // Parses "ДП Ліси України" weekly briefing documents (.docx)
 // Extracts tables and text notes from word/document.xml
 
-// Table index → section mapping (matches WEEKLY_SECTIONS keys in weekly-entry.js)
-const TABLE_MAP = [
-    { index: 0, section: 'kpi', cols: ['indicator', 'current', 'delta', 'previous', 'ytd'] },
-    { index: 1, section: 'forest_protection', cols: ['indicator', 'ytd', 'current'] },
-    { index: 2, section: 'raids', cols: ['indicator', 'ytd', 'current'] },
-    { index: 3, section: 'mru_raids', cols: ['indicator', 'ytd', 'current'] },
-    { index: 4, section: 'demining', cols: ['indicator', 'current'] },
-    { index: 5, section: 'certification', cols: ['indicator', 'current', 'ytd', 'delta'] },
-    { index: 6, section: 'land_self_forested', cols: ['indicator', 'all_time', 'ytd', 'current'] },
-    { index: 7, section: 'land_reforestation', cols: ['indicator', 'all_time', 'ytd', 'current'] },
-    { index: 8, section: 'land_reserves', cols: ['indicator', 'all_time', 'ytd', 'current'] },
-    { index: 9, section: 'harvesting', cols: ['indicator', 'current'] },
-    { index: 10, section: 'contracts', cols: ['indicator', 'current', 'ytd', 'delta'] },
-    { index: 11, section: 'sales', cols: ['indicator', 'current'] },
-    { index: 12, section: 'finance', cols: ['indicator', 'current', 'delta'] },
-    { index: 13, section: 'personnel', cols: ['indicator', 'current'] },
-    { index: 14, section: 'legal', cols: ['indicator', 'current'] },
-    { index: 15, section: 'procurement', cols: ['indicator', 'current'] },
-    { index: 16, section: 'zsu', cols: ['indicator', 'current'] },
+// Smart table detection by header/data keywords (handles 17, 19+ tables)
+const SECTION_SIGS = [
+    { section: 'kpi',                 header: /попередній тиждень/i,              cols: ['indicator', 'current', 'delta', 'previous', 'ytd'] },
+    { section: 'forest_protection',   data:   /кількість випадків/i,             cols: ['indicator', 'ytd', 'current'] },
+    { section: 'raids',               data:   /кількість рейдів(?!.*шт)/i,      cols: ['indicator', 'ytd', 'current'] },
+    { section: 'mru_raids',           data:   /кількість рейдів.*шт/i,          cols: ['indicator', 'ytd', 'current'] },
+    { section: 'fires',               data:   /кількість\s*пожеж/i,             cols: ['indicator', 'ytd', 'current'] },
+    { section: 'forestry_campaign',   data:   /площа створених/i,               cols: ['indicator', 'ytd', 'current'] },
+    { section: 'demining',            header: /площа.*тис.*га/i,                 cols: ['indicator', 'current'] },
+    { section: 'certification',       header: /надлісництва/i,                   cols: ['indicator', 'current', 'ytd', 'delta'] },
+    { section: 'land_self_forested',  data:   /надіслано клопотань/i,            cols: ['indicator', 'all_time', 'ytd', 'current'], seq: 0 },
+    { section: 'land_reforestation',  data:   /надіслано клопотань/i,            cols: ['indicator', 'all_time', 'ytd', 'current'], seq: 1 },
+    { section: 'land_reserves',       data:   /подано клопотань/i,               cols: ['indicator', 'all_time', 'ytd', 'current'] },
+    { section: 'harvesting',          data:   /заготовлено з початку/i,          cols: ['indicator', 'current'] },
+    { section: 'contracts',           header: /тип.*обсяг|обсяг.*млн\s*м/i,     cols: ['indicator', 'current', 'ytd', 'delta'] },
+    { section: 'sales',               data:   /реалізовано з початку/i,          cols: ['indicator', 'current'] },
+    { section: 'finance',             header: /за тиждень/i, data: /залишки коштів/i, cols: ['indicator', 'current', 'delta'] },
+    { section: 'personnel',           data:   /облікова чисельність/i,           cols: ['indicator', 'current'] },
+    { section: 'legal',               data:   /загальна площа земель/i,          cols: ['indicator', 'current'] },
+    { section: 'procurement',         data:   /процедури з початку/i,            cols: ['indicator', 'current'] },
+    { section: 'zsu',                 data:   /допомога з початку/i,             cols: ['indicator', 'current'] },
 ];
+
+function identifyTable(headerText, firstRowText) {
+    const h = headerText.toLowerCase().replace(/\s+/g, ' ');
+    const d = firstRowText.toLowerCase().replace(/\s+/g, ' ');
+    for (const sig of SECTION_SIGS) {
+        if (sig._matched) continue; // already matched (no duplicates except seq)
+        const hOk = !sig.header || sig.header.test(h);
+        const dOk = !sig.data || sig.data.test(d);
+        if (hOk && dOk) {
+            if (sig.seq != null) {
+                // Sequential matching: first match → seq=0, second → seq=1
+                const seqKey = `_seq_${sig.data}`;
+                identifyTable[seqKey] = (identifyTable[seqKey] || 0);
+                if (identifyTable[seqKey] !== sig.seq) { identifyTable[seqKey]++; continue; }
+                identifyTable[seqKey]++;
+            }
+            sig._matched = true;
+            return sig;
+        }
+    }
+    return null;
+}
 
 // Note type detection from text sections
 const NOTE_PATTERNS = [
@@ -55,13 +79,27 @@ export async function parseSummaryDocx(buffer) {
     // Extract report date from title/filename
     const reportDate = extractReportDate(doc, ns);
 
-    // Extract all tables
+    // Extract all tables — identify each by header/data keywords
     const tables = doc.getElementsByTagNameNS(ns, 'tbl');
     const records = [];
 
-    for (let ti = 0; ti < tables.length && ti < TABLE_MAP.length; ti++) {
-        const mapping = TABLE_MAP[ti];
+    // Reset sequential matching state
+    for (const sig of SECTION_SIGS) { sig._matched = false; }
+    for (const k of Object.keys(identifyTable)) { if (k.startsWith('_seq_')) delete identifyTable[k]; }
+
+    for (let ti = 0; ti < tables.length; ti++) {
         const tableRows = tables[ti].getElementsByTagNameNS(ns, 'tr');
+        if (tableRows.length < 2) continue;
+
+        // Get header + first data row text for identification
+        const headerText = getCellText(tableRows[0], ns, true);
+        const firstDataText = tableRows.length > 1 ? getCellText(tableRows[1], ns, true) : '';
+        const mapping = identifyTable(headerText, firstDataText);
+        if (!mapping) {
+            console.log(`DOCX parser: skipping unknown table ${ti}: "${headerText.slice(0, 60)}" / "${firstDataText.slice(0, 60)}"`);
+            continue;
+        }
+        console.log(`DOCX parser: table ${ti} → ${mapping.section}`);
 
         // Skip header row (index 0), parse data rows
         for (let ri = 1; ri < tableRows.length; ri++) {
@@ -104,9 +142,19 @@ export async function parseSummaryDocx(buffer) {
 /**
  * Extract text content from a table cell, joining all <w:t> elements
  */
-function getCellText(tc, ns) {
+function getCellText(el, ns, joinAll) {
+    if (joinAll) {
+        // Join ALL <w:t> in the element (used for rows — get all cell texts combined)
+        const texts = [];
+        const tElements = el.getElementsByTagNameNS(ns, 't');
+        for (let i = 0; i < tElements.length; i++) {
+            const t = tElements[i].textContent;
+            if (t) texts.push(t);
+        }
+        return texts.join(' ').trim();
+    }
     const texts = [];
-    const tElements = tc.getElementsByTagNameNS(ns, 't');
+    const tElements = el.getElementsByTagNameNS(ns, 't');
     for (let i = 0; i < tElements.length; i++) {
         const t = tElements[i].textContent;
         if (t) texts.push(t);
