@@ -72,26 +72,35 @@ export async function openMonthlyIndicatorModal(indicatorName, group) {
     // Populate month selector from available data
     const history = await loadMonthlyIndicatorHistory(indicatorName);
     const availMonths = [...new Set(history.filter(r => r.month > 0).map(r => r.month))].sort((a, b) => a - b);
-    _selectedMonth = availMonths.length ? availMonths[availMonths.length - 1] : new Date().getMonth() + 1;
+    const isAnnualOnly = availMonths.length === 0;
+    _selectedMonth = availMonths.length ? availMonths[availMonths.length - 1] : null;
 
     const monthSel = $('infModalMonthSelect');
     if (monthSel) {
-        monthSel.style.display = '';
-        monthSel.innerHTML = availMonths.map(m =>
-            `<option value="${m}"${m === _selectedMonth ? ' selected' : ''}>${MO_SHORT[m - 1]}</option>`
-        ).join('');
-        monthSel.onchange = async () => {
-            _selectedMonth = parseInt(monthSel.value);
-            const activeBtn = document.querySelector('#infModalPeriod .inf-period-btn.active');
-            const mode = activeBtn?.dataset.mode || 'month_vs_month';
-            if (mode === 'years') await loadAndDrawMonthlyYears(_currentIndicator);
-            else if (mode === 'ytd') await loadAndDrawMonthlyYTD(_currentIndicator);
-            else await loadAndDrawMonthlyMonthVsMonth(_currentIndicator);
-        };
+        if (isAnnualOnly) {
+            monthSel.style.display = 'none';
+        } else {
+            monthSel.style.display = '';
+            monthSel.innerHTML = availMonths.map(m =>
+                `<option value="${m}"${m === _selectedMonth ? ' selected' : ''}>${MO_SHORT[m - 1]}</option>`
+            ).join('');
+            monthSel.onchange = async () => {
+                _selectedMonth = parseInt(monthSel.value);
+                const activeBtn = document.querySelector('#infModalPeriod .inf-period-btn.active');
+                const mode = activeBtn?.dataset.mode || 'month_vs_month';
+                if (mode === 'years') await loadAndDrawMonthlyYears(_currentIndicator);
+                else if (mode === 'ytd') await loadAndDrawMonthlyYTD(_currentIndicator);
+                else await loadAndDrawMonthlyMonthVsMonth(_currentIndicator);
+            };
+        }
     }
 
     renderPeriodButtons('monthly', indicatorName, group);
-    await loadAndDrawMonthlyMonthVsMonth(indicatorName);
+    if (isAnnualOnly) {
+        await loadAndDrawMonthlyYears(indicatorName);
+    } else {
+        await loadAndDrawMonthlyMonthVsMonth(indicatorName);
+    }
 }
 
 function renderMeta(current, prev, delta) {
