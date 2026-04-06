@@ -215,8 +215,11 @@ export function renderMonthlyReport(container, year, month) {
 }
 
 function getLatestMonth(year) {
+    // Find the latest month that has actual numeric data for the selected year
+    // Use only sub_type='value' to avoid false positives from volume/price records
     const months = summaryIndicators
-        .filter(r => r.year === year && r.month > 0)
+        .filter(r => r.year === year && r.month > 0 && r.value_numeric != null
+            && (!r.sub_type || r.sub_type === 'value'))
         .map(r => r.month);
     return months.length ? Math.max(...months) : null;
 }
