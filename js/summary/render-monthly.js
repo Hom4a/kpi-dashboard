@@ -421,29 +421,24 @@ function renderSalaryTable(showYears, year, month, allData) {
         html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
     }
 
-    // FIX #8: Average from actual company-wide data, not avg of branches
-    let avgCells = `<td class="ind-name"><b>Середня по підприємству</b></td>`;
+    // Average across displayed branches
+    let avgCells = `<td class="ind-name"><b>Середня по філіях</b></td>`;
     for (const y of showYears) {
         if (y > year) { avgCells += '<td>—</td>'; continue; }
-        // Try to find the real company-wide average salary
-        const realAvg = allData.find(r =>
-            r.indicator_name.toLowerCase().includes('середня заробітна плата штатного') &&
-            r.year === y && r.month === 0 && r.value_numeric != null);
-        if (realAvg) {
-            avgCells += `<td><b>${fN(realAvg.value_numeric)}</b></td>`;
-        } else {
-            avgCells += `<td>—</td>`;
-        }
+        const vals = branchNames.map(n => {
+            const r = salaryRows.find(r => r.indicator_name === n && r.year === y && r.month === 0);
+            return r?.value_numeric;
+        }).filter(v => v != null);
+        avgCells += vals.length ? `<td><b>${fN(vals.reduce((s, v) => s + v, 0) / vals.length)}</b></td>` : '<td>—</td>';
     }
-    // Current month average from real data
-    const realAvgCur = allData.find(r =>
-        r.indicator_name.toLowerCase().includes('середня заробітна плата штатного') &&
-        r.year === year && r.month === month && r.value_numeric != null);
-    const realAvgPrev = month > 1
-        ? allData.find(r => r.indicator_name.toLowerCase().includes('середня заробітна плата штатного') && r.year === year && r.month === month - 1 && r.value_numeric != null)
-        : allData.find(r => r.indicator_name.toLowerCase().includes('середня заробітна плата штатного') && r.year === year - 1 && r.month === 12 && r.value_numeric != null);
-    const avgCur = realAvgCur?.value_numeric ?? null;
-    const avgPrev = realAvgPrev?.value_numeric ?? null;
+    const curVals = branchNames.map(n => salaryRows.find(r => r.indicator_name === n && r.year === year && r.month === month)?.value_numeric).filter(v => v != null);
+    const prevVals = branchNames.map(n => {
+        const pm = month > 1 ? month - 1 : 12;
+        const py = month > 1 ? year : year - 1;
+        return salaryRows.find(r => r.indicator_name === n && r.year === py && r.month === pm)?.value_numeric;
+    }).filter(v => v != null);
+    const avgCur = curVals.length ? curVals.reduce((s, v) => s + v, 0) / curVals.length : null;
+    const avgPrev = prevVals.length ? prevVals.reduce((s, v) => s + v, 0) / prevVals.length : null;
     avgCells += `<td><b>${avgCur != null ? fN(avgCur) : '—'}</b></td>`;
     avgCells += `<td class="${deltaCls(avgCur, avgPrev)}">${deltaBadge(avgCur, avgPrev) || '—'}</td>`;
     html += `<tr class="salary-avg-row" style="border-top:2px solid var(--primary);font-weight:600">${avgCells}</tr>`;
