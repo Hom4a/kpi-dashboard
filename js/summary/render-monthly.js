@@ -227,26 +227,22 @@ function isSub(name, subSet) {
     return [...subSet].some(s => s.replace(/\s+/g, ' ').trim().toLowerCase() === n);
 }
 
-// FIX #2: match indicator — prefer sub_type='value', fallback to any
+// Match indicator: collect ALL records with matching name (exact + fuzzy both directions)
 function matchIndicator(name, allData) {
     const lower = name.toLowerCase().replace(/\s+/g, ' ').trim();
-    // Exact match (value sub_type first)
-    let rows = allData.filter(r => r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim() === lower && r.sub_type === 'value');
-    if (rows.length) return rows;
-    // Exact match any sub_type
-    rows = allData.filter(r => r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim() === lower);
-    if (rows.length) return rows;
-    // Fuzzy: one direction only (name contains data or data contains name)
-    rows = allData.filter(r => {
+    const matched = new Set();
+    const result = [];
+
+    for (const r of allData) {
+        if (matched.has(r)) continue;
         const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
-        return rk.includes(lower);
-    });
-    if (rows.length) return rows;
-    // Reverse fuzzy
-    return allData.filter(r => {
-        const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
-        return lower.includes(rk) && rk.length > 5;
-    });
+        // Exact match OR either direction contains
+        if (rk === lower || rk.includes(lower) || (lower.includes(rk) && rk.length > 5)) {
+            matched.add(r);
+            result.push(r);
+        }
+    }
+    return result;
 }
 
 function renderTable(title, rowNames, subSet, showYears, year, month, allData, commentId) {
