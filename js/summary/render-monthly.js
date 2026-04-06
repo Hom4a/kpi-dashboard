@@ -20,12 +20,13 @@ function fN(v) {
 function deltaBadge(cur, prev) {
     if (cur == null || prev == null) return '';
     if (typeof cur === 'string' || typeof prev === 'string') return '';
-    if (prev === 0) {
+    if (prev === 0 || Math.abs(prev) < 0.01) {
         if (cur === 0) return '';
-        return `<span class="pivot-badge-orange">${cur > 0 ? '+' : ''}${fN(cur)}</span>`;
+        return `<span class="pivot-badge-orange">—</span>`;
     }
     const pct = Math.round((cur / prev) * 1000) / 10;
     if (pct === 100) return '';
+    if (pct > 9999 || pct < 0) return `<span class="pivot-badge-orange">—</span>`;
     return pct > 100
         ? `<span class="pivot-badge-up">${pct}%</span>`
         : `<span class="pivot-badge-down">${pct}%</span>`;
@@ -33,8 +34,9 @@ function deltaBadge(cur, prev) {
 
 function deltaCls(cur, prev) {
     if (cur == null || prev == null || typeof cur === 'string' || typeof prev === 'string') return '';
-    if (prev === 0) return cur !== 0 ? 'cell-orange' : '';
+    if (prev === 0 || Math.abs(prev) < 0.01) return cur !== 0 ? 'cell-orange' : '';
     const pct = (cur / prev) * 100;
+    if (pct > 9999 || pct < 0) return 'cell-orange';
     return pct > 100 ? 'cell-up' : pct < 100 ? 'cell-down' : '';
 }
 
