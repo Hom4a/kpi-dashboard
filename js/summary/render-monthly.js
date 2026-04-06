@@ -171,7 +171,14 @@ const TABLE_2_SUB = new Set([
 export function renderMonthlyReport(container, year, month) {
     if (!container) return;
     if (!month) month = getLatestMonth(year);
-    if (!month) month = new Date().getMonth() + 1;
+    if (!month) {
+        // Fallback: find latest month across all years
+        const allMonths = summaryIndicators
+            .filter(r => r.month > 0 && r.value_numeric != null && (!r.sub_type || r.sub_type === 'value'))
+            .sort((a, b) => b.year - a.year || b.month - a.month);
+        month = allMonths.length ? allMonths[0].month : 1;
+    }
+    console.log(`renderMonthlyReport: year=${year}, month=${month}`);
 
     const allYears = [...new Set(summaryIndicators.map(r => r.year))].sort();
     const showYears = allYears.slice(-5);
