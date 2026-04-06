@@ -351,15 +351,20 @@ function renderSalaryTable(showYears, year, month, allData) {
     const salaryRows = allData.filter(r => {
         const lower = r.indicator_name.toLowerCase();
         if (EXCLUDE_SALARY.some(ex => lower.includes(ex))) return false;
-        if (lower.startsWith('**') || lower.startsWith('***')) return false; // footnotes
+        if (lower.startsWith('*')) return false; // footnotes: *, **, ***
+        if (lower.startsWith('довідково')) return false;
+        if (lower.includes('прожитковий') || lower.includes('мінімальна заробітна') || lower.includes('середня заробітна плата в країні')) return false;
         return r.indicator_group === 'salary_by_branch' ||
             lower.includes('філія') || lower.includes('лісовий офіс') ||
             lower.includes('навчальний центр') || lower.includes('репродуктивні') ||
-            lower.includes('пожежний') || lower.includes('карпатський');
+            lower.includes('пожежний') || lower.includes('карпатський') ||
+            lower.includes('південний') || lower.includes('північний') ||
+            lower.includes('подільський') || lower.includes('поліський') ||
+            lower.includes('слобожанський') || lower.includes('столичний') ||
+            lower.includes('східний') || lower.includes('центральний');
     });
 
-    // Smart branch filtering: show branches that have data in the selected year
-    // Priority: branches with data in selected month → branches with data in selected year → all
+    // Show branches that exist in the selected year's data
     let branchNames = [...new Set(salaryRows
         .filter(r => r.year === year && r.value_numeric != null)
         .map(r => r.indicator_name))].sort();
