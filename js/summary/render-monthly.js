@@ -49,19 +49,31 @@ const TABLE_1_ROWS = [
     'Залишок коштів на рахунках, млн. грн',
     'Недоїмка перед бюджетом, млн. грн',
     'Недоїмка перед ПФ, млн. грн',
-    'Недоїмка перед бюджетом млн. грн',
+    // FIX #5: removed duplicate 'Недоїмка перед бюджетом млн. грн'
     'Загальна реалізація, млн. грн',
     'в т.ч: лісоматеріали в круглому вигляді, млн. грн',
     'продукція переробки,  млн. грн',
     'інша реалізація (послуги, побічне користування тощо), млн грн',
     'Обсяг переробки, всього, тис. м3',
+    // FIX #4: sub-indicators for processing
+    'В т.ч: хвойні',
+    'дуб',
+    'інші',
     'Реалізація лісоматеріалів круглих, тис. м3',
     'Середня цін реалізації 1 м3 лісоматеріалів круглих, грн/м3',
+    // FIX #4: volume/price sub-indicators
+    'В.т.ч: вільха, береза тис. м3/сер. ціна грн',
+    'сосна тис. м3/сер. ціна грн',
+    'дуб тис. м3/сер. ціна грн',
+    'інші тис. м3/сер. ціна грн',
     "Реалізація деревини дров'яної ПВ  тис. м3",
     'Середня ціна реалізації 1 м3 деревини дровяної ПВ, грн/м3',
     "Реалізація деревини дров'яної НП  тис. м3",
     'Середня ціна реалізації 1 м3 деревини дровяної НП, грн/м3',
     'Реалізовано на експорт, млн. грн',
+    // FIX #4: export sub-indicators
+    'У т.ч.: продукція переробки (деревина) м3/сер. ціна грн',
+    'продукція переробки (тріска) м3/сер. ціна грн',
     'Реалізовано на 1 штатного, грн',
     'Заготівля деревини, всього  тис. м3',
     'Рубки головного користування',
@@ -73,13 +85,29 @@ const TABLE_1_ROWS = [
     'Вирощування садивного матеріалу із закритою кореневою системою, млн шт.'
 ];
 
-// Sub-indicators (indented with →)
+// FIX #4: Sub-indicators (indented with →) — normalized matching
 const SUB_INDICATORS = new Set([
     'в т.ч: лісоматеріали в круглому вигляді, млн. грн',
     'продукція переробки,  млн. грн',
     'інша реалізація (послуги, побічне користування тощо), млн грн',
+    'В т.ч: хвойні', 'дуб', 'інші',
+    'В.т.ч: вільха, береза тис. м3/сер. ціна грн',
+    'сосна тис. м3/сер. ціна грн',
+    'дуб тис. м3/сер. ціна грн',
+    'інші тис. м3/сер. ціна грн',
+    'У т.ч.: продукція переробки (деревина) м3/сер. ціна грн',
+    'продукція переробки (тріска) м3/сер. ціна грн',
     'Рубки головного користування',
     'Рубки формування і оздоровлення лісів'
+]);
+
+// FIX #6: Bold indicators (group headers / totals)
+const BOLD_ROWS = new Set([
+    'Загальна реалізація, млн. грн',
+    'Обсяг переробки, всього, тис. м3',
+    'Реалізація лісоматеріалів круглих, тис. м3',
+    'Заготівля деревини, всього  тис. м3',
+    'Сплачено податків та зборів всього млн. грн.',
 ]);
 
 const TABLE_2_ROWS = [
@@ -111,6 +139,11 @@ const TABLE_2_SUB = new Set([
     'інші   млн. грн'
 ]);
 
+// FIX #7: Animal limits data
+const ANIMAL_ROWS = [
+    'Олень благор.', 'Олень плямистий', 'Козуля', 'Кабан', 'Лань', 'Муфлон'
+];
+
 // ===== Rendering =====
 
 export function renderMonthlyReport(container, year, month) {
@@ -120,7 +153,8 @@ export function renderMonthlyReport(container, year, month) {
 
     const allYears = [...new Set(summaryIndicators.map(r => r.year))].sort();
     const showYears = allYears.slice(-5);
-    const allData = summaryIndicators.filter(r => r.sub_type === 'value');
+    // FIX #2: include ALL sub_types, not just 'value'
+    const allData = summaryIndicators;
 
     // Month selector
     let monthSelectHtml = `<select id="monthlyMonthSelect" class="filter-select" style="width:auto;min-width:100px">
@@ -134,6 +168,9 @@ export function renderMonthlyReport(container, year, month) {
 
     // Table 1: Main indicators
     html += renderTable('Основні показники', TABLE_1_ROWS, SUB_INDICATORS, showYears, year, month, allData, 'monthly_t1');
+
+    // Table 1b: Animal limits
+    html += renderAnimalTable(showYears, year, allData);
 
     // Table 2: Taxes
     html += renderTable('Податки та збори', TABLE_2_ROWS, TABLE_2_SUB, showYears, year, month, allData, 'monthly_t2');
@@ -153,7 +190,6 @@ export function renderMonthlyReport(container, year, month) {
     wireCommentSaves(container, year, month);
     const reportDate = `${year}-${String(month).padStart(2, '0')}-01`;
     initCellAnnotations(container, 'monthly', reportDate, { year, month });
-
 }
 
 function getLatestMonth(year) {
@@ -161,6 +197,34 @@ function getLatestMonth(year) {
         .filter(r => r.year === year && r.month > 0)
         .map(r => r.month);
     return months.length ? Math.max(...months) : null;
+}
+
+// FIX #4: normalized matching for sub-indicators
+function isSub(name, subSet) {
+    const n = name.replace(/\s+/g, ' ').trim().toLowerCase();
+    return [...subSet].some(s => s.replace(/\s+/g, ' ').trim().toLowerCase() === n);
+}
+
+// FIX #2: match indicator — prefer sub_type='value', fallback to any
+function matchIndicator(name, allData) {
+    const lower = name.toLowerCase().replace(/\s+/g, ' ').trim();
+    // Exact match (value sub_type first)
+    let rows = allData.filter(r => r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim() === lower && r.sub_type === 'value');
+    if (rows.length) return rows;
+    // Exact match any sub_type
+    rows = allData.filter(r => r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim() === lower);
+    if (rows.length) return rows;
+    // Fuzzy: one direction only (name contains data or data contains name)
+    rows = allData.filter(r => {
+        const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
+        return rk.includes(lower);
+    });
+    if (rows.length) return rows;
+    // Reverse fuzzy
+    return allData.filter(r => {
+        const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
+        return lower.includes(rk) && rk.length > 5;
+    });
 }
 
 function renderTable(title, rowNames, subSet, showYears, year, month, allData, commentId) {
@@ -183,49 +247,48 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             <tbody>`;
 
     for (const name of rowNames) {
-        const isSub = subSet.has(name);
-        const displayName = isSub ? `<span class="indent-sub">→ ${name}</span>` : name;
+        const sub = isSub(name, subSet);
+        const bold = BOLD_ROWS.has(name); // FIX #6
+        let displayName = sub ? `<span class="indent-sub">→ ${name}</span>` : name;
+        if (bold) displayName = `<b>${displayName}</b>`;
 
-        // Find data for this indicator
-        const match = n => {
-            const lower = n.toLowerCase().trim();
-            return allData.filter(r => r.indicator_name.toLowerCase().trim() === lower);
-        };
-        let rows = match(name);
-        // Fuzzy match: try partial
-        if (!rows.length) {
-            const key = name.toLowerCase().replace(/\s+/g, ' ').trim();
-            rows = allData.filter(r => {
-                const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
-                return rk.includes(key) || key.includes(rk);
-            });
-        }
+        const rows = matchIndicator(name, allData);
 
-        // Annual values — use month=0 (annual) record; fallback to sum of months for current year
         let cells = `<td class="ind-name">${displayName}</td>`;
         for (const y of showYears) {
+            // FIX #1: years > selected year → dashes
+            if (y > year) { cells += '<td>—</td>'; continue; }
+
             const ann = rows.find(r => r.year === y && r.month === 0);
             if (ann?.value_numeric != null) {
-                // Annual record exists — use it (works for both past years and current year)
                 const isCurrent = y === year;
                 cells += `<td${isCurrent ? '><b' : ''}>${fN(ann.value_numeric)}${isCurrent ? '</b>' : ''}</td>`;
             } else if (y === year) {
-                // No annual record for current year — compute from monthly data
-                const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
+                // FIX #1: YTD only up to selected month
+                const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
                 if (monthlyRecords.length) {
                     const ytd = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
                     cells += `<td><b>${fN(ytd)}</b></td>`;
                 } else {
-                    cells += `<td>${ann?.value_text || '—'}</td>`;
+                    cells += `<td>—</td>`;
                 }
             } else {
-                cells += `<td>${ann?.value_text || '—'}</td>`;
+                // Non-current past year without annual record — try sum of months
+                const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
+                if (monthlyRecords.length) {
+                    const ytd = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                    cells += `<td>${fN(ytd)}</td>`;
+                } else {
+                    cells += `<td>—</td>`;
+                }
             }
         }
 
-        // Selected month value + delta vs previous month
+        // FIX #3: delta — for January, compare with December of previous year
         const monthRec = rows.find(r => r.year === year && r.month === month);
-        const prevMonthRec = rows.find(r => r.year === year && r.month === month - 1);
+        const prevMonthRec = month > 1
+            ? rows.find(r => r.year === year && r.month === month - 1)
+            : rows.find(r => r.year === year - 1 && r.month === 12);
         const curVal = monthRec?.value_numeric;
         const prevVal = prevMonthRec?.value_numeric;
 
@@ -239,9 +302,9 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
 
     html += `</tbody></table></div>`;
 
-    // Comment area
+    // FIX #9: comment full width
     const val = existingComment ? existingComment.content.replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
-    html += `<div class="ws-block-comment">
+    html += `<div class="ws-block-comment monthly-comment-block">
         <textarea class="ws-comment-input monthly-comment" data-block="${commentId}" placeholder="Коментар..." rows="2">${val}</textarea>
         <button class="ws-comment-save btn-sm" data-block="${commentId}">Зберегти</button>
     </div>`;
@@ -250,8 +313,40 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
     return html;
 }
 
+// FIX #7: Animal limits table
+function renderAnimalTable(showYears, year, allData) {
+    const animalData = allData.filter(r =>
+        ANIMAL_ROWS.some(a => r.indicator_name.toLowerCase().includes(a.toLowerCase()))
+    );
+    if (!animalData.length) return '';
+
+    let html = `<div class="monthly-table-block">
+        <div class="monthly-table-header" data-collapse-target="mt_animals">
+            <span class="ws-block-chevron">▶</span>
+            <span class="monthly-table-title">Чисельність / кількість лімітів тварин</span>
+        </div>
+        <div class="monthly-table-body" id="mt_animals" style="display:none">
+        <div class="tbl-wrap"><table class="tbl monthly-tbl">
+            <thead><tr><th>Вид</th>${showYears.filter(y => y <= year).map(y => `<th>${y} рік</th>`).join('')}</tr></thead>
+            <tbody>`;
+
+    for (const animal of ANIMAL_ROWS) {
+        const rows = animalData.filter(r => r.indicator_name.toLowerCase().includes(animal.toLowerCase()));
+        if (!rows.length) continue;
+        let cells = `<td class="ind-name">${animal}</td>`;
+        for (const y of showYears) {
+            if (y > year) continue;
+            const rec = rows.find(r => r.year === y && (r.month === 0 || r.month == null));
+            cells += `<td>${rec?.value_text || (rec?.value_numeric != null ? fN(rec.value_numeric) : '—')}</td>`;
+        }
+        html += `<tr>${cells}</tr>`;
+    }
+
+    html += `</tbody></table></div></div></div>`;
+    return html;
+}
+
 function renderSalaryTable(showYears, year, month, allData) {
-    // Filter: only branch salary rows, exclude the header/total row
     const EXCLUDE_SALARY = ['середня з/п по філіях', 'середня заробітна плата штатного'];
     const salaryRows = allData.filter(r => {
         const lower = r.indicator_name.toLowerCase();
@@ -261,7 +356,13 @@ function renderSalaryTable(showYears, year, month, allData) {
             lower.includes('навчальний центр') || lower.includes('репродуктивні');
     });
 
-    const branchNames = [...new Set(salaryRows.map(r => r.indicator_name))].sort();
+    // FIX #10: filter branches by those with data in selected month (fallback to all)
+    let branchNames = [...new Set(salaryRows
+        .filter(r => r.year === year && r.month === month && r.value_numeric != null)
+        .map(r => r.indicator_name))].sort();
+    if (!branchNames.length) {
+        branchNames = [...new Set(salaryRows.map(r => r.indicator_name))].sort();
+    }
     if (!branchNames.length) return '';
 
     const comments = summaryBlockComments.filter(c => c.report_type === 'monthly' && c.block_id === 'monthly_t3');
@@ -286,12 +387,13 @@ function renderSalaryTable(showYears, year, month, allData) {
         const rows = salaryRows.filter(r => r.indicator_name === name);
         let cells = `<td class="ind-name">${name}</td>`;
         for (const y of showYears) {
+            if (y > year) { cells += '<td>—</td>'; continue; } // FIX #1
             const ann = rows.find(r => r.year === y && r.month === 0);
             if (ann?.value_numeric != null) {
                 const isCurrent = y === year;
                 cells += `<td${isCurrent ? '><b' : ''}>${fN(ann.value_numeric)}${isCurrent ? '</b>' : ''}</td>`;
             } else if (y === year) {
-                const monthlyRecs = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
+                const monthlyRecs = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
                 if (monthlyRecs.length) {
                     const avg = monthlyRecs.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecs.length;
                     cells += `<td><b>${fN(avg)}</b></td>`;
@@ -303,7 +405,10 @@ function renderSalaryTable(showYears, year, month, allData) {
             }
         }
         const cur = rows.find(r => r.year === year && r.month === month);
-        const prev = rows.find(r => r.year === year && r.month === month - 1);
+        // FIX #3: January → December prev year
+        const prev = month > 1
+            ? rows.find(r => r.year === year && r.month === month - 1)
+            : rows.find(r => r.year === year - 1 && r.month === 12);
         const curVal = cur?.value_numeric;
         const prevVal = prev?.value_numeric;
         cells += `<td><b>${curVal != null ? fN(curVal) : '—'}</b></td>`;
@@ -313,28 +418,29 @@ function renderSalaryTable(showYears, year, month, allData) {
         html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
     }
 
-    // Average row (company-wide)
+    // FIX #8: Average from actual company-wide data, not avg of branches
     let avgCells = `<td class="ind-name"><b>Середня по підприємству</b></td>`;
     for (const y of showYears) {
-        const vals = branchNames.map(n => {
-            const r = salaryRows.find(r => r.indicator_name === n && r.year === y && r.month === 0);
-            return r?.value_numeric;
-        }).filter(v => v != null);
-        if (vals.length) {
-            const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
-            avgCells += `<td><b>${fN(avg)}</b></td>`;
-        } else avgCells += `<td>—</td>`;
+        if (y > year) { avgCells += '<td>—</td>'; continue; }
+        // Try to find the real company-wide average salary
+        const realAvg = allData.find(r =>
+            r.indicator_name.toLowerCase().includes('середня заробітна плата штатного') &&
+            r.year === y && r.month === 0 && r.value_numeric != null);
+        if (realAvg) {
+            avgCells += `<td><b>${fN(realAvg.value_numeric)}</b></td>`;
+        } else {
+            avgCells += `<td>—</td>`;
+        }
     }
-    const curVals = branchNames.map(n => {
-        const r = salaryRows.find(r => r.indicator_name === n && r.year === year && r.month === month);
-        return r?.value_numeric;
-    }).filter(v => v != null);
-    const prevVals = branchNames.map(n => {
-        const r = salaryRows.find(r => r.indicator_name === n && r.year === year && r.month === month - 1);
-        return r?.value_numeric;
-    }).filter(v => v != null);
-    const avgCur = curVals.length ? curVals.reduce((s, v) => s + v, 0) / curVals.length : null;
-    const avgPrev = prevVals.length ? prevVals.reduce((s, v) => s + v, 0) / prevVals.length : null;
+    // Current month average from real data
+    const realAvgCur = allData.find(r =>
+        r.indicator_name.toLowerCase().includes('середня заробітна плата штатного') &&
+        r.year === year && r.month === month && r.value_numeric != null);
+    const realAvgPrev = month > 1
+        ? allData.find(r => r.indicator_name.toLowerCase().includes('середня заробітна плата штатного') && r.year === year && r.month === month - 1 && r.value_numeric != null)
+        : allData.find(r => r.indicator_name.toLowerCase().includes('середня заробітна плата штатного') && r.year === year - 1 && r.month === 12 && r.value_numeric != null);
+    const avgCur = realAvgCur?.value_numeric ?? null;
+    const avgPrev = realAvgPrev?.value_numeric ?? null;
     avgCells += `<td><b>${avgCur != null ? fN(avgCur) : '—'}</b></td>`;
     avgCells += `<td class="${deltaCls(avgCur, avgPrev)}">${deltaBadge(avgCur, avgPrev) || '—'}</td>`;
     html += `<tr class="salary-avg-row" style="border-top:2px solid var(--primary);font-weight:600">${avgCells}</tr>`;
@@ -342,7 +448,7 @@ function renderSalaryTable(showYears, year, month, allData) {
     html += `</tbody></table></div>`;
 
     const val = existingComment ? existingComment.content.replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
-    html += `<div class="ws-block-comment">
+    html += `<div class="ws-block-comment monthly-comment-block">
         <textarea class="ws-comment-input monthly-comment" data-block="monthly_t3" placeholder="Коментар..." rows="2">${val}</textarea>
         <button class="ws-comment-save btn-sm" data-block="monthly_t3">Зберегти</button>
     </div>`;

@@ -173,6 +173,11 @@
 .ws-subsection-label:first-child { margin-top: 0; }
 
 /* Block comment area */
+/* FIX #9: monthly comment full width */
+.monthly-comment-block { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.monthly-comment-block .ws-comment-input { width: 100%; box-sizing: border-box; }
+.monthly-comment-block .ws-comment-save { align-self: flex-end; }
+
 .ws-block-comment-area {
     margin-top: 10px; padding-top: 10px;
     border-top: 1px dashed var(--border);
