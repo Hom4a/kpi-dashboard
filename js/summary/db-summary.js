@@ -247,8 +247,15 @@ export async function loadWeeklyIndicatorHistory(section, indicatorName, limit =
 }
 
 export async function loadMonthlyIndicatorHistory(indicatorName, subType, limit = 200) {
-    // Fuzzy match: replace spaces with % for ilike pattern
-    const pattern = '%' + indicatorName.replace(/\s+/g, '%').replace(/['"]/g, '%') + '%';
+    // Fuzzy match: use first significant words to avoid over-specific patterns
+    // Short names (≤10 chars) → use as-is; longer → first 3 words with length > 2
+    let pattern;
+    if (indicatorName.length <= 10) {
+        pattern = '%' + indicatorName + '%';
+    } else {
+        const words = indicatorName.replace(/['"()]/g, '').split(/[\s,]+/).filter(w => w.length > 2);
+        pattern = '%' + words.slice(0, 3).join('%') + '%';
+    }
     let q = sb.from('summary_indicators')
         .select('*')
         .ilike('indicator_name', pattern)
