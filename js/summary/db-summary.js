@@ -246,14 +246,16 @@ export async function loadWeeklyIndicatorHistory(section, indicatorName, limit =
     return (data || []).reverse();
 }
 
-export async function loadMonthlyIndicatorHistory(indicatorName, subType = 'value', limit = 60) {
+export async function loadMonthlyIndicatorHistory(indicatorName, subType, limit = 200) {
+    // Fuzzy match: replace spaces with % for ilike pattern
+    const pattern = '%' + indicatorName.replace(/\s+/g, '%').replace(/['"]/g, '%') + '%';
     let q = sb.from('summary_indicators')
         .select('*')
-        .eq('indicator_name', indicatorName)
-        .eq('sub_type', subType)
+        .ilike('indicator_name', pattern)
         .order('year', { ascending: true })
         .order('month', { ascending: true })
         .limit(limit);
+    if (subType) q = q.eq('sub_type', subType);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     return data || [];

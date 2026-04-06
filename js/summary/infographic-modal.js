@@ -70,7 +70,7 @@ export async function openMonthlyIndicatorModal(indicatorName, group) {
     $('infModalMeta').innerHTML = '';
 
     // Populate month selector from available data
-    const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
+    const history = await loadMonthlyIndicatorHistory(indicatorName);
     const availMonths = [...new Set(history.filter(r => r.month > 0).map(r => r.month))].sort((a, b) => a - b);
     _selectedMonth = availMonths.length ? availMonths[availMonths.length - 1] : new Date().getMonth() + 1;
 
@@ -210,7 +210,7 @@ const MO_SHORT = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип'
 // Mode 1: Same month across different years (e.g., Feb 2023 vs Feb 2024 vs Feb 2025)
 async function loadAndDrawMonthlyMonthVsMonth(indicatorName) {
     try {
-        const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
+        const history = await loadMonthlyIndicatorHistory(indicatorName);
         if (!history.length) return;
 
         const targetMonth = _selectedMonth || (() => {
@@ -229,7 +229,7 @@ async function loadAndDrawMonthlyMonthVsMonth(indicatorName) {
 // Mode 2: Annual totals comparison
 async function loadAndDrawMonthlyYears(indicatorName) {
     try {
-        const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
+        const history = await loadMonthlyIndicatorHistory(indicatorName);
         if (!history.length) return;
 
         // Annual records (month=0) or sum monthly
@@ -257,7 +257,7 @@ async function loadAndDrawMonthlyYears(indicatorName) {
 // Mode 3: YTD (year-to-date) comparison across years
 async function loadAndDrawMonthlyYTD(indicatorName) {
     try {
-        const history = await loadMonthlyIndicatorHistory(indicatorName, 'value');
+        const history = await loadMonthlyIndicatorHistory(indicatorName);
         if (!history.length) return;
 
         const upToMonth = _selectedMonth || (() => {
