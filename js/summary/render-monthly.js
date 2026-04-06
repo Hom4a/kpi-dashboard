@@ -256,30 +256,29 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
 
         let cells = `<td class="ind-name">${displayName}</td>`;
         for (const y of showYears) {
-            // FIX #1: years > selected year → dashes
             if (y > year) { cells += '<td>—</td>'; continue; }
 
-            const ann = rows.find(r => r.year === y && r.month === 0);
-            if (ann?.value_numeric != null) {
-                const isCurrent = y === year;
-                cells += `<td${isCurrent ? '><b' : ''}>${fN(ann.value_numeric)}${isCurrent ? '</b>' : ''}</td>`;
-            } else if (y === year) {
-                // FIX #1: YTD only up to selected month
+            if (y === year) {
+                // Current year: YTD = sum of months up to selected month only
                 const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
                 if (monthlyRecords.length) {
                     const ytd = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
                     cells += `<td><b>${fN(ytd)}</b></td>`;
                 } else {
-                    cells += `<td>—</td>`;
+                    // Fallback to annual record text (e.g. "до 01.03.2027")
+                    const ann = rows.find(r => r.year === y && r.month === 0);
+                    cells += `<td><b>${ann?.value_text || '—'}</b></td>`;
                 }
             } else {
-                // Non-current past year without annual record — try sum of months
-                const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
-                if (monthlyRecords.length) {
-                    const ytd = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
-                    cells += `<td>${fN(ytd)}</td>`;
+                // Past years: use annual record (month=0) or sum all months
+                const ann = rows.find(r => r.year === y && r.month === 0);
+                if (ann?.value_numeric != null) {
+                    cells += `<td>${fN(ann.value_numeric)}</td>`;
                 } else {
-                    cells += `<td>—</td>`;
+                    const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
+                    cells += monthlyRecords.length
+                        ? `<td>${fN(monthlyRecords.reduce((s, r) => s + r.value_numeric, 0))}</td>`
+                        : `<td>—</td>`;
                 }
             }
         }
