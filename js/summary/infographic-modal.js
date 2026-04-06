@@ -73,7 +73,9 @@ export async function openMonthlyIndicatorModal(indicatorName, group) {
     const history = await loadMonthlyIndicatorHistory(indicatorName);
     const availMonths = [...new Set(history.filter(r => r.month > 0).map(r => r.month))].sort((a, b) => a - b);
     const isAnnualOnly = availMonths.length === 0;
-    _selectedMonth = availMonths.length ? availMonths[availMonths.length - 1] : null;
+    // Default to latest month from latest year with data
+    const latestRec = history.filter(r => r.month > 0).sort((a, b) => b.year - a.year || b.month - a.month)[0];
+    _selectedMonth = latestRec ? latestRec.month : (availMonths.length ? availMonths[availMonths.length - 1] : null);
 
     const monthSel = $('infModalMonthSelect');
     if (monthSel) {
