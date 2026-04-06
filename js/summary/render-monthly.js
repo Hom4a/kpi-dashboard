@@ -347,18 +347,21 @@ function renderAnimalTable(showYears, year, allData) {
 }
 
 function renderSalaryTable(showYears, year, month, allData) {
-    const EXCLUDE_SALARY = ['середня з/п по філіях', 'середня заробітна плата штатного'];
+    const EXCLUDE_SALARY = ['середня з/п по філіях', 'середня з/п по лісових', 'середня заробітна плата штатного'];
     const salaryRows = allData.filter(r => {
         const lower = r.indicator_name.toLowerCase();
         if (EXCLUDE_SALARY.some(ex => lower.includes(ex))) return false;
+        if (lower.startsWith('**') || lower.startsWith('***')) return false; // footnotes
         return r.indicator_group === 'salary_by_branch' ||
             lower.includes('філія') || lower.includes('лісовий офіс') ||
-            lower.includes('навчальний центр') || lower.includes('репродуктивні');
+            lower.includes('навчальний центр') || lower.includes('репродуктивні') ||
+            lower.includes('пожежний') || lower.includes('карпатський');
     });
 
-    // FIX #10: filter branches by those with data in selected month (fallback to all)
+    // Smart branch filtering: show branches that have data in the selected year
+    // Priority: branches with data in selected month → branches with data in selected year → all
     let branchNames = [...new Set(salaryRows
-        .filter(r => r.year === year && r.month === month && r.value_numeric != null)
+        .filter(r => r.year === year && r.value_numeric != null)
         .map(r => r.indicator_name))].sort();
     if (!branchNames.length) {
         branchNames = [...new Set(salaryRows.map(r => r.indicator_name))].sort();
