@@ -358,15 +358,25 @@ function renderAnimalTable(showYears, year, allData) {
 
     for (const name of animalNames) {
         const rows = animalData.filter(r => r.indicator_name === name);
-        let cells = `<td class="ind-name">${name}</td>`;
+        let cells = `<td class="ind-name"><span class="cell-text">${name}</span><span class="cell-anno-dot" data-indicator="${name}"></span></td>`;
         for (const y of visibleYears) {
             const rec = rows.find(r => r.year === y);
             cells += `<td>${rec?.value_text || (rec?.value_numeric != null ? fN(rec.value_numeric) : '—')}</td>`;
         }
-        html += `<tr>${cells}</tr>`;
+        html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
     }
 
-    html += `</tbody></table></div></div></div>`;
+    html += `</tbody></table></div>`;
+
+    const comments = summaryBlockComments.filter(c => c.report_type === 'monthly' && c.block_id === 'monthly_animals');
+    const existingComment = comments[0];
+    const val = existingComment ? existingComment.content.replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
+    html += `<div class="ws-block-comment monthly-comment-block">
+        <textarea class="ws-comment-input monthly-comment" data-block="monthly_animals" placeholder="Коментар..." rows="2">${val}</textarea>
+        <button class="ws-comment-save btn-sm" data-block="monthly_animals">Зберегти</button>
+    </div>`;
+
+    html += `</div></div>`;
     return html;
 }
 
