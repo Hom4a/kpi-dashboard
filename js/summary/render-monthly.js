@@ -164,10 +164,7 @@ const TABLE_2_SUB = new Set([
     'інші   млн. грн'
 ]);
 
-// FIX #7: Animal limits data
-const ANIMAL_ROWS = [
-    'Олень благор.', 'Олень плямистий', 'Козуля', 'Кабан', 'Лань', 'Муфлон'
-];
+// Animal names detected dynamically from indicator_group='animals' in DB
 
 // ===== Rendering =====
 
@@ -345,30 +342,29 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
     return html;
 }
 
-// FIX #7: Animal limits table
+// Animal limits table
 function renderAnimalTable(showYears, year, allData) {
-    const animalData = allData.filter(r =>
-        ANIMAL_ROWS.some(a => r.indicator_name.toLowerCase().includes(a.toLowerCase()))
-    );
+    const animalData = allData.filter(r => r.indicator_group === 'animals');
     if (!animalData.length) return '';
+
+    const animalNames = [...new Set(animalData.map(r => r.indicator_name))];
+    const visibleYears = showYears.filter(y => y <= year);
 
     let html = `<div class="monthly-table-block">
         <div class="monthly-table-header" data-collapse-target="mt_animals">
-            <span class="ws-block-chevron">▶</span>
+            <span class="ws-block-chevron">▼</span>
             <span class="monthly-table-title">Чисельність / кількість лімітів тварин</span>
         </div>
-        <div class="monthly-table-body" id="mt_animals" style="display:none">
+        <div class="monthly-table-body" id="mt_animals">
         <div class="tbl-wrap"><table class="tbl monthly-tbl">
-            <thead><tr><th>Вид</th>${showYears.filter(y => y <= year).map(y => `<th>${y} рік</th>`).join('')}</tr></thead>
+            <thead><tr><th>Вид</th>${visibleYears.map(y => `<th>${y} рік</th>`).join('')}</tr></thead>
             <tbody>`;
 
-    for (const animal of ANIMAL_ROWS) {
-        const rows = animalData.filter(r => r.indicator_name.toLowerCase().includes(animal.toLowerCase()));
-        if (!rows.length) continue;
-        let cells = `<td class="ind-name">${animal}</td>`;
-        for (const y of showYears) {
-            if (y > year) continue;
-            const rec = rows.find(r => r.year === y && (r.month === 0 || r.month == null));
+    for (const name of animalNames) {
+        const rows = animalData.filter(r => r.indicator_name === name);
+        let cells = `<td class="ind-name">${name}</td>`;
+        for (const y of visibleYears) {
+            const rec = rows.find(r => r.year === y);
             cells += `<td>${rec?.value_text || (rec?.value_numeric != null ? fN(rec.value_numeric) : '—')}</td>`;
         }
         html += `<tr>${cells}</tr>`;

@@ -204,6 +204,33 @@ export function parseSummaryXlsx(wb) {
             }
         }
 
+        // Parse animal limits: rows like "Олень благор. 3787/*" in each year column
+        let inAnimalSection = false;
+        for (let i = 3; i < rows.length; i++) {
+            const r = rows[i];
+            const name = r ? String(r[0] || '').trim() : '';
+            if (/^чисельність\/кількість/i.test(name)) { inAnimalSection = true; continue; }
+            if (inAnimalSection) {
+                if (!name && (!r || !r[1])) { inAnimalSection = false; continue; }
+                // Each cell = "Олень благор. 3787/*" — parse all year columns
+                for (const yc of yearColumns) {
+                    const cellVal = r ? r[yc.col] : null;
+                    if (!cellVal) continue;
+                    const text = String(cellVal).trim();
+                    if (!text) continue;
+                    // Extract animal name and number: "Олень благор. 3787/*" → name="Олень благор.", value=3787
+                    const m = text.match(/^(.+?)\s+([\d\s]+)\s*[\/\\*]/);
+                    const animalName = m ? m[1].trim() : text;
+                    const animalValue = m ? parseFloat(m[2].replace(/\s/g, '')) : null;
+                    records.push({
+                        year: yc.year, month: 0, indicator_group: 'animals',
+                        indicator_name: animalName, sub_type: 'value',
+                        value_numeric: animalValue, value_text: text, unit: 'шт.'
+                    });
+                }
+            }
+        }
+
         lastGroup = 'finance';
         for (let i = 3; i < rows.length; i++) {
             const r = rows[i];
