@@ -258,7 +258,14 @@ export async function loadMonthlyIndicatorHistory(indicatorName, subType, limit 
     if (subType) q = q.eq('sub_type', subType);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
-    return data || [];
+    // Deduplicate by (year, month) — keep first (prefer sub_type='value')
+    const seen = new Set();
+    return (data || []).filter(r => {
+        const key = `${r.year}-${r.month}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 }
 
 // ===== Clear =====
