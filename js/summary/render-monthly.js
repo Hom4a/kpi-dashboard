@@ -16,6 +16,7 @@ function fN(v) {
     return v.toLocaleString('uk-UA', { maximumFractionDigits: 4 });
 }
 
+// Темп росту: cur / prev × 100 (скільки % від попереднього)
 function deltaBadge(cur, prev) {
     if (cur == null || prev == null) return '';
     if (typeof cur === 'string' || typeof prev === 'string') return '';
@@ -23,18 +24,18 @@ function deltaBadge(cur, prev) {
         if (cur === 0) return '';
         return `<span class="pivot-badge-orange">${cur > 0 ? '+' : ''}${fN(cur)}</span>`;
     }
-    const pct = Math.round(((cur - prev) / Math.abs(prev)) * 1000) / 10;
-    if (pct === 0) return '';
-    return pct > 0
-        ? `<span class="pivot-badge-up">+${pct}%</span>`
+    const pct = Math.round((cur / prev) * 1000) / 10;
+    if (pct === 100) return '';
+    return pct > 100
+        ? `<span class="pivot-badge-up">${pct}%</span>`
         : `<span class="pivot-badge-down">${pct}%</span>`;
 }
 
 function deltaCls(cur, prev) {
     if (cur == null || prev == null || typeof cur === 'string' || typeof prev === 'string') return '';
     if (prev === 0) return cur !== 0 ? 'cell-orange' : '';
-    const pct = ((cur - prev) / Math.abs(prev)) * 100;
-    return pct > 0 ? 'cell-up' : pct < 0 ? 'cell-down' : '';
+    const pct = (cur / prev) * 100;
+    return pct > 100 ? 'cell-up' : pct < 100 ? 'cell-down' : '';
 }
 
 // ===== Table definitions (exact names from "Дод 1 до ТЗ") =====
