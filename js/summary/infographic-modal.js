@@ -301,6 +301,16 @@ function drawChart(labels, values, label, type) {
     gradient.addColorStop(0, 'rgba(74,157,111,.3)');
     gradient.addColorStop(1, 'rgba(74,157,111,.02)');
 
+    // Gradient fill for bars — each bar gets unique color intensity
+    const barGradients = values.map((v, i) => {
+        if (type !== 'bar') return null;
+        const intensity = 0.4 + (i / Math.max(values.length - 1, 1)) * 0.4;
+        const g = ctx.createLinearGradient(0, 0, 0, 280);
+        g.addColorStop(0, `rgba(74,157,111,${intensity})`);
+        g.addColorStop(1, `rgba(74,157,111,${intensity * 0.3})`);
+        return g;
+    });
+
     _chart = new Chart(ctx, {
         type: type === 'bar' ? 'bar' : 'line',
         data: {
@@ -308,34 +318,57 @@ function drawChart(labels, values, label, type) {
             datasets: [{
                 label,
                 data: values,
-                borderColor: '#4A9D6F',
-                backgroundColor: type === 'bar' ? 'rgba(74,157,111,.6)' : gradient,
-                borderWidth: 2,
+                borderColor: type === 'bar' ? 'rgba(74,157,111,.8)' : '#4A9D6F',
+                backgroundColor: type === 'bar' ? barGradients : gradient,
+                borderWidth: type === 'bar' ? 0 : 2,
+                borderRadius: type === 'bar' ? 6 : 0,
                 fill: type !== 'bar',
-                tension: .3,
-                pointRadius: 3,
-                pointBackgroundColor: '#4A9D6F'
+                tension: .4,
+                pointRadius: type === 'bar' ? 0 : 4,
+                pointBackgroundColor: '#4A9D6F',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                barPercentage: 0.65,
+                categoryPercentage: 0.8
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: { padding: { top: 28 } },
+            layout: { padding: { top: 32 } },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(15,20,25,.9)',
+                    backgroundColor: 'rgba(15,20,25,.92)',
                     titleColor: '#fff',
-                    bodyColor: '#9ca3af',
-                    borderColor: 'rgba(74,157,111,.3)',
+                    titleFont: { size: 12, weight: 600 },
+                    bodyColor: '#e5e7eb',
+                    bodyFont: { size: 13 },
+                    borderColor: 'rgba(74,157,111,.4)',
                     borderWidth: 1,
-                    cornerRadius: 8,
-                    padding: 10
+                    cornerRadius: 10,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: ctx => {
+                            const v = ctx.parsed.y;
+                            return v != null ? v.toLocaleString('uk-UA', { maximumFractionDigits: 2 }) : '';
+                        }
+                    }
                 }
             },
             scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6b7280', maxRotation: 45 } },
-                y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { font: { size: 10 }, color: '#6b7280' }, grace: '15%' }
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11, weight: 500 }, color: '#9ca3af', maxRotation: 0 },
+                    border: { display: false }
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,.04)', drawBorder: false },
+                    ticks: { font: { size: 10 }, color: '#6b7280', padding: 8 },
+                    border: { display: false },
+                    grace: '15%'
+                }
             }
         },
         plugins: [{
@@ -358,35 +391,37 @@ function drawChart(labels, values, label, type) {
                     const valStr = fmtN(val);
 
                     if (i === 0) {
-                        c.font = `bold 11px ${font}`;
-                        c.fillStyle = '#d1d5db';
+                        // Base value — white bold
+                        c.font = `bold 12px ${font}`;
+                        c.fillStyle = '#e5e7eb';
                         c.textAlign = 'center';
-                        c.fillText(valStr, xP, yP - 10);
+                        c.fillText(valStr, xP, yP - 12);
                     } else {
+                        // Value + tempo росту
                         const prev = vals[i - 1];
-                        let deltaStr = '', deltaCol = '#d1d5db';
-                        if (prev != null && prev !== 0) {
-                            const pct = Math.round(((val - prev) / Math.abs(prev)) * 1000) / 10;
-                            deltaStr = ` (${pct >= 0 ? '+' : ''}${pct}%)`;
-                            deltaCol = pct > 0 ? '#4A9D6F' : pct < 0 ? '#E74C3C' : '#E67E22';
-                        } else if (prev === 0) {
-                            deltaStr = ' (n/a)';
-                            deltaCol = '#E67E22';
+                        let deltaStr = '', deltaCol = '#9ca3af';
+                        if (prev != null && Math.abs(prev) >= 0.01) {
+                            const pct = Math.round((val / prev) * 1000) / 10;
+                            if (pct !== 100) {
+                                deltaStr = ` ${pct}%`;
+                                deltaCol = pct > 100 ? '#4ADE80' : '#FB7185';
+                            }
                         }
-                        c.font = `bold 11px ${font}`;
+                        c.font = `bold 12px ${font}`;
+                        c.fillStyle = '#e5e7eb';
                         const vW = c.measureText(valStr).width;
-                        c.font = `10px ${font}`;
+                        c.font = `bold 10px ${font}`;
                         const dW = deltaStr ? c.measureText(deltaStr).width : 0;
                         const startX = xP - (vW + dW) / 2;
 
-                        c.font = `bold 11px ${font}`;
-                        c.fillStyle = '#d1d5db';
+                        c.font = `bold 12px ${font}`;
+                        c.fillStyle = '#e5e7eb';
                         c.textAlign = 'left';
-                        c.fillText(valStr, startX, yP - 10);
+                        c.fillText(valStr, startX, yP - 12);
                         if (deltaStr) {
-                            c.font = `10px ${font}`;
+                            c.font = `bold 10px ${font}`;
                             c.fillStyle = deltaCol;
-                            c.fillText(deltaStr, startX + vW, yP - 10);
+                            c.fillText(deltaStr, startX + vW + 2, yP - 12);
                         }
                     }
                 });
