@@ -75,7 +75,8 @@ function initTabBar() {
 function updateDataDate(year) {
     const el = $('summaryDataDate');
     if (!el) return;
-    const monthly = summaryIndicators.filter(r => r.year === year && r.month > 0);
+    const monthly = summaryIndicators.filter(r => r.year === year && r.month > 0
+        && r.value_numeric != null && (!r.sub_type || r.sub_type === 'value'));
     if (monthly.length) {
         const maxMonth = Math.max(...monthly.map(r => r.month));
         el.textContent = `Дані за ${MO[maxMonth - 1]} ${year}`;
