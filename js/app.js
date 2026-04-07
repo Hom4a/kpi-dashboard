@@ -567,20 +567,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // File input handlers
     // Handle multiple files sequentially with progress
-    async function handleMultipleFiles(files, expected) {
-        const total = files.length;
-        if (total === 1) { await handleFile(files[0], expected); return; }
+    async function handleMultipleFiles(fileList, expected) {
+        // Copy FileList to Array immediately (DOM changes can invalidate FileList)
+        const files = Array.from(fileList);
+        if (files.length === 1) { await handleFile(files[0], expected); return; }
         showLoader(true);
         let ok = 0, fail = 0;
-        for (let i = 0; i < total; i++) {
-            toast(`Завантаження ${i + 1}/${total}: ${files[i].name.slice(0, 30)}...`);
+        for (let i = 0; i < files.length; i++) {
+            toast(`Завантаження ${i + 1}/${files.length}: ${files[i].name.slice(0, 30)}...`);
             try {
                 await handleFile(files[i], expected, true);
                 ok++;
-            } catch (e) { fail++; console.error(e); }
+            } catch (e) { fail++; console.error('File error:', files[i].name, e); }
         }
-        toast(`Завантажено ${ok}/${total} файлів${fail ? ` (помилок: ${fail})` : ''}`);
-        // Reload data once after all files
+        toast(`Завантажено ${ok}/${files.length} файлів${fail ? ` (помилок: ${fail})` : ''}`);
         await loadSummaryDataAndRender();
         showLoader(false);
     }
