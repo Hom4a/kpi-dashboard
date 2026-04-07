@@ -566,21 +566,28 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
 
     // File input handlers
-    $('fileHdr').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
-    $('fileDrop').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
+    // Handle multiple files sequentially
+    async function handleMultipleFiles(files, expected) {
+        for (const file of files) {
+            await handleFile(file, expected);
+        }
+    }
 
-    // Drag & drop
+    $('fileHdr').addEventListener('change', e => { if (e.target.files.length) handleMultipleFiles(e.target.files); e.target.value = ''; });
+    $('fileDrop').addEventListener('change', e => { if (e.target.files.length) handleMultipleFiles(e.target.files); e.target.value = ''; });
+
+    // Drag & drop (supports multiple files)
     const dz = $('dropZone');
     ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag-over'); }));
     ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag-over'); }));
-    dz.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+    dz.addEventListener('drop', e => { if (e.dataTransfer.files.length) handleMultipleFiles(e.dataTransfer.files); });
 
-    // Per-page upload buttons (with file type validation)
+    // Per-page upload buttons (with file type validation, supports multiple)
     document.querySelectorAll('.page-upload').forEach(input => {
         input.addEventListener('change', e => {
-            if (e.target.files[0]) {
+            if (e.target.files.length) {
                 const expected = e.target.dataset.expected || null;
-                handleFile(e.target.files[0], expected);
+                handleMultipleFiles(e.target.files, expected);
             }
             e.target.value = '';
         });
