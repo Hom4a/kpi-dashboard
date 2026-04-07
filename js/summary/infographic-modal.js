@@ -393,7 +393,7 @@ function drawChart(labels, values, label, type) {
                     if (i === 0) {
                         // Base value — white bold
                         c.font = `bold 12px ${font}`;
-                        c.fillStyle = '#e5e7eb';
+                        c.fillStyle = '#1F2937';
                         c.textAlign = 'center';
                         c.fillText(valStr, xP, yP - 12);
                     } else {
@@ -408,14 +408,14 @@ function drawChart(labels, values, label, type) {
                             }
                         }
                         c.font = `bold 12px ${font}`;
-                        c.fillStyle = '#e5e7eb';
+                        c.fillStyle = '#1F2937';
                         const vW = c.measureText(valStr).width;
                         c.font = `bold 10px ${font}`;
                         const dW = deltaStr ? c.measureText(deltaStr).width : 0;
                         const startX = xP - (vW + dW) / 2;
 
                         c.font = `bold 12px ${font}`;
-                        c.fillStyle = '#e5e7eb';
+                        c.fillStyle = '#1F2937';
                         c.textAlign = 'left';
                         c.fillText(valStr, startX, yP - 12);
                         if (deltaStr) {
