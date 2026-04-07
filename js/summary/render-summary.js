@@ -408,7 +408,7 @@ function renderWeeklySectionTabs(data, date) {
             html += renderBlockCommentArea(block.id + '_pre', date, preComment);
         }
 
-        // Data blocks — show tables per section
+        // Data blocks — show tables per section + auto-comments from docx text
         if (block.sections.length) {
             for (const sec of block.sections) {
                 const sData = data.filter(r => r.section === sec);
@@ -417,9 +417,23 @@ function renderWeeklySectionTabs(data, date) {
                 if (block.sections.length > 1) {
                     html += `<div class="ws-subsection-label">${SECTION_LABELS[sec] || sec}</div>`;
                 }
-                // Use per-section columns if defined, else block-level
                 const secCols = block.sectionColumns?.[sec] || block.columns;
                 html += renderSectionTable(sData, secCols);
+
+                // Show auto-extracted section text from docx (if any)
+                const secNote = latestNotes.find(n => n.note_type === `section_${sec}`);
+                if (secNote) {
+                    html += `<div class="ws-section-text">${formatParagraphs(secNote.content)}</div>`;
+                }
+            }
+            // Also show general section text (e.g. land, sales — text for whole block)
+            const blockSectionNote = latestNotes.find(n =>
+                block.sections.some(s => n.note_type === `section_${s}`) === false &&
+                n.note_type.startsWith('section_') &&
+                block.sections.some(s => n.note_type.includes(s))
+            );
+            if (blockSectionNote) {
+                html += `<div class="ws-section-text">${formatParagraphs(blockSectionNote.content)}</div>`;
             }
         }
 
@@ -546,6 +560,21 @@ function renderWeeklySectionTabs(data, date) {
     initCellAnnotations(container, 'weekly', date);
 }
 
+// Format multi-paragraph text with visual separators
+function formatParagraphs(text) {
+    if (!text) return '';
+    return text.split('\n').filter(l => l.trim()).map(line => {
+        const t = line.trim();
+        // Detect list items: dates, dashes, bullets, numbered items
+        if (/^\d{2}\.\d{2}\./.test(t) || /^[–\-•]\s/.test(t) || /^\d+[\.\)]\s/.test(t))
+            return `<div class="ws-para-item ws-para-bullet">${t}</div>`;
+        // Detect headers: all caps or ending with colon
+        if (/^[А-ЯЄЇҐ\s]{5,}[.:]?$/.test(t) || /^[А-ЯA-Z].*:$/.test(t))
+            return `<div class="ws-para-item ws-para-header">${t}</div>`;
+        return `<div class="ws-para-item">${t}</div>`;
+    }).join('');
+}
+
 function renderBlockNotes(notes) {
     const typeConfig = {
         general: { label: 'Загальна оцінка', cls: 'summary-alert-info', order: 0 },
@@ -560,19 +589,9 @@ function renderBlockNotes(notes) {
         (typeConfig[a.note_type]?.order ?? 9) - (typeConfig[b.note_type]?.order ?? 9));
     return sorted.map(n => {
         const cfg = typeConfig[n.note_type] || { label: n.note_type, cls: 'summary-alert-neutral' };
-        // FIX #2: format events with bullet markers for dates and dashes
-        const formatted = n.content.split('\n').map(line => {
-            const trimmed = line.trim();
-            if (!trimmed) return '';
-            if (/^\d{2}\.\d{2}\.\d{2,4}/.test(trimmed))
-                return `<div class="event-item">${trimmed}</div>`;
-            if (/^[–\-•]/.test(trimmed))
-                return `<div class="event-item">${trimmed}</div>`;
-            return trimmed;
-        }).filter(Boolean).join('<br>');
         return `<div class="summary-alert ${cfg.cls}"><div>
             <div class="note-label">${cfg.label}</div>
-            <div class="note-text">${formatted}</div>
+            <div class="note-text">${formatParagraphs(n.content)}</div>
         </div></div>`;
     }).join('');
 }

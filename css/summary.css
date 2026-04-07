@@ -35,6 +35,14 @@
 .summary-alert .note-text { font-size: 14px; color: var(--text1); line-height: 1.6; }
 .event-item { padding: 4px 0 4px 16px; border-left: 2px solid var(--primary); margin: 4px 0; }
 
+/* Section text from docx + paragraph formatting */
+.ws-section-text { margin: 10px 0; padding: 10px 14px; background: var(--bg2); border-radius: 8px; border-left: 3px solid var(--secondary); font-size: 12px; color: var(--text2); line-height: 1.6; }
+.ws-para-item { padding: 3px 0; }
+.ws-para-item + .ws-para-item { border-top: 1px dotted var(--border); }
+.ws-para-bullet { padding-left: 12px; position: relative; }
+.ws-para-bullet::before { content: '—'; position: absolute; left: 0; color: var(--primary); font-weight: 600; }
+.ws-para-header { font-weight: 600; color: var(--text1); margin-top: 4px; }
+
 .summary-alerts-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 10px; margin-top: 10px;
