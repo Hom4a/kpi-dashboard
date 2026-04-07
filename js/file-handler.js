@@ -76,7 +76,7 @@ const FILE_TYPE_LABELS = {
     wood_sales: 'реалізація лісопродукції (ЕОД)'
 };
 
-export async function handleFile(file, expectedType = null) {
+export async function handleFile(file, expectedType = null, skipReload = false) {
     const role = currentProfile ? currentProfile.role : 'viewer';
     if (!UPLOAD_ROLES.includes(role)) { toast('У вас немає прав для завантаження даних', true); return; }
     if (file.size > MAX_FILE_SIZE) { toast(`Файл занадто великий (${(file.size / 1024 / 1024).toFixed(1)} MB). Максимум: 50 MB`, true); return; }
@@ -94,7 +94,7 @@ export async function handleFile(file, expectedType = null) {
                 showLoader(false);
                 return;
             }
-            await handleDocxFile(buffer, file.name);
+            await handleDocxFile(buffer, file.name, skipReload);
             showLoader(false);
             return;
         }
@@ -261,7 +261,7 @@ export async function handleFile(file, expectedType = null) {
     showLoader(false);
 }
 
-async function handleDocxFile(buffer, fileName) {
+async function handleDocxFile(buffer, fileName, skipReload = false) {
     try {
         const parsed = await parseSummaryDocx(buffer);
         if (!parsed.records.length && !parsed.notes.length) {
@@ -290,7 +290,7 @@ async function handleDocxFile(buffer, fileName) {
             toast(`Тижнева довідка (${reportDate}): додано ${result.added}, оновлено ${result.updated} показників`);
         }
 
-        if (_loadSummaryFn) await _loadSummaryFn();
+        if (!skipReload && _loadSummaryFn) await _loadSummaryFn();
     } catch (err) {
         toast('Помилка обробки .docx: ' + err.message, true);
         console.error(err);

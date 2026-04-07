@@ -566,11 +566,23 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
 
     // File input handlers
-    // Handle multiple files sequentially
+    // Handle multiple files sequentially with progress
     async function handleMultipleFiles(files, expected) {
-        for (const file of files) {
-            await handleFile(file, expected);
+        const total = files.length;
+        if (total === 1) { await handleFile(files[0], expected); return; }
+        showLoader(true);
+        let ok = 0, fail = 0;
+        for (let i = 0; i < total; i++) {
+            toast(`Завантаження ${i + 1}/${total}: ${files[i].name.slice(0, 30)}...`);
+            try {
+                await handleFile(files[i], expected, true);
+                ok++;
+            } catch (e) { fail++; console.error(e); }
         }
+        toast(`Завантажено ${ok}/${total} файлів${fail ? ` (помилок: ${fail})` : ''}`);
+        // Reload data once after all files
+        await loadSummaryDataAndRender();
+        showLoader(false);
     }
 
     $('fileHdr').addEventListener('change', e => { if (e.target.files.length) handleMultipleFiles(e.target.files); e.target.value = ''; });
