@@ -417,7 +417,9 @@ function renderWeeklySectionTabs(data, date) {
                 if (block.sections.length > 1) {
                     html += `<div class="ws-subsection-label">${SECTION_LABELS[sec] || sec}</div>`;
                 }
-                html += renderSectionTable(sData, block.columns);
+                // Use per-section columns if defined, else block-level
+                const secCols = block.sectionColumns?.[sec] || block.columns;
+                html += renderSectionTable(sData, secCols);
             }
         }
 
@@ -546,18 +548,31 @@ function renderWeeklySectionTabs(data, date) {
 
 function renderBlockNotes(notes) {
     const typeConfig = {
-        general: { label: 'Загальна оцінка', cls: 'summary-alert-info' },
-        events: { label: 'Ключові події', cls: 'summary-alert-neutral' },
-        positive: { label: 'Позитивна динаміка', cls: 'summary-alert-success' },
-        negative: { label: 'Негативна / ризикова', cls: 'summary-alert-danger' },
-        decisions: { label: 'Питання для рішення', cls: 'summary-alert-warning' },
-        other: { label: 'Інша інформація', cls: 'summary-alert-neutral' }
+        general: { label: 'Загальна оцінка', cls: 'summary-alert-info', order: 0 },
+        events: { label: 'Ключові події', cls: 'summary-alert-neutral', order: 1 },
+        positive: { label: 'Позитивна динаміка', cls: 'summary-alert-success', order: 2 },
+        negative: { label: 'Негативна / ризикова', cls: 'summary-alert-danger', order: 3 },
+        decisions: { label: 'Питання для рішення', cls: 'summary-alert-warning', order: 4 },
+        other: { label: 'Інша інформація', cls: 'summary-alert-neutral', order: 5 }
     };
-    return notes.map(n => {
+    // FIX #1: sort notes by type order
+    const sorted = [...notes].sort((a, b) =>
+        (typeConfig[a.note_type]?.order ?? 9) - (typeConfig[b.note_type]?.order ?? 9));
+    return sorted.map(n => {
         const cfg = typeConfig[n.note_type] || { label: n.note_type, cls: 'summary-alert-neutral' };
+        // FIX #2: format events with bullet markers for dates and dashes
+        const formatted = n.content.split('\n').map(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return '';
+            if (/^\d{2}\.\d{2}\.\d{2,4}/.test(trimmed))
+                return `<div class="event-item">${trimmed}</div>`;
+            if (/^[–\-•]/.test(trimmed))
+                return `<div class="event-item">${trimmed}</div>`;
+            return trimmed;
+        }).filter(Boolean).join('<br>');
         return `<div class="summary-alert ${cfg.cls}"><div>
             <div class="note-label">${cfg.label}</div>
-            <div class="note-text">${n.content.replace(/\n/g, '<br>')}</div>
+            <div class="note-text">${formatted}</div>
         </div></div>`;
     }).join('');
 }
@@ -567,8 +582,10 @@ const COL_LABELS = {
     indicator: 'Показник', unit: 'од.вим.', current: 'За звітний тиждень',
     delta_pct: '%Δ до попер.тиж.', previous: 'Попередній тиждень',
     ytd: 'З поч. року', total: 'Весь період', value: 'Значення',
+    delta_abs: 'Δ за тиждень',
     delta_yoy_pct: '%Δ до попер.року', yoy: 'Аналог. період поп. року',
-    area: 'Площа, тис. га', count: 'Надлісництва', area_mln: 'Площа, млн.га', share: 'Частка, %'
+    area: 'Площа, тис. га', count: 'Надлісництва', area_mln: 'Площа, млн.га', share: 'Частка, %',
+    contract_vol: 'Обсяг, млн м3', contract_sum: 'Сума, млрд грн', contract_pct: 'Виконання, %'
 };
 
 function renderSectionTable(sData, blockColumns) {
@@ -597,21 +614,32 @@ function renderSectionTable(sData, blockColumns) {
             const deltaDisplay = delta.display !== '—' ? delta
                 : directDelta ? { display: fmtNum(r.value_delta), badgeCls: r.value_delta > 0 ? 'badge-up' : r.value_delta < 0 ? 'badge-down' : '' }
                 : delta;
+            // FIX #8: delta_abs for finance — show absolute delta value
+            const deltaAbsVal = r.value_delta;
+            const deltaAbsCls = deltaAbsVal > 0 ? 'badge-up' : deltaAbsVal < 0 ? 'badge-down' : '';
+            const deltaAbsStr = deltaAbsVal != null ? `${deltaAbsVal > 0 ? '+' : ''}${fmtNum(deltaAbsVal)}` : '—';
+
             const cellMap = {
                 indicator: r.indicator_name,
                 unit: r.unit || '',
                 current: r.value_text || fmtNum(r.value_current),
                 delta_pct: `<span class="summary-delta-badge ${deltaDisplay.badgeCls}">${deltaDisplay.display}</span>`,
+                delta_abs: `<span class="summary-delta-badge ${deltaAbsCls}">${deltaAbsStr}</span>`,
                 previous: fmtNum(prevVal),
                 ytd: fmtNum(r.value_ytd),
-                total: fmtNum(r.value_text) || fmtNum(r.value_ytd),
+                // FIX #5: total (land "Весь період") — parse from value_text
+                total: r.value_text != null ? fmtNum(parseFloat(String(r.value_text).replace(/\s/g, '').replace(',', '.'))) : '—',
                 value: r.value_text || fmtNum(r.value_current),
                 delta_yoy_pct: r.value_yoy != null ? calcDeltaPct(r.value_ytd, r.value_yoy).display : '—',
                 yoy: fmtNum(r.value_yoy),
                 area: fmtNum(r.value_current),
                 count: fmtNum(r.value_current),
                 area_mln: fmtNum(r.value_current),
-                share: r.value_delta != null ? fmtNum(r.value_delta) + '%' : '—'
+                share: r.value_delta != null ? fmtNum(r.value_delta) + '%' : '—',
+                // FIX #7: contracts columns
+                contract_vol: fmtNum(r.value_current),
+                contract_sum: fmtNum(r.value_ytd),
+                contract_pct: r.value_delta != null ? fmtNum(r.value_delta) + '%' : '—'
             };
             const cellsArr = colKeys.map((k, ci) => {
                 let val = cellMap[k] ?? '—';

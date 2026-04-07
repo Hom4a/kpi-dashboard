@@ -26,9 +26,14 @@ export const WEEKLY_BLOCKS = [
       columns: ['indicator', 'total', 'ytd', 'current'] },
     { id: 'VII',  roman: 'VII',  name: 'Заготівля та лісові ресурси', sections: ['harvesting'],
       columns: ['indicator', 'value'] },
-    { id: 'VIII', roman: 'VIII', name: 'Реалізація та договори',      sections: ['contracts', 'sales'] },
+    { id: 'VIII', roman: 'VIII', name: 'Реалізація та договори',      sections: ['contracts', 'sales'],
+      sectionColumns: {
+          contracts: ['indicator', 'contract_vol', 'contract_sum', 'contract_pct'],
+          sales: ['indicator', 'value']
+      }
+    },
     { id: 'IX',   roman: 'IX',   name: 'Фінансовий стан',             sections: ['finance'],
-      columns: ['indicator', 'value', 'delta_pct'] },
+      columns: ['indicator', 'value', 'delta_abs'] },
     { id: 'X',    roman: 'X',    name: 'Персонал',                    sections: ['personnel'],
       columns: ['indicator', 'value'] },
     { id: 'XI',   roman: 'XI',   name: 'Правові питання',             sections: ['legal'],

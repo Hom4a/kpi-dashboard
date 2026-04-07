@@ -32,7 +32,8 @@
     border: 1px solid rgba(100,100,120,.18);
 }
 .summary-alert .note-label { font-weight: 600; font-size: 12px; margin-bottom: 4px; color: var(--text2); }
-.summary-alert .note-text { font-size: 14px; color: var(--text1); }
+.summary-alert .note-text { font-size: 14px; color: var(--text1); line-height: 1.6; }
+.event-item { padding: 4px 0 4px 16px; border-left: 2px solid var(--primary); margin: 4px 0; }
 
 .summary-alerts-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

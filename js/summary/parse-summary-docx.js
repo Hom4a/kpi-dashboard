@@ -132,9 +132,11 @@ export async function parseSummaryDocx(buffer) {
         }
 
         // Skip header row (index 0), parse data rows
+        const sectionNameCount = {}; // Track duplicate indicator names within section
         for (let ri = 1; ri < tableRows.length; ri++) {
             const cells = tableRows[ri].getElementsByTagNameNS(ns, 'tc');
             const values = {};
+            const rawTexts = {};
             let indicatorName = '';
 
             for (let ci = 0; ci < cells.length && ci < cols.length; ci++) {
@@ -143,12 +145,27 @@ export async function parseSummaryDocx(buffer) {
 
                 if (colKey === 'indicator') {
                     indicatorName = text;
+                } else if (colKey === '_skip') {
+                    continue;
                 } else {
                     values[colKey] = parseNumericValue(text);
+                    // FIX #9: preserve raw text for cells with brackets/percentages
+                    if (/\(.*[%\d].*\)/.test(text)) rawTexts[colKey] = text;
                 }
             }
 
             if (!indicatorName) continue;
+
+            // FIX #10: deduplicate indicator names (e.g. two "Сума, млн грн" in procurement)
+            const nameKey = `${mapping.section}|${indicatorName}`;
+            sectionNameCount[nameKey] = (sectionNameCount[nameKey] || 0) + 1;
+            if (sectionNameCount[nameKey] > 1) {
+                indicatorName = `${indicatorName} (${sectionNameCount[nameKey]})`;
+            }
+
+            // Determine value_text: prioritize all_time, then raw text with brackets
+            let valueText = values.all_time != null ? String(values.all_time) : null;
+            if (!valueText && rawTexts.current) valueText = rawTexts.current;
 
             records.push({
                 section: mapping.section,
@@ -157,13 +174,19 @@ export async function parseSummaryDocx(buffer) {
                 value_previous: values.previous ?? null,
                 value_ytd: values.ytd ?? null,
                 value_delta: values.delta ?? null,
-                value_text: values.all_time != null ? String(values.all_time) : null
+                value_text: valueText
             });
         }
     }
 
-    // Extract text notes from paragraphs before first table
+    // Extract text notes (Block I) from paragraphs
     const notes = extractNotes(doc, ns);
+
+    // FIX #4: Extract section-level text (comments between/after tables)
+    const sectionTexts = extractSectionTexts(doc, ns);
+    for (const st of sectionTexts) {
+        notes.push({ note_type: `section_${st.section}`, content: st.content });
+    }
 
     console.log(`DOCX parser: ${records.length} indicators, ${notes.length} notes, date: ${reportDate}`);
     return { records, notes, reportDate };
@@ -269,6 +292,72 @@ function isInsideTable(el) {
         node = node.parentNode;
     }
     return false;
+}
+
+// FIX #4: Extract section-level text (analytical comments between tables)
+const SECTION_HEADERS = [
+    { pattern: /ОХОРОНА\s*ТА\s*ЗАХИСТ/i, section: 'forest_protection' },
+    { pattern: /ЛІСОКУЛЬТУРНА/i, section: 'forestry_campaign' },
+    { pattern: /РОЗМІНУВАННЯ/i, section: 'demining' },
+    { pattern: /СЕРТИФІКАЦІЯ/i, section: 'certification' },
+    { pattern: /ЗЕМЕЛЬНІ\s*ПИТАННЯ/i, section: 'land' },
+    { pattern: /ЗАГОТІВЛЯ/i, section: 'harvesting' },
+    { pattern: /РЕАЛІЗАЦІЯ\s*ТА\s*ДОГОВОРИ/i, section: 'sales' },
+    { pattern: /ФІНАНСОВИЙ/i, section: 'finance' },
+    { pattern: /ПЕРСОНАЛ/i, section: 'personnel' },
+    { pattern: /ПРАВОВІ/i, section: 'legal' },
+    { pattern: /ЗАКУПІВЛІ/i, section: 'procurement' },
+    { pattern: /ДОПОМОГА\s*ЗСУ/i, section: 'zsu' },
+];
+
+function extractSectionTexts(doc, ns) {
+    const paragraphs = doc.getElementsByTagNameNS(ns, 'p');
+    const results = [];
+    let currentSection = null;
+    let currentText = [];
+
+    for (let i = 0; i < paragraphs.length; i++) {
+        if (isInsideTable(paragraphs[i])) continue;
+        const texts = paragraphs[i].getElementsByTagNameNS(ns, 't');
+        let fullText = '';
+        for (let j = 0; j < texts.length; j++) fullText += texts[j].textContent || '';
+        fullText = fullText.trim();
+        if (!fullText) continue;
+
+        // Check if this is a section header
+        let matchedSection = null;
+        for (const sh of SECTION_HEADERS) {
+            if (sh.pattern.test(fullText)) { matchedSection = sh.section; break; }
+        }
+
+        if (matchedSection) {
+            // Save previous section text
+            if (currentSection && currentText.length) {
+                results.push({ section: currentSection, content: currentText.join('\n').trim() });
+            }
+            currentSection = matchedSection;
+            currentText = [];
+        } else if (currentSection) {
+            // Skip Block I note patterns
+            if (/загальна оцінка|ключові події|позитивна|негативна|ризикова|питання.*рішення/i.test(fullText)) continue;
+            // Skip Roman numeral headers
+            if (/^[ІIVXХX]{1,4}\.\s/i.test(fullText)) {
+                if (currentText.length) {
+                    results.push({ section: currentSection, content: currentText.join('\n').trim() });
+                }
+                currentSection = null;
+                currentText = [];
+                continue;
+            }
+            currentText.push(fullText);
+        }
+    }
+    if (currentSection && currentText.length) {
+        results.push({ section: currentSection, content: currentText.join('\n').trim() });
+    }
+
+    // Filter: only keep sections with actual text (not just table data repeated)
+    return results.filter(r => r.content.length > 20);
 }
 
 function extractNotes(doc, ns) {
