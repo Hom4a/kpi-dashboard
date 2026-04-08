@@ -150,20 +150,14 @@ export function parseSummaryXlsx(wb) {
 
                 const parsed = parseValue(cellVal);
                 if (parsed.isVolPrice) {
-                    if (parsed.volume != null) {
-                        records.push({
-                            year, month: col, indicator_group: finalGroup,
-                            indicator_name: name, sub_type: 'volume',
-                            value_numeric: parsed.volume, value_text: null, unit: 'тис. м3'
-                        });
-                    }
-                    if (parsed.price != null) {
-                        records.push({
-                            year, month: col, indicator_group: finalGroup,
-                            indicator_name: name, sub_type: 'price',
-                            value_numeric: parsed.price, value_text: null, unit: 'грн/м3'
-                        });
-                    }
+                    // Store as value with formatted text: "360,6(2318,7)"
+                    const raw = String(cellVal).trim();
+                    const formatted = raw.replace(/\//, '(') + ')';
+                    records.push({
+                        year, month: col, indicator_group: finalGroup,
+                        indicator_name: name, sub_type: 'value',
+                        value_numeric: parsed.volume, value_text: formatted, unit: unit
+                    });
                 } else if (parsed.value_numeric != null || parsed.value_text != null) {
                     records.push({
                         year, month: col, indicator_group: finalGroup,
@@ -253,20 +247,13 @@ export function parseSummaryXlsx(wb) {
                 const month = yc.month || 0; // 0 = annual
 
                 if (parsed.isVolPrice) {
-                    if (parsed.volume != null) {
-                        records.push({
-                            year: yc.year, month, indicator_group: finalGroup,
-                            indicator_name: name, sub_type: 'volume',
-                            value_numeric: parsed.volume, value_text: null, unit: 'тис. м3'
-                        });
-                    }
-                    if (parsed.price != null) {
-                        records.push({
-                            year: yc.year, month, indicator_group: finalGroup,
-                            indicator_name: name, sub_type: 'price',
-                            value_numeric: parsed.price, value_text: null, unit: 'грн/м3'
-                        });
-                    }
+                    const raw = String(cellVal).trim();
+                    const formatted = raw.replace(/\//, '(') + ')';
+                    records.push({
+                        year: yc.year, month, indicator_group: finalGroup,
+                        indicator_name: name, sub_type: 'value',
+                        value_numeric: parsed.volume, value_text: formatted, unit: unit
+                    });
                 } else if (parsed.value_numeric != null || parsed.value_text != null) {
                     records.push({
                         year: yc.year, month, indicator_group: finalGroup,
