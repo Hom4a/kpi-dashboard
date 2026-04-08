@@ -24,7 +24,7 @@ export const WEEKLY_BLOCKS = [
       columns: ['indicator', 'count', 'area_mln', 'share'] },
     { id: 'VI',   roman: 'VI',   name: 'Земельні питання',            sections: ['land_self_forested', 'land_reforestation', 'land_reserves'],
       columns: ['indicator', 'current', 'delta_pct', 'previous', 'ytd', 'total'] },
-    { id: 'VII',  roman: 'VII',  name: 'Заготівля та лісові ресурси', sections: ['harvesting'] },
+    { id: 'VII',  roman: 'VII',  name: 'Заготівля та лісові ресурси', sections: ['harvesting', 'harvesting_extra'] },
     { id: 'VIII', roman: 'VIII', name: 'Реалізація та договори',      sections: ['contracts', 'sales'],
       sectionColumns: {
           contracts: ['indicator', 'contract_vol', 'contract_sum', 'contract_pct'],

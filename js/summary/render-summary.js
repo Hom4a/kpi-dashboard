@@ -342,7 +342,7 @@ const SECTION_LABELS = {
     forestry_campaign: 'Лісокультурна кампанія',
     demining: 'Розмінування', certification: 'Сертифікація',
     land_self_forested: 'Самозалісені землі', land_reforestation: 'Лісорозведення',
-    land_reserves: 'Землі запасу', harvesting: 'Заготівля', contracts: 'Договори',
+    land_reserves: 'Землі запасу', harvesting: 'Заготівля', harvesting_extra: 'Додаткові показники', contracts: 'Договори',
     sales: 'Реалізація', finance: 'Фінанси', personnel: 'Персонал',
     legal: 'Правові питання', procurement: 'Закупівлі', zsu: 'Допомога ЗСУ'
 };

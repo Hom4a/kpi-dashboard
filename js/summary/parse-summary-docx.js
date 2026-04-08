@@ -16,7 +16,7 @@ const SECTION_SIGS = [
     { section: 'land_reforestation',  data:   /надіслано клопотань/i, seq: 1 },
     { section: 'land_reserves',       data:   /подано клопотань/i },
     { section: 'harvesting',          data:   /заготівл[яі]|загальні залишки/i },
-    { section: 'harvesting',          data:   /частка лісосічного|залишки круглих/i },
+    { section: 'harvesting_extra',    data:   /частка лісосічного|залишки круглих/i },
     { section: 'contracts',           header: /тип.*обсяг|обсяг.*млн\s*м/i },
     { section: 'sales',               data:   /реалізовано з початку|реалізація деревини/i },
     { section: 'finance',             data:   /залишки коштів/i },
