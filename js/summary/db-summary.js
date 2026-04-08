@@ -148,7 +148,7 @@ export async function loadSummaryWeekly(limit = 0) {
     const all = [];
     for (const rd of uniqueDates) {
         const { data, error } = await sb.from('summary_weekly')
-            .select('*').eq('report_date', rd);
+            .select('*').eq('report_date', rd).order('created_at', { ascending: true });
         if (error) throw new Error(error.message);
         if (data) all.push(...data);
     }

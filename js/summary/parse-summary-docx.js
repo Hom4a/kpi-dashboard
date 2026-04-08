@@ -2,34 +2,35 @@
 // Parses "ДП Ліси України" weekly briefing documents (.docx)
 // Extracts tables and text notes from word/document.xml
 
-// Smart table detection by header/data keywords (handles 17, 19+ tables)
+// Smart table detection: identify section by keywords, detect columns from headers
 const SECTION_SIGS = [
-    { section: 'kpi',                 header: /попередній тиждень/i,              cols: null, detectCols: true },
-    { section: 'forest_protection',   data:   /кількість випадків/i,             cols: ['indicator', 'ytd', 'current'] },
-    { section: 'raids',               data:   /кількість рейдів(?!.*шт)/i,      cols: ['indicator', 'ytd', 'current'] },
-    { section: 'mru_raids',           data:   /кількість рейдів.*шт/i,          cols: ['indicator', 'ytd', 'current'] },
-    { section: 'fires',               data:   /кількість\s*пожеж/i,             cols: ['indicator', 'ytd', 'current'] },
-    { section: 'forestry_campaign',   data:   /площа створених/i,               cols: ['indicator', 'ytd', 'current'] },
-    { section: 'demining',            header: /площа.*тис.*га/i,                 cols: ['indicator', 'current'] },
-    { section: 'certification',       header: /надлісництва/i,                   cols: ['indicator', 'current', 'ytd', 'delta'] },
-    { section: 'land_self_forested',  data:   /надіслано клопотань/i,            cols: ['indicator', 'all_time', 'ytd', 'current'], seq: 0 },
-    { section: 'land_reforestation',  data:   /надіслано клопотань/i,            cols: ['indicator', 'all_time', 'ytd', 'current'], seq: 1 },
-    { section: 'land_reserves',       data:   /подано клопотань/i,               cols: ['indicator', 'all_time', 'ytd', 'current'] },
-    { section: 'harvesting',          data:   /заготовлено з початку/i,          cols: ['indicator', 'current'] },
-    { section: 'contracts',           header: /тип.*обсяг|обсяг.*млн\s*м/i,     cols: ['indicator', 'current', 'ytd', 'delta'] },
-    { section: 'sales',               data:   /реалізовано з початку/i,          cols: ['indicator', 'current'] },
-    { section: 'finance',             header: /за тиждень/i, data: /залишки коштів/i, cols: ['indicator', 'current', 'delta'] },
-    { section: 'personnel',           data:   /облікова чисельність/i,           cols: ['indicator', 'current'] },
-    { section: 'legal',               data:   /загальна площа земель/i,          cols: ['indicator', 'current'] },
-    { section: 'procurement',         data:   /процедури з початку/i,            cols: ['indicator', 'current'] },
-    { section: 'zsu',                 data:   /допомога з початку/i,             cols: ['indicator', 'current'] },
+    { section: 'kpi',                 header: /попередній тиждень/i },
+    { section: 'forest_protection',   data:   /кількість випадків/i },
+    { section: 'raids',               data:   /кількість рейдів(?!.*шт)/i },
+    { section: 'mru_raids',           data:   /кількість рейдів.*шт/i },
+    { section: 'fires',               data:   /кількість\s*пожеж/i },
+    { section: 'forestry_campaign',   data:   /площа створених/i },
+    { section: 'demining',            header: /площа.*тис.*га/i },
+    { section: 'certification',       header: /надлісництва/i },
+    { section: 'land_self_forested',  data:   /надіслано клопотань/i, seq: 0 },
+    { section: 'land_reforestation',  data:   /надіслано клопотань/i, seq: 1 },
+    { section: 'land_reserves',       data:   /подано клопотань/i },
+    { section: 'harvesting',          data:   /заготівл[яі]|загальні залишки/i },
+    { section: 'harvesting',          data:   /частка лісосічного|залишки круглих/i },
+    { section: 'contracts',           header: /тип.*обсяг|обсяг.*млн\s*м/i },
+    { section: 'sales',               data:   /реалізовано з початку|реалізація деревини/i },
+    { section: 'finance',             data:   /залишки коштів/i },
+    { section: 'personnel',           data:   /облікова чисельність/i },
+    { section: 'legal',               data:   /загальна площа земель/i },
+    { section: 'procurement',         data:   /процедури з початку/i },
+    { section: 'zsu',                 data:   /допомога з початку/i },
 ];
 
 function identifyTable(headerText, firstRowText) {
     const h = headerText.toLowerCase().replace(/\s+/g, ' ');
     const d = firstRowText.toLowerCase().replace(/\s+/g, ' ');
     for (const sig of SECTION_SIGS) {
-        if (sig._matched) continue; // already matched (no duplicates except seq)
+        if (sig._matched && sig.section !== 'harvesting') continue; // harvesting can have 2 tables
         const hOk = !sig.header || sig.header.test(h);
         const dOk = !sig.data || sig.data.test(d);
         if (hOk && dOk) {
@@ -58,24 +59,33 @@ const NOTE_PATTERNS = [
 ];
 
 /**
- * Detect KPI table column order from header cells.
- * Handles: "За тиждень | Попередній тиждень | З початку року | ∆"
- * or:      "За тиждень | %Δ | Попередній тиждень | З початку року"
+ * Universal column detection from header cells.
+ * Handles all template versions (v1: 17 tables, v2: 19, v3: 20+).
+ * %Δ columns → _skip (delta calculated in dashboard, not from Word).
  */
-function detectKpiCols(headerRow, ns) {
+function detectCols(headerRow, ns) {
     const headerCells = headerRow.getElementsByTagNameNS(ns, 'tc');
     const cols = [];
     for (let ci = 0; ci < headerCells.length; ci++) {
         const t = getCellText(headerCells[ci], ns).toLowerCase().replace(/\s+/g, ' ');
-        if (t.includes('показник')) cols.push('indicator');
+        if (t.includes('показник') || t.includes('тип') || t.includes('система')) cols.push('indicator');
         else if (t.includes('попередній')) cols.push('previous');
         else if (t.includes('з початку') || t.includes('з поч')) cols.push('ytd');
         else if (t.includes('за тиждень') || t.includes('за звітний')) cols.push('current');
-        else if (t.includes('∆') || t.includes('дельта') || t.includes('%')) cols.push('delta');
+        else if (t.includes('аналогічний період') || t.includes('попередньог')) cols.push('yoy');
+        else if (t.includes('весь період')) cols.push('all_time');
+        else if (t.includes('значення')) cols.push('current');
+        else if (t.includes('виконання')) cols.push('delta');
+        else if (t.includes('∆') || t.includes('δ') || t.includes('%')) cols.push('_skip');
+        else if (t.includes('площа') && t.includes('тис')) cols.push('current');
+        else if (t.includes('площа') && t.includes('млн')) cols.push('current');
+        else if (t.includes('надлісництва')) cols.push('current');
+        else if (t.includes('частка')) cols.push('delta');
+        else if (t.includes('обсяг')) cols.push('current');
+        else if (t.includes('сума')) cols.push('ytd');
         else if (t.includes('план') || t.includes('орієнтир') || t.includes('статус')) cols.push('_skip');
         else cols.push('current'); // fallback
     }
-    // Ensure at least indicator + current
     if (!cols.includes('indicator')) cols.unshift('indicator');
     return cols;
 }
@@ -122,14 +132,9 @@ export async function parseSummaryDocx(buffer) {
             console.log(`DOCX parser: skipping unknown table ${ti}: "${headerText.slice(0, 60)}" / "${firstDataText.slice(0, 60)}"`);
             continue;
         }
-        // Dynamic column detection for KPI table (column order varies between docs)
-        let cols = mapping.cols;
-        if (mapping.detectCols) {
-            cols = detectKpiCols(tableRows[0], ns);
-            console.log(`DOCX parser: table ${ti} → ${mapping.section} (auto-cols: ${cols.join(',')})`);
-        } else {
-            console.log(`DOCX parser: table ${ti} → ${mapping.section}`);
-        }
+        // Universal column detection from header row (all tables)
+        const cols = detectCols(tableRows[0], ns);
+        console.log(`DOCX parser: table ${ti} → ${mapping.section} (cols: ${cols.join(',')})`);
 
         // Skip header row (index 0), parse data rows
         const sectionNameCount = {}; // Track duplicate indicator names within section
@@ -174,7 +179,8 @@ export async function parseSummaryDocx(buffer) {
                 value_previous: values.previous ?? null,
                 value_ytd: values.ytd ?? null,
                 value_delta: values.delta ?? null,
-                value_text: valueText
+                value_text: valueText,
+                sort_order: records.length
             });
         }
     }

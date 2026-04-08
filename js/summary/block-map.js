@@ -23,17 +23,16 @@ export const WEEKLY_BLOCKS = [
     { id: 'V',    roman: 'V',    name: 'Лісова сертифікація',         sections: ['certification'],
       columns: ['indicator', 'count', 'area_mln', 'share'] },
     { id: 'VI',   roman: 'VI',   name: 'Земельні питання',            sections: ['land_self_forested', 'land_reforestation', 'land_reserves'],
-      columns: ['indicator', 'total', 'ytd', 'current'] },
-    { id: 'VII',  roman: 'VII',  name: 'Заготівля та лісові ресурси', sections: ['harvesting'],
-      columns: ['indicator', 'value'] },
+      columns: ['indicator', 'current', 'delta_pct', 'previous', 'ytd', 'total'] },
+    { id: 'VII',  roman: 'VII',  name: 'Заготівля та лісові ресурси', sections: ['harvesting'] },
     { id: 'VIII', roman: 'VIII', name: 'Реалізація та договори',      sections: ['contracts', 'sales'],
       sectionColumns: {
           contracts: ['indicator', 'contract_vol', 'contract_sum', 'contract_pct'],
-          sales: ['indicator', 'value']
+          sales: null  // auto-detect
       }
     },
     { id: 'IX',   roman: 'IX',   name: 'Фінансовий стан',             sections: ['finance'],
-      columns: ['indicator', 'value', 'delta_abs'] },
+      columns: ['indicator', 'value', 'delta_pct', 'previous'] },
     { id: 'X',    roman: 'X',    name: 'Персонал',                    sections: ['personnel'],
       columns: ['indicator', 'value'] },
     { id: 'XI',   roman: 'XI',   name: 'Правові питання',             sections: ['legal'],
