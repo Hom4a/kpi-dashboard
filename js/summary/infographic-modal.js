@@ -6,6 +6,15 @@ import { charts } from '../state.js';
 import { loadWeeklyIndicatorHistory, loadMonthlyIndicatorHistory } from './db-summary.js';
 
 const MODAL_ID = 'indicatorModal';
+
+// Filter history to same indicator type (vol/price vs regular)
+function filterByType(history, indicatorName) {
+    const isVP = /м3.*ціна|ціна.*грн|сер\.\s*ціна/i.test(indicatorName);
+    return history.filter(r => {
+        const rkIsVP = /м3.*ціна|ціна.*грн|сер\.\s*ціна/i.test(r.indicator_name);
+        return isVP === rkIsVP;
+    });
+}
 let _chart = null;
 
 export function initIndicatorModal() {
@@ -70,7 +79,7 @@ export async function openMonthlyIndicatorModal(indicatorName, group) {
     $('infModalMeta').innerHTML = '';
 
     // Populate month selector from available data
-    const history = await loadMonthlyIndicatorHistory(indicatorName);
+    const history = filterByType(await loadMonthlyIndicatorHistory(indicatorName), indicatorName);
     const availMonths = [...new Set(history.filter(r => r.month > 0).map(r => r.month))].sort((a, b) => a - b);
     const isAnnualOnly = availMonths.length === 0;
     // Default to latest month from latest year with data
@@ -221,7 +230,7 @@ const MO_SHORT = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип'
 // Mode 1: Same month across different years (e.g., Feb 2023 vs Feb 2024 vs Feb 2025)
 async function loadAndDrawMonthlyMonthVsMonth(indicatorName) {
     try {
-        const history = await loadMonthlyIndicatorHistory(indicatorName);
+        const history = filterByType(await loadMonthlyIndicatorHistory(indicatorName), indicatorName);
         if (!history.length) return;
 
         const targetMonth = _selectedMonth || (() => {
@@ -242,7 +251,7 @@ async function loadAndDrawMonthlyMonthVsMonth(indicatorName) {
 // Mode 2: Annual totals comparison
 async function loadAndDrawMonthlyYears(indicatorName) {
     try {
-        const history = await loadMonthlyIndicatorHistory(indicatorName);
+        const history = filterByType(await loadMonthlyIndicatorHistory(indicatorName), indicatorName);
         if (!history.length) return;
 
         // Annual records (month=0) or sum monthly
@@ -274,7 +283,7 @@ async function loadAndDrawMonthlyYears(indicatorName) {
 // Mode 3: YTD (year-to-date) comparison across years
 async function loadAndDrawMonthlyYTD(indicatorName) {
     try {
-        const history = await loadMonthlyIndicatorHistory(indicatorName);
+        const history = filterByType(await loadMonthlyIndicatorHistory(indicatorName), indicatorName);
         if (!history.length) return;
 
         const upToMonth = _selectedMonth || (() => {
