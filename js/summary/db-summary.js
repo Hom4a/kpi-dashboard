@@ -253,7 +253,7 @@ export async function loadMonthlyIndicatorHistory(indicatorName, subType, limit 
     if (indicatorName.length <= 10) {
         pattern = '%' + indicatorName + '%';
     } else {
-        const words = indicatorName.replace(/['"()]/g, '').split(/[\s,]+/).filter(w => w.length > 2);
+        const words = indicatorName.replace(/['''\u2019"()]/g, '%').split(/[\s,]+/).filter(w => w.length > 2);
         pattern = '%' + words.slice(0, 3).join('%') + '%';
     }
     let q = sb.from('summary_indicators')
