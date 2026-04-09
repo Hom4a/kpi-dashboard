@@ -233,7 +233,9 @@ async function loadAndDrawMonthlyMonthVsMonth(indicatorName) {
         if (!sameMonth.length) return;
 
         const labels = sameMonth.map(r => `${MO_SHORT[r.month - 1]} ${r.year}`);
-        drawChart(labels, sameMonth.map(r => r.value_numeric), indicatorName, 'bar');
+        const texts = sameMonth.some(r => r.value_text && /[\/(]/.test(r.value_text))
+            ? sameMonth.map(r => r.value_text || null) : null;
+        drawChart(labels, sameMonth.map(r => r.value_numeric), indicatorName, 'bar', texts);
     } catch (e) { console.error('infographic month-vs-month error:', e); }
 }
 
@@ -248,20 +250,24 @@ async function loadAndDrawMonthlyYears(indicatorName) {
         const labels = [];
         const values = [];
 
+        const texts = [];
         for (const y of years) {
             const annual = history.find(r => r.year === y && r.month === 0);
             if (annual) {
                 labels.push(String(y));
                 values.push(annual.value_numeric);
+                texts.push(annual.value_text && /[\/(]/.test(annual.value_text) ? annual.value_text : null);
             } else {
                 const monthly = history.filter(r => r.year === y && r.month > 0);
                 if (monthly.length) {
                     labels.push(String(y));
                     values.push(monthly.reduce((s, r) => s + (r.value_numeric || 0), 0));
+                    texts.push(null);
                 }
             }
         }
-        drawChart(labels, values, indicatorName, 'bar');
+        const hasTexts = texts.some(t => t);
+        drawChart(labels, values, indicatorName, 'bar', hasTexts ? texts : null);
     } catch (e) { console.error('infographic years error:', e); }
 }
 
@@ -290,7 +296,7 @@ async function loadAndDrawMonthlyYTD(indicatorName) {
     } catch (e) { console.error('infographic YTD error:', e); }
 }
 
-function drawChart(labels, values, label, type) {
+function drawChart(labels, values, label, type, textLabels) {
     if (_chart) { _chart.destroy(); _chart = null; }
 
     const canvas = $('infModalChart');
@@ -384,20 +390,19 @@ function drawChart(labels, values, label, type) {
                     : v.toLocaleString('uk-UA', { maximumFractionDigits: 2 });
 
                 c.save();
+                const tLabels = textLabels || [];
                 vals.forEach((val, i) => {
                     if (val == null) return;
                     const xP = x.getPixelForValue(i);
                     const yP = y.getPixelForValue(val);
-                    const valStr = fmtN(val);
+                    const valStr = tLabels[i] || fmtN(val);
 
                     if (i === 0) {
-                        // Base value — white bold
-                        c.font = `bold 12px ${font}`;
+                        c.font = `bold ${tLabels[i] ? '10' : '12'}px ${font}`;
                         c.fillStyle = '#1F2937';
                         c.textAlign = 'center';
                         c.fillText(valStr, xP, yP - 12);
                     } else {
-                        // Value + tempo росту
                         const prev = vals[i - 1];
                         let deltaStr = '', deltaCol = '#9ca3af';
                         if (prev != null && Math.abs(prev) >= 0.01) {
@@ -407,14 +412,15 @@ function drawChart(labels, values, label, type) {
                                 deltaCol = pct > 100 ? '#4ADE80' : '#FB7185';
                             }
                         }
-                        c.font = `bold 12px ${font}`;
+                        const fontSize = tLabels[i] ? 10 : 12;
+                        c.font = `bold ${fontSize}px ${font}`;
                         c.fillStyle = '#1F2937';
                         const vW = c.measureText(valStr).width;
-                        c.font = `bold 10px ${font}`;
+                        c.font = `bold ${fontSize - 2}px ${font}`;
                         const dW = deltaStr ? c.measureText(deltaStr).width : 0;
                         const startX = xP - (vW + dW) / 2;
 
-                        c.font = `bold 12px ${font}`;
+                        c.font = `bold ${fontSize}px ${font}`;
                         c.fillStyle = '#1F2937';
                         c.textAlign = 'left';
                         c.fillText(valStr, startX, yP - 12);
