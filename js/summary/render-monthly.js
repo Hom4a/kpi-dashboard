@@ -289,21 +289,32 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             if (y > year) { cells += '<td>—</td>'; continue; }
 
             if (y === year) {
-                // Current year
-                const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
-                if (monthlyRecords.length) {
-                    const val = snapshot
-                        ? monthlyRecords.sort((a, b) => b.month - a.month)[0].value_numeric // last month value
-                        : monthlyRecords.reduce((s, r) => s + r.value_numeric, 0); // sum
-                    cells += `<td><b>${fN(val)}</b></td>`;
+                // Current year — check for text values first (e.g. "360,6(2318,7)")
+                const ann = rows.find(r => r.year === y && r.month === 0);
+                if (ann?.value_text && /[\/(]/.test(ann.value_text)) {
+                    cells += `<td><b>${ann.value_text}</b></td>`;
                 } else {
-                    const ann = rows.find(r => r.year === y && r.month === 0);
-                    cells += `<td><b>${ann?.value_text || '—'}</b></td>`;
+                    const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
+                    if (monthlyRecords.length) {
+                        // Check if latest record has value_text (vol/price format)
+                        const latest = monthlyRecords.sort((a, b) => b.month - a.month)[0];
+                        if (latest.value_text && /[\/(]/.test(latest.value_text)) {
+                            cells += `<td><b>${latest.value_text}</b></td>`;
+                        } else {
+                            const val = snapshot ? latest.value_numeric
+                                : monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                            cells += `<td><b>${fN(val)}</b></td>`;
+                        }
+                    } else {
+                        cells += `<td><b>${ann?.value_text || '—'}</b></td>`;
+                    }
                 }
             } else {
-                // Past years: use annual record (month=0) or compute from months
+                // Past years
                 const ann = rows.find(r => r.year === y && r.month === 0);
-                if (ann?.value_numeric != null) {
+                if (ann?.value_text && /[\/(]/.test(ann.value_text)) {
+                    cells += `<td>${ann.value_text}</td>`;
+                } else if (ann?.value_numeric != null) {
                     cells += `<td>${fN(ann.value_numeric)}</td>`;
                 } else {
                     const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
@@ -327,7 +338,11 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
         const curVal = monthRec?.value_numeric;
         const prevVal = prevMonthRec?.value_numeric;
 
-        cells += `<td><b>${curVal != null ? fN(curVal) : (monthRec?.value_text || '—')}</b></td>`;
+        // Show value_text for volume/price format, else numeric
+        const monthDisplay = (monthRec?.value_text && /[\/(]/.test(monthRec.value_text))
+            ? monthRec.value_text
+            : (curVal != null ? fN(curVal) : (monthRec?.value_text || '—'));
+        cells += `<td><b>${monthDisplay}</b></td>`;
         cells += `<td class="${deltaCls(curVal, prevVal)}">${deltaBadge(curVal, prevVal) || '—'}</td>`;
 
         cells = cells.replace(/^<td>/, `<td><span class="cell-text">`);
