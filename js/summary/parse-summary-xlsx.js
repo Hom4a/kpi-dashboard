@@ -82,15 +82,15 @@ function parseValue(val) {
     if (s === '*') return { value_numeric: null, value_text: '*', isVolPrice: false };
     if (/^до\s/i.test(s)) return { value_numeric: null, value_text: s, isVolPrice: false };
 
-    // Volume/price pattern: "366,82/3189,61" or "366/3189"
-    if (s.includes('/')) {
-        const parts = s.split('/');
-        if (parts.length === 2) {
-            const vol = parseNumeric(parts[0]);
-            const price = parseNumeric(parts[1]);
-            if (vol != null || price != null) {
-                return { volume: vol, price: price, isVolPrice: true };
-            }
+    // Volume/price pattern: "366,82/3189,61" or "366,82(3189,61)" or "366(3189)"
+    const vpSlash = s.match(/^([\d\s,.]+)\/([\d\s,.]+)$/);
+    const vpBracket = s.match(/^([\d\s,.]+)\(([\d\s,.]+)\)*$/);
+    const vpMatch = vpSlash || vpBracket;
+    if (vpMatch) {
+        const vol = parseNumeric(vpMatch[1]);
+        const price = parseNumeric(vpMatch[2]);
+        if (vol != null || price != null) {
+            return { volume: vol, price: price, isVolPrice: true };
         }
     }
 
@@ -151,8 +151,8 @@ export function parseSummaryXlsx(wb) {
                 const parsed = parseValue(cellVal);
                 if (parsed.isVolPrice) {
                     // Store as value with formatted text: "360,6(2318,7)"
-                    const raw = String(cellVal).trim();
-                    const formatted = raw.replace(/\//, '(') + ')';
+                    const raw = String(cellVal).trim().replace(/\)+$/, ''); // remove trailing ))
+                    const formatted = raw.includes('(') ? raw + ')' : raw.replace(/\//, '(') + ')';
                     records.push({
                         year, month: col, indicator_group: finalGroup,
                         indicator_name: name, sub_type: 'value',
@@ -247,8 +247,8 @@ export function parseSummaryXlsx(wb) {
                 const month = yc.month || 0; // 0 = annual
 
                 if (parsed.isVolPrice) {
-                    const raw = String(cellVal).trim();
-                    const formatted = raw.replace(/\//, '(') + ')';
+                    const raw = String(cellVal).trim().replace(/\)+$/, '');
+                    const formatted = raw.includes('(') ? raw + ')' : raw.replace(/\//, '(') + ')';
                     records.push({
                         year: yc.year, month, indicator_group: finalGroup,
                         indicator_name: name, sub_type: 'value',
