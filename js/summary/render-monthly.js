@@ -237,7 +237,7 @@ function isSub(name, subSet) {
     return [...subSet].some(s => s.replace(/\s+/g, ' ').trim().toLowerCase() === n);
 }
 
-// Match indicator: collect ALL records with matching name (exact + fuzzy both directions)
+// Match indicator: collect ALL records with matching name
 function matchIndicator(name, allData) {
     const lower = name.toLowerCase().replace(/\s+/g, ' ').trim();
     const matched = new Set();
@@ -246,10 +246,14 @@ function matchIndicator(name, allData) {
     for (const r of allData) {
         if (matched.has(r)) continue;
         const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
-        // Exact match OR either direction contains
-        if (rk === lower || rk.includes(lower) || (lower.includes(rk) && rk.length > 5)) {
-            matched.add(r);
-            result.push(r);
+        if (rk === lower) {
+            // Exact match — always include
+            matched.add(r); result.push(r);
+        } else if (lower.length > 10) {
+            // Fuzzy only for longer names (avoids "дуб" matching "дуб тис. м3/сер. ціна грн")
+            if (rk.includes(lower) || (lower.includes(rk) && rk.length > 10)) {
+                matched.add(r); result.push(r);
+            }
         }
     }
     return result;
