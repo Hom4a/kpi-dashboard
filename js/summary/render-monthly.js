@@ -240,19 +240,21 @@ function isSub(name, subSet) {
 // Match indicator: collect ALL records with matching name
 function matchIndicator(name, allData) {
     const lower = name.toLowerCase().replace(/\s+/g, ' ').trim();
-    const matched = new Set();
+    const isVolPriceName = /м3.*ціна|ціна.*грн|сер\.\s*ціна/.test(lower);
     const result = [];
 
     for (const r of allData) {
-        if (matched.has(r)) continue;
         const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
+        const rkIsVolPrice = /м3.*ціна|ціна.*грн|сер\.\s*ціна/.test(rk);
+
+        // Don't mix vol/price indicators with regular ones
+        if (isVolPriceName !== rkIsVolPrice) continue;
+
         if (rk === lower) {
-            // Exact match — always include
-            matched.add(r); result.push(r);
+            result.push(r);
         } else if (lower.length > 10) {
-            // Fuzzy only for longer names (avoids "дуб" matching "дуб тис. м3/сер. ціна грн")
             if (rk.includes(lower) || (lower.includes(rk) && rk.length > 10)) {
-                matched.add(r); result.push(r);
+                result.push(r);
             }
         }
     }
