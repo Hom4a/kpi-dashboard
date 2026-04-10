@@ -404,7 +404,42 @@ function drawDualChart(labels, volumes, prices, label) {
                     border: { display: false }
                 }
             }
-        }
+        },
+        plugins: [{
+            id: 'dualLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx: c, scales: { x, y, y1 } } = chart;
+                const font = 'Inter,system-ui,sans-serif';
+                const fN = v => v == null ? '' : v.toLocaleString('uk-UA', { maximumFractionDigits: 1 });
+                c.save();
+
+                // Volume labels (above bars)
+                const volData = chart.data.datasets[0].data;
+                volData.forEach((val, i) => {
+                    if (val == null) return;
+                    const xP = x.getPixelForValue(i);
+                    const yP = y.getPixelForValue(val);
+                    c.font = `bold 10px ${font}`;
+                    c.fillStyle = '#4A9D6F';
+                    c.textAlign = 'center';
+                    c.fillText(fN(val), xP, yP - 8);
+                });
+
+                // Price labels (next to line points)
+                const priceData = chart.data.datasets[1].data;
+                priceData.forEach((val, i) => {
+                    if (val == null) return;
+                    const xP = x.getPixelForValue(i);
+                    const yP = y1.getPixelForValue(val);
+                    c.font = `bold 10px ${font}`;
+                    c.fillStyle = '#E67E22';
+                    c.textAlign = 'center';
+                    c.fillText(fN(val), xP, yP - 10);
+                });
+
+                c.restore();
+            }
+        }]
     });
 }
 
