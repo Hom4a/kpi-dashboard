@@ -228,19 +228,20 @@ function getCellText(el, ns, joinAll) {
 function parseNumericValue(text) {
     if (!text || text === '-' || text === '—' || text === '–') return null;
 
-    // Remove internal spaces (e.g., "21 328" → "21328", "137 996,8" → "137996,8")
+    // If text has "number (percentage%)" pattern like "5912850 (85,8%)"
+    // → parse ONLY the number before the bracket
+    const bracketMatch = text.match(/^([+\-]?[\d\s\u00A0,.]+)\s*\(/);
+    if (bracketMatch) {
+        let s = bracketMatch[1].replace(/[\s\u00A0]/g, '').replace(',', '.');
+        if (s.startsWith('+')) s = s.substring(1);
+        const num = parseFloat(s);
+        return isNaN(num) ? null : num;
+    }
+
     let s = text.replace(/[\s\u00A0]/g, '');
-
-    // Remove + prefix but keep - for negative
     if (s.startsWith('+')) s = s.substring(1);
-
-    // Remove % suffix
     s = s.replace(/%$/, '');
-
-    // Replace comma with dot for decimal
     s = s.replace(',', '.');
-
-    // Handle parenthesized values like "(85,3%)" → 85.3
     s = s.replace(/[()]/g, '');
 
     const num = parseFloat(s);
