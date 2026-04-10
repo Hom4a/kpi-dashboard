@@ -225,12 +225,29 @@ export function parseSummaryXlsx(wb) {
             }
         }
 
+        // Extract "Довідково" reference text block
+        let inRef = false;
+        const refLines = [];
+        for (let i = 3; i < rows.length; i++) {
+            const name = String(rows[i]?.[0] || '').trim();
+            if (/^довідково/i.test(name)) { inRef = true; continue; }
+            if (inRef && name) refLines.push(name);
+        }
+        if (refLines.length) {
+            records.push({
+                year: 0, month: 0, indicator_group: 'reference',
+                indicator_name: 'Довідково', sub_type: 'value',
+                value_numeric: null, value_text: refLines.join('\n'), unit: null
+            });
+        }
+
         lastGroup = 'finance';
         for (let i = 3; i < rows.length; i++) {
             const r = rows[i];
             if (!r || !r[0]) continue;
             const name = String(r[0]).trim();
             if (!name) continue;
+            if (/^довідково/i.test(name)) break; // Stop before reference section
             if (/^чисельність\/кількість/i.test(name)) continue;
             if (/^олень/i.test(name)) continue;
 

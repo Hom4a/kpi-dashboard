@@ -242,9 +242,13 @@ async function loadAndDrawMonthlyMonthVsMonth(indicatorName) {
         if (!sameMonth.length) return;
 
         const labels = sameMonth.map(r => `${MO_SHORT[r.month - 1]} ${r.year}`);
-        const texts = sameMonth.some(r => r.value_text && /[\/(]/.test(r.value_text))
-            ? sameMonth.map(r => r.value_text || null) : null;
-        drawChart(labels, sameMonth.map(r => r.value_numeric), indicatorName, 'bar', texts);
+        if (isVolPrice(sameMonth)) {
+            const volumes = sameMonth.map(r => r.value_numeric);
+            const prices = sameMonth.map(r => extractPrice(r.value_text));
+            drawDualChart(labels, volumes, prices, indicatorName);
+        } else {
+            drawChart(labels, sameMonth.map(r => r.value_numeric), indicatorName, 'bar');
+        }
     } catch (e) { console.error('infographic month-vs-month error:', e); }
 }
 
@@ -276,7 +280,12 @@ async function loadAndDrawMonthlyYears(indicatorName) {
             }
         }
         const hasTexts = texts.some(t => t);
-        drawChart(labels, values, indicatorName, 'bar', hasTexts ? texts : null);
+        if (hasTexts) {
+            const prices = texts.map(t => extractPrice(t));
+            drawDualChart(labels, values, prices, indicatorName);
+        } else {
+            drawChart(labels, values, indicatorName, 'bar');
+        }
     } catch (e) { console.error('infographic years error:', e); }
 }
 
@@ -303,6 +312,100 @@ async function loadAndDrawMonthlyYTD(indicatorName) {
         }
         drawChart(labels, values, indicatorName, 'bar');
     } catch (e) { console.error('infographic YTD error:', e); }
+}
+
+// Extract price from value_text like "360,6(2318,7)" → 2318.7
+function extractPrice(text) {
+    if (!text) return null;
+    const m = text.match(/\(([^)]+)\)/);
+    if (!m) return null;
+    return parseFloat(m[1].replace(/\s/g, '').replace(',', '.'));
+}
+
+function isVolPrice(records) {
+    return records.some(r => r.value_text && /\([\d,.]+\)/.test(r.value_text));
+}
+
+// Dual-axis chart: bars for volume (left Y) + line for price (right Y)
+function drawDualChart(labels, volumes, prices, label) {
+    if (_chart) { _chart.destroy(); _chart = null; }
+    const canvas = $('infModalChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const volGradients = volumes.map((v, i) => {
+        const intensity = 0.4 + (i / Math.max(volumes.length - 1, 1)) * 0.4;
+        const g = ctx.createLinearGradient(0, 0, 0, 280);
+        g.addColorStop(0, `rgba(74,157,111,${intensity})`);
+        g.addColorStop(1, `rgba(74,157,111,${intensity * 0.3})`);
+        return g;
+    });
+
+    _chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Об\'єм, тис. м3',
+                    data: volumes,
+                    backgroundColor: volGradients,
+                    borderRadius: 6,
+                    borderWidth: 0,
+                    barPercentage: 0.45,
+                    yAxisID: 'y',
+                    order: 2
+                },
+                {
+                    label: 'Сер. ціна, грн/м3',
+                    data: prices,
+                    type: 'line',
+                    borderColor: '#E67E22',
+                    backgroundColor: 'rgba(230,126,34,.15)',
+                    borderWidth: 2.5,
+                    pointRadius: 5,
+                    pointBackgroundColor: '#E67E22',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    fill: false,
+                    tension: 0.3,
+                    yAxisID: 'y1',
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { top: 32 } },
+            plugins: {
+                legend: { display: true, position: 'top', labels: { font: { size: 11 }, usePointStyle: true, padding: 16 } },
+                tooltip: {
+                    backgroundColor: 'rgba(15,20,25,.92)',
+                    titleColor: '#fff', bodyColor: '#e5e7eb',
+                    borderColor: 'rgba(74,157,111,.4)', borderWidth: 1,
+                    cornerRadius: 10, padding: 12
+                }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 11, weight: 500 }, color: '#9ca3af', maxRotation: 0 }, border: { display: false } },
+                y: {
+                    position: 'left',
+                    title: { display: true, text: 'тис. м3', font: { size: 10 }, color: '#4A9D6F' },
+                    grid: { color: 'rgba(255,255,255,.04)' },
+                    ticks: { font: { size: 10 }, color: '#4A9D6F' },
+                    border: { display: false }
+                },
+                y1: {
+                    position: 'right',
+                    title: { display: true, text: 'грн/м3', font: { size: 10 }, color: '#E67E22' },
+                    grid: { display: false },
+                    ticks: { font: { size: 10 }, color: '#E67E22' },
+                    border: { display: false }
+                }
+            }
+        }
+    });
 }
 
 function drawChart(labels, values, label, type, textLabels) {
