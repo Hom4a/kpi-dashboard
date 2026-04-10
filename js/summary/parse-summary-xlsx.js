@@ -225,7 +225,11 @@ export function parseSummaryXlsx(wb) {
             }
         }
 
-        // Extract "Довідково" reference text block
+        // Extract "Довідково" reference text block — bind to the monthly column
+        const monthCol = yearColumns.find(yc => yc.month);
+        const refYear = monthCol ? monthCol.year : yearColumns[yearColumns.length - 1]?.year || 0;
+        const refMonth = monthCol ? monthCol.month : 0;
+
         let inRef = false;
         const refLines = [];
         for (let i = 3; i < rows.length; i++) {
@@ -235,7 +239,7 @@ export function parseSummaryXlsx(wb) {
         }
         if (refLines.length) {
             records.push({
-                year: 0, month: 0, indicator_group: 'reference',
+                year: refYear, month: refMonth, indicator_group: 'reference',
                 indicator_name: 'Довідково', sub_type: 'value',
                 value_numeric: null, value_text: refLines.join('\n'), unit: null
             });

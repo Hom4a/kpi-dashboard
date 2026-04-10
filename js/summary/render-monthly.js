@@ -208,7 +208,7 @@ export function renderMonthlyReport(container, year, month) {
     html += renderSalaryTable(showYears, year, month, allData);
 
     // Reference info
-    html += renderReferenceBlock(allData);
+    html += renderReferenceBlock(allData, year, month);
 
     container.innerHTML = html;
 
@@ -525,9 +525,14 @@ function renderSalaryTable(showYears, year, month, allData) {
     return html;
 }
 
-function renderReferenceBlock(allData) {
-    // Try to get reference text from DB (parsed from Excel)
-    const refRecord = allData.find(r => r.indicator_group === 'reference' && r.indicator_name === 'Довідково');
+function renderReferenceBlock(allData, year, month) {
+    // Try to get reference text for selected month, fallback to latest available
+    let refRecord = allData.find(r => r.indicator_group === 'reference' && r.year === year && r.month === month);
+    if (!refRecord) {
+        // Fallback: latest reference record
+        refRecord = allData.filter(r => r.indicator_group === 'reference')
+            .sort((a, b) => b.year - a.year || b.month - a.month)[0];
+    }
     const refText = refRecord?.value_text || '';
 
     let content = '';
