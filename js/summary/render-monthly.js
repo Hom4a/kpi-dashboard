@@ -415,12 +415,16 @@ function renderSalaryTable(showYears, year, month, allData) {
             lower.includes('східний') || lower.includes('центральний');
     });
 
-    // Show branches that exist in the selected year's data
-    let branchNames = [...new Set(salaryRows
+    // Show branches in original Excel order (no alphabetical sort)
+    const seen = new Set();
+    let branchNames = salaryRows
         .filter(r => r.year === year && r.value_numeric != null)
-        .map(r => r.indicator_name))].sort();
+        .map(r => r.indicator_name)
+        .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
     if (!branchNames.length) {
-        branchNames = [...new Set(salaryRows.map(r => r.indicator_name))].sort();
+        seen.clear();
+        branchNames = salaryRows.map(r => r.indicator_name)
+            .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
     }
     if (!branchNames.length) return '';
 
@@ -439,6 +443,7 @@ function renderSalaryTable(showYears, year, month, allData) {
                 ${showYears.map(y => `<th>${y} рік</th>`).join('')}
                 <th>${MO[month - 1]} ${year}</th>
                 <th>%Δ до попер.місяця</th>
+                <th>Сер. з/п в регіоні</th>
             </tr></thead>
             <tbody>`;
 
@@ -472,32 +477,13 @@ function renderSalaryTable(showYears, year, month, allData) {
         const prevVal = prev?.value_numeric;
         cells += `<td><b>${curVal != null ? fN(curVal) : '—'}</b></td>`;
         cells += `<td class="${deltaCls(curVal, prevVal)}">${deltaBadge(curVal, prevVal) || '—'}</td>`;
+        // Region salary column
+        const regionRec = allData.find(r => r.indicator_group === 'region_salary' && r.indicator_name === name);
+        cells += `<td>${regionRec?.value_numeric != null ? fN(regionRec.value_numeric) : '—'}</td>`;
         cells = cells.replace(/^<td>/, `<td><span class="cell-text">`);
         cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name}"></span></td>`);
         html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
     }
-
-    // Average across displayed branches
-    let avgCells = `<td class="ind-name"><b>Середня по філіях</b></td>`;
-    for (const y of showYears) {
-        if (y > year) { avgCells += '<td>—</td>'; continue; }
-        const vals = branchNames.map(n => {
-            const r = salaryRows.find(r => r.indicator_name === n && r.year === y && r.month === 0);
-            return r?.value_numeric;
-        }).filter(v => v != null);
-        avgCells += vals.length ? `<td><b>${fN(vals.reduce((s, v) => s + v, 0) / vals.length)}</b></td>` : '<td>—</td>';
-    }
-    const curVals = branchNames.map(n => salaryRows.find(r => r.indicator_name === n && r.year === year && r.month === month)?.value_numeric).filter(v => v != null);
-    const prevVals = branchNames.map(n => {
-        const pm = month > 1 ? month - 1 : 12;
-        const py = month > 1 ? year : year - 1;
-        return salaryRows.find(r => r.indicator_name === n && r.year === py && r.month === pm)?.value_numeric;
-    }).filter(v => v != null);
-    const avgCur = curVals.length ? curVals.reduce((s, v) => s + v, 0) / curVals.length : null;
-    const avgPrev = prevVals.length ? prevVals.reduce((s, v) => s + v, 0) / prevVals.length : null;
-    avgCells += `<td><b>${avgCur != null ? fN(avgCur) : '—'}</b></td>`;
-    avgCells += `<td class="${deltaCls(avgCur, avgPrev)}">${deltaBadge(avgCur, avgPrev) || '—'}</td>`;
-    html += `<tr class="salary-avg-row" style="border-top:2px solid var(--primary);font-weight:600">${avgCells}</tr>`;
 
     html += `</tbody></table></div>`;
 

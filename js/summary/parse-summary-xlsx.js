@@ -245,13 +245,23 @@ export function parseSummaryXlsx(wb) {
             });
         }
 
+        // Detect "Середня з/п в регіоні" column (for salary region averages)
+        let regionSalaryCol = null;
+        for (let c = 1; c < headerRow.length; c++) {
+            const h = String(headerRow[c] || '').trim().toLowerCase();
+            if (h.includes('середня з/п в регіоні') || h.includes('дані мінфіну')) {
+                regionSalaryCol = c;
+                break;
+            }
+        }
+
         lastGroup = 'finance';
         for (let i = 3; i < rows.length; i++) {
             const r = rows[i];
             if (!r || !r[0]) continue;
             const name = String(r[0]).trim();
             if (!name) continue;
-            if (/^довідково/i.test(name)) break; // Stop before reference section
+            if (/^довідково/i.test(name)) break;
             if (/^чисельність\/кількість/i.test(name)) continue;
             if (/^олень/i.test(name)) continue;
 
@@ -281,6 +291,18 @@ export function parseSummaryXlsx(wb) {
                         indicator_name: name, sub_type: 'value',
                         value_numeric: parsed.value_numeric, value_text: parsed.value_text,
                         unit: unit
+                    });
+                }
+            }
+
+            // Parse region salary column if exists
+            if (regionSalaryCol && r[regionSalaryCol] != null && r[regionSalaryCol] !== '') {
+                const parsed = parseValue(r[regionSalaryCol]);
+                if (parsed.value_numeric != null) {
+                    records.push({
+                        year: 0, month: 0, indicator_group: 'region_salary',
+                        indicator_name: name, sub_type: 'value',
+                        value_numeric: parsed.value_numeric, value_text: null, unit: 'грн'
                     });
                 }
             }
