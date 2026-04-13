@@ -244,7 +244,12 @@ function matchIndicator(name, allData) {
 
         if (rk === lower) {
             result.push(r);
-        } else if (lower.length > 10) {
+        } else if (lower.length <= 10) {
+            // Short names: also match "ПДФО" → "пдфо  млн. грн" (yearly sheet has units in name)
+            if (rk.startsWith(lower + ' ') || rk.startsWith(lower + '\u00A0')) {
+                result.push(r);
+            }
+        } else {
             if (rk.includes(lower) || (lower.includes(rk) && rk.length > 10)) {
                 result.push(r);
             }
