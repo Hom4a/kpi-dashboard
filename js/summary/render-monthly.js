@@ -88,39 +88,18 @@ const TABLE_1_ROWS = [
     'Вирощування садивного матеріалу із закритою кореневою системою, млн шт.'
 ];
 
-// Average indicators: YTD = average of months (чисельність, з/п, ціни)
-const AVG_INDICATORS = new Set([
-    'середньооблікова чисельність',
-    'середня заробітна плата',
-    'середня цін реалізації',
-    'середня ціна реалізації',
-    'ціна знеособленого',
-    'реалізовано на 1 штатного',
-]);
-
-// Point-in-time indicators: YTD = last known value (заборгованість, залишки)
-const LAST_VALUE_INDICATORS = new Set([
+// Snapshot indicators (past years only): use average instead of sum
+const SNAPSHOT_INDICATORS = new Set([
+    'середньооблікова чисельність', 'середня заробітна плата',
+    'середня цін реалізації', 'середня ціна реалізації',
+    'ціна знеособленого', 'реалізовано на 1 штатного',
     'коефіцієнт фінансової стійкості',
-    'дебіторська заборгованість',
-    'кредиторська заборгованість',
-    'залишок коштів на рахунках',
-    'недоїмка перед бюджетом',
-    'недоїмка перед пф',
+    'дебіторська заборгованість', 'кредиторська заборгованість',
+    'залишок коштів на рахунках', 'недоїмка перед бюджетом', 'недоїмка перед пф',
 ]);
-
 function isSnapshot(name) {
     const lower = name.toLowerCase();
-    return [...AVG_INDICATORS].some(s => lower.includes(s)) || [...LAST_VALUE_INDICATORS].some(s => lower.includes(s));
-}
-
-function isAvgType(name) {
-    const lower = name.toLowerCase();
-    return [...AVG_INDICATORS].some(s => lower.includes(s));
-}
-
-function isLastValueType(name) {
-    const lower = name.toLowerCase();
-    return [...LAST_VALUE_INDICATORS].some(s => lower.includes(s));
+    return [...SNAPSHOT_INDICATORS].some(s => lower.includes(s));
 }
 
 // FIX #4: Sub-indicators (indented with →) — normalized matching
@@ -300,7 +279,6 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
         if (bold) displayName = `<b>${displayName}</b>`;
 
         const rows = matchIndicator(name, allData);
-
         const snapshot = isSnapshot(name);
 
         let cells = `<td class="ind-name">${displayName}</td>`;
@@ -308,28 +286,14 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             if (y > year) { cells += '<td>—</td>'; continue; }
 
             if (y === year) {
-                // Current year — check for text values first (e.g. "360,6(2318,7)")
-                const ann = rows.find(r => r.year === y && r.month === 0);
-                if (ann?.value_text && /[\/(]/.test(ann.value_text)) {
-                    cells += `<td><b>${ann.value_text}</b></td>`;
+                // Current year: sum of all months up to selected month
+                const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
+                if (monthlyRecords.length) {
+                    const ytd = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                    cells += `<td><b>${fN(ytd)}</b></td>`;
                 } else {
-                    const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
-                    if (monthlyRecords.length) {
-                        // Check if latest record has value_text (vol/price format)
-                        const latest = monthlyRecords.sort((a, b) => b.month - a.month)[0];
-                        if (latest.value_text && /[\/(]/.test(latest.value_text)) {
-                            cells += `<td><b>${latest.value_text}</b></td>`;
-                        } else {
-                            const val = isAvgType(name)
-                                ? monthlyRecords.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecords.length
-                                : isLastValueType(name)
-                                    ? monthlyRecords.sort((a, b) => b.month - a.month)[0].value_numeric
-                                    : monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
-                            cells += `<td><b>${fN(val)}</b></td>`;
-                        }
-                    } else {
-                        cells += `<td><b>${ann?.value_text || '—'}</b></td>`;
-                    }
+                    const ann = rows.find(r => r.year === y && r.month === 0);
+                    cells += `<td><b>${ann?.value_text || '—'}</b></td>`;
                 }
             } else {
                 // Past years
