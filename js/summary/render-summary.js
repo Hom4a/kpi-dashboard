@@ -664,7 +664,7 @@ function renderSectionTable(sData, blockColumns) {
                 delta_yoy_pct: r.value_yoy != null ? calcDeltaPct(r.value_ytd, r.value_yoy).display : '—',
                 yoy: fmtNum(r.value_yoy),
                 area: fmtNum(r.value_current),
-                count: fmtNum(r.value_current),
+                count: fmtNum(r.value_ytd),
                 area_mln: fmtNum(r.value_current),
                 share: r.value_delta != null ? fmtNum(r.value_delta) + '%' : '—',
                 // FIX #7: contracts columns

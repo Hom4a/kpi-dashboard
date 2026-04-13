@@ -80,7 +80,7 @@ function detectCols(headerRow, ns) {
         else if (t.includes('∆') || t.includes('δ') || t.includes('%')) cols.push('_skip');
         else if (t.includes('площа') && t.includes('тис')) cols.push('current');
         else if (t.includes('площа') && t.includes('млн')) cols.push('current');
-        else if (t.includes('надлісництва')) cols.push('current');
+        else if (t.includes('надлісництва')) cols.push('ytd');
         else if (t.includes('частка')) cols.push('delta');
         else if (t.includes('обсяг')) cols.push('current');
         else if (t.includes('сума')) cols.push('ytd');
