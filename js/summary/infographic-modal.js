@@ -239,8 +239,6 @@ async function loadAndDrawMonthlyMonthVsMonth(indicatorName) {
         })();
 
         const sameMonth = history.filter(r => r.month === targetMonth).sort((a, b) => a.year - b.year);
-        console.log(`Infographic: "${indicatorName}" month=${targetMonth}, history=${history.length}, sameMonth=${sameMonth.length}`,
-            history.slice(0,5).map(r => `${r.year}/${r.month}="${r.indicator_name?.slice(0,20)}"`));
         if (!sameMonth.length) return;
 
         const labels = sameMonth.map(r => `${MO_SHORT[r.month - 1]} ${r.year}`);

@@ -11,6 +11,14 @@ const ANNO_COLORS = [
 
 function annoKey(section, indicator) { return `cell|${section}|${indicator}`; }
 
+// Find annotation dot by dataset (avoids CSS selector issues with quotes in indicator names)
+function findDot(container, section, indicator) {
+    for (const dot of container.querySelectorAll('.cell-anno-dot')) {
+        if (dot.dataset.indicator === indicator && (!section || dot.dataset.section === section)) return dot;
+    }
+    return null;
+}
+
 /**
  * Initialize cell annotations on a container.
  * @param {HTMLElement} container — the container with .clickable-row elements
@@ -22,13 +30,18 @@ export function initCellAnnotations(container, reportType, reportDate, opts) {
     // Apply existing annotation dots
     const annos = summaryBlockComments.filter(c =>
         c.report_type === reportType && c.report_date === reportDate && c.block_id?.startsWith('cell|'));
+    // Find dots by dataset (avoids CSS selector issues with quotes in names)
+    const allDots = container.querySelectorAll('.cell-anno-dot');
     for (const a of annos) {
         const parts = a.block_id.split('|');
-        const selector = parts[1]
-            ? `.cell-anno-dot[data-section="${parts[1]}"][data-indicator="${parts[2]}"]`
-            : `.cell-anno-dot[data-indicator="${parts[2]}"]`;
-        const dot = container.querySelector(selector);
-        if (dot) applyDot(dot, a.content);
+        const sec = parts[1] || '';
+        const ind = parts[2] || '';
+        for (const dot of allDots) {
+            if (dot.dataset.indicator === ind && (!sec || dot.dataset.section === sec)) {
+                applyDot(dot, a.content);
+                break;
+            }
+        }
     }
 
     // Right-click on row → annotation popup (event delegation)
@@ -102,11 +115,7 @@ function showAnnoPopup(x, y, section, indicator, reportType, reportDate, contain
             const entry = { report_type: reportType, report_date: reportDate, block_id: key, content };
             if (idx >= 0) summaryBlockComments[idx] = { ...summaryBlockComments[idx], ...entry };
             else summaryBlockComments.push(entry);
-            const dot = container.querySelector(
-                section
-                    ? `.cell-anno-dot[data-section="${section}"][data-indicator="${indicator}"]`
-                    : `.cell-anno-dot[data-indicator="${indicator}"]`
-            );
+            const dot = findDot(container, section, indicator);
             if (dot) applyDot(dot, content);
         } catch (e) { console.error('Annotation save error:', e); }
         popup.remove();

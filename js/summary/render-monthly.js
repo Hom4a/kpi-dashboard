@@ -338,8 +338,8 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
         cells += `<td class="${deltaCls(curVal, prevVal)}">${deltaBadge(curVal, prevVal) || '—'}</td>`;
 
         cells = cells.replace(/^<td>/, `<td><span class="cell-text">`);
-        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name}"></span></td>`);
-        html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
+        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name.replace(/"/g, '&quot;')}"></span></td>`);
+        html += `<tr class="clickable-row" data-indicator="${name.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
     }
 
     html += `</tbody></table></div>`;
@@ -375,12 +375,12 @@ function renderAnimalTable(showYears, year, allData) {
 
     for (const name of animalNames) {
         const rows = animalData.filter(r => r.indicator_name === name);
-        let cells = `<td class="ind-name"><span class="cell-text">${name}</span><span class="cell-anno-dot" data-indicator="${name}"></span></td>`;
+        let cells = `<td class="ind-name"><span class="cell-text">${name}</span><span class="cell-anno-dot" data-indicator="${name.replace(/"/g, '&quot;')}"></span></td>`;
         for (const y of visibleYears) {
             const rec = rows.find(r => r.year === y);
             cells += `<td>${rec?.value_text || (rec?.value_numeric != null ? fN(rec.value_numeric) : '—')}</td>`;
         }
-        html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
+        html += `<tr class="clickable-row" data-indicator="${name.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
     }
 
     html += `</tbody></table></div>`;
@@ -481,8 +481,8 @@ function renderSalaryTable(showYears, year, month, allData) {
         const regionRec = allData.find(r => r.indicator_group === 'region_salary' && r.indicator_name === name);
         cells += `<td>${regionRec?.value_numeric != null ? fN(regionRec.value_numeric) : '—'}</td>`;
         cells = cells.replace(/^<td>/, `<td><span class="cell-text">`);
-        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name}"></span></td>`);
-        html += `<tr class="clickable-row" data-indicator="${name}" style="cursor:pointer">${cells}</tr>`;
+        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name.replace(/"/g, '&quot;')}"></span></td>`);
+        html += `<tr class="clickable-row" data-indicator="${name.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
     }
 
     html += `</tbody></table></div>`;

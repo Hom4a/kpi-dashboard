@@ -663,10 +663,10 @@ function renderSectionTable(sData, blockColumns) {
             };
             const cellsArr = colKeys.map((k, ci) => {
                 let val = cellMap[k] ?? '—';
-                if (ci === 0) val = `<span class="cell-text">${val}</span><span class="cell-anno-dot" data-section="${section}" data-indicator="${r.indicator_name}"></span>`;
+                if (ci === 0) val = `<span class="cell-text">${val}</span><span class="cell-anno-dot" data-section="${section}" data-indicator="${r.indicator_name.replace(/"/g, '&quot;')}"></span>`;
                 return `<td>${val}</td>`;
             });
-            return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name}" data-current="${r.value_current ?? ''}" data-prev="${prevVal ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">${cellsArr.join('')}</tr>`;
+            return `<tr class="clickable-row" data-section="${section}" data-indicator="${r.indicator_name.replace(/"/g, '&quot;')}" data-current="${r.value_current ?? ''}" data-prev="${prevVal ?? ''}" data-delta="${delta.pct ?? ''}" style="cursor:pointer">${cellsArr.join('')}</tr>`;
         }).join('')
     }</tbody></table></div>`;
 }
