@@ -318,54 +318,109 @@ const SECTION_HEADERS = [
     { pattern: /ДОПОМОГА\s*ЗСУ/i, section: 'zsu' },
 ];
 
+// Sub-section detection: maps sub-header text to DB section
+const SUB_SECTION_MAP = [
+    { pattern: /незаконні рубки/i, section: 'forest_protection' },
+    { pattern: /рейдова робота/i, section: 'raids' },
+    { pattern: /спільні рейди/i, section: 'mru_raids' },
+    { pattern: /лісові пожежі/i, section: 'fires' },
+    { pattern: /самозалісені/i, section: 'land_self_forested' },
+    { pattern: /лісорозведення|під лісорозведення/i, section: 'land_reforestation' },
+    { pattern: /землі запасу/i, section: 'land_reserves' },
+    { pattern: /укладені договори/i, section: 'contracts' },
+    { pattern: /реалізація деревини/i, section: 'sales' },
+];
+
 function extractSectionTexts(doc, ns) {
     const paragraphs = doc.getElementsByTagNameNS(ns, 'p');
     const results = [];
-    let currentSection = null;
+    let currentSection = null;  // broad section (ОХОРОНА, ЗЕМЕЛЬНІ...)
+    let currentSubSection = null;  // specific DB section (forest_protection, raids...)
     let currentText = [];
-
     for (let i = 0; i < paragraphs.length; i++) {
-        if (isInsideTable(paragraphs[i])) continue;
+        const isTable = isInsideTable(paragraphs[i]);
+
+        if (isTable) {
+            // Save any text collected before this table
+            if (currentText.length) {
+                const sec = currentSubSection || currentSection;
+                if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
+                currentText = [];
+            }
+            // Detect which DB section this table belongs to (from first row text)
+            const tTexts = paragraphs[i].getElementsByTagNameNS(ns, 't');
+            let tText = '';
+            for (let j = 0; j < tTexts.length; j++) tText += tTexts[j].textContent || '';
+            // We can't reliably detect section from table paragraphs, skip
+            continue;
+        }
+
         const texts = paragraphs[i].getElementsByTagNameNS(ns, 't');
         let fullText = '';
         for (let j = 0; j < texts.length; j++) fullText += texts[j].textContent || '';
         fullText = fullText.trim();
         if (!fullText) continue;
 
-        // Check if this is a section header
+        // Check broad section headers (ОХОРОНА, ЗЕМЕЛЬНІ...)
         let matchedSection = null;
         for (const sh of SECTION_HEADERS) {
             if (sh.pattern.test(fullText)) { matchedSection = sh.section; break; }
         }
 
         if (matchedSection) {
-            // Save previous section text
-            if (currentSection && currentText.length) {
-                results.push({ section: currentSection, content: currentText.join('\n').trim() });
+            if (currentText.length) {
+                const sec = currentSubSection || currentSection;
+                if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
             }
             currentSection = matchedSection;
+            currentSubSection = matchedSection;
             currentText = [];
-        } else if (currentSection) {
-            // Skip Block I note patterns
-            if (/загальна оцінка|ключові події|позитивна|негативна|ризикова|питання.*рішення/i.test(fullText)) continue;
-            // Skip Roman numeral headers
-            if (/^[ІIVXХX]{1,4}\.\s/i.test(fullText)) {
-                if (currentText.length) {
-                    results.push({ section: currentSection, content: currentText.join('\n').trim() });
-                }
-                currentSection = null;
-                currentText = [];
-                continue;
+            continue;
+        }
+
+        // Check sub-section headers (Незаконні рубки, Рейдова робота...)
+        let matchedSub = null;
+        for (const ss of SUB_SECTION_MAP) {
+            if (ss.pattern.test(fullText)) { matchedSub = ss.section; break; }
+        }
+
+        if (matchedSub) {
+            if (currentText.length) {
+                const sec = currentSubSection || currentSection;
+                if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
             }
+            currentSubSection = matchedSub;
+            currentText = [];
+            continue;
+        }
+
+        // Roman numeral header → new broad section, save and reset
+        if (/^[ІIVXХX]{1,5}\.\s/i.test(fullText)) {
+            if (currentText.length) {
+                const sec = currentSubSection || currentSection;
+                if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
+            }
+            currentSection = null;
+            currentSubSection = null;
+            currentText = [];
+            continue;
+        }
+
+        // Skip Block I note patterns
+        if (/загальна оцінка|ключові події|позитивна|негативна|ризикова|питання.*рішення|основна динаміка/i.test(fullText)) continue;
+
+        // Collect text
+        if (currentSection) {
             currentText.push(fullText);
         }
     }
-    if (currentSection && currentText.length) {
-        results.push({ section: currentSection, content: currentText.join('\n').trim() });
+
+    if (currentText.length) {
+        const sec = currentSubSection || currentSection;
+        if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
     }
 
-    // Filter: only keep sections with actual text (not just table data repeated)
-    return results.filter(r => r.content.length > 20);
+    return results.filter(r => r.content.length > 15);
 }
 
 function extractNotes(doc, ns) {
