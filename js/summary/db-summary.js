@@ -83,6 +83,7 @@ export async function saveSummaryWeekly(records, notes, reportDate, fileName) {
                 section: r.section, indicator_name: r.indicator_name,
                 value_current: r.value_current, value_previous: r.value_previous,
                 value_ytd: r.value_ytd, value_delta: r.value_delta,
+                value_yoy: r.value_yoy ?? null,
                 value_text: r.value_text || null, unit: r.unit || null,
                 uploaded_by: userId
             };

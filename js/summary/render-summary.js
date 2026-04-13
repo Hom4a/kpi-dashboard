@@ -631,6 +631,7 @@ function renderSectionTable(sData, blockColumns) {
         if (sData.some(r => r.value_current != null)) { colKeys.push('current'); colKeys.push('delta_pct'); }
         if (sData.some(r => r.value_previous != null)) colKeys.push('previous');
         if (sData.some(r => r.value_ytd != null)) colKeys.push('ytd');
+        if (sData.some(r => r.value_yoy != null)) { colKeys.push('delta_yoy_pct'); colKeys.push('yoy'); }
     }
 
     const cols = colKeys.map(k => COL_LABELS[k] || k);
@@ -661,7 +662,7 @@ function renderSectionTable(sData, blockColumns) {
                 // FIX #5: total (land "Весь період") — parse from value_text
                 total: r.value_text != null ? fmtNum(parseFloat(String(r.value_text).replace(/\s/g, '').replace(',', '.'))) : '—',
                 value: (r.value_text && /[\/(]/.test(r.value_text)) ? r.value_text : fmtNum(r.value_current),
-                delta_yoy_pct: r.value_yoy != null ? calcDeltaPct(r.value_ytd, r.value_yoy).display : '—',
+                delta_yoy_pct: (() => { const d = r.value_yoy != null ? calcDeltaPct(r.value_ytd, r.value_yoy) : null; return d ? `<span class="summary-delta-badge ${d.badgeCls}">${d.display}</span>` : '—'; })(),
                 yoy: fmtNum(r.value_yoy),
                 area: fmtNum(r.value_current),
                 count: fmtNum(r.value_ytd),

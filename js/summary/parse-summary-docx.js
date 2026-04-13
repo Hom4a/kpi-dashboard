@@ -180,6 +180,7 @@ export async function parseSummaryDocx(buffer) {
                 value_previous: values.previous ?? null,
                 value_ytd: values.ytd ?? null,
                 value_delta: values.delta ?? null,
+                value_yoy: values.yoy ?? null,
                 value_text: valueText,
                 sort_order: records.length
             });
