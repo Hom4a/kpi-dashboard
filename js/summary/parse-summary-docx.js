@@ -280,9 +280,13 @@ function extractReportDate(doc, ns) {
         return d.toISOString().slice(0, 10);
     }
 
-    // Priority 2: "по DD.MM.YY(YY)" (end of date range — take the last date)
+    // Priority 2: "по DD.MM.YY(YY)" — boundary date, subtract 1 day (same logic as "станом на")
     const mRange = cleaned.match(/по\s+(\d{2})\s*\.\s*(\d{2})\s*\.\s*(\d{2,4})/i);
-    if (mRange) return `${normalizeYear(mRange[3])}-${mRange[2]}-${mRange[1]}`;
+    if (mRange) {
+        const d = new Date(`${normalizeYear(mRange[3])}-${mRange[2]}-${mRange[1]}T12:00:00`);
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().slice(0, 10);
+    }
 
     // Priority 3: any DD.MM.YY(YY) pattern
     const m = cleaned.match(/(\d{2})\s*\.\s*(\d{2})\s*\.\s*(\d{2,4})/);
