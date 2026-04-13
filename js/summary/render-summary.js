@@ -653,14 +653,14 @@ function renderSectionTable(sData, blockColumns) {
             const cellMap = {
                 indicator: r.indicator_name,
                 unit: r.unit || '',
-                current: r.value_text || fmtNum(r.value_current),
+                current: (r.value_text && /[\/(]/.test(r.value_text)) ? r.value_text : fmtNum(r.value_current),
                 delta_pct: `<span class="summary-delta-badge ${deltaDisplay.badgeCls}">${deltaDisplay.display}</span>`,
                 delta_abs: `<span class="summary-delta-badge ${deltaAbsCls}">${deltaAbsStr}</span>`,
                 previous: fmtNum(prevVal),
                 ytd: fmtNum(r.value_ytd),
                 // FIX #5: total (land "Весь період") — parse from value_text
                 total: r.value_text != null ? fmtNum(parseFloat(String(r.value_text).replace(/\s/g, '').replace(',', '.'))) : '—',
-                value: r.value_text || fmtNum(r.value_current),
+                value: (r.value_text && /[\/(]/.test(r.value_text)) ? r.value_text : fmtNum(r.value_current),
                 delta_yoy_pct: r.value_yoy != null ? calcDeltaPct(r.value_ytd, r.value_yoy).display : '—',
                 yoy: fmtNum(r.value_yoy),
                 area: fmtNum(r.value_current),
