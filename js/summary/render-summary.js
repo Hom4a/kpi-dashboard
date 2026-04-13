@@ -248,18 +248,7 @@ function renderWeeklyBriefing() {
     // Populate week selector dropdown
     const sel = $('weeklyDateSelect');
     if (sel) {
-        // Deduplicate weeks: if two dates map to same week, keep the later one
-        const weekMap = new Map();
-        for (const d of dates) {
-            const { weekNum } = getWeekInfo(d);
-            if (!weekMap.has(weekNum) || d > weekMap.get(weekNum)) weekMap.set(weekNum, d);
-        }
-        const dedupDates = dates.filter(d => {
-            const { weekNum } = getWeekInfo(d);
-            return weekMap.get(weekNum) === d;
-        });
-
-        sel.innerHTML = dedupDates.map(d => {
+        sel.innerHTML = dates.map(d => {
             const { monday, sunday, weekNum } = getWeekInfo(d);
             return `<option value="${d}" ${d === activeDate ? 'selected' : ''}>Тиждень №${weekNum} (${fmtDD(monday)} — ${fmtDDFull(sunday)})</option>`;
         }).join('');
