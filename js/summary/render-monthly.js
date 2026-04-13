@@ -286,10 +286,11 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             if (y > year) { cells += '<td>—</td>'; continue; }
 
             if (y === year) {
-                // Current year: sum of all months up to selected month
+                // Current year: sum up to selected month; snapshot = average
                 const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
                 if (monthlyRecords.length) {
-                    const ytd = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                    const total = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                    const ytd = snapshot ? total / monthlyRecords.length : total;
                     cells += `<td><b>${fN(ytd)}</b></td>`;
                 } else {
                     const ann = rows.find(r => r.year === y && r.month === 0);
