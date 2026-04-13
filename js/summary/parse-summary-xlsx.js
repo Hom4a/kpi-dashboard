@@ -131,10 +131,10 @@ export function parseSummaryXlsx(wb) {
         for (let i = 3; i < rows.length; i++) {
             const r = rows[i];
             if (!r || !r[0]) continue;
-            const name = String(r[0]).trim();
+            const name = String(r[0]).trim().replace(/\*+$/, '').trim(); // strip trailing asterisks
             if (!name) continue;
 
-            // Skip non-data rows (sub-headers with year comparisons, etc.)
+            // Skip non-data rows
             if (/^чисельність\/кількість/i.test(name)) continue;
             if (/^олень/i.test(name)) continue;
 
@@ -264,7 +264,7 @@ export function parseSummaryXlsx(wb) {
         for (let i = 3; i < rows.length; i++) {
             const r = rows[i];
             if (!r || !r[0]) continue;
-            const name = String(r[0]).trim();
+            const name = String(r[0]).trim().replace(/\*+$/, '').trim(); // strip trailing asterisks
             if (!name) continue;
             if (/^довідково/i.test(name)) break;
             if (/^чисельність\/кількість/i.test(name)) continue;
