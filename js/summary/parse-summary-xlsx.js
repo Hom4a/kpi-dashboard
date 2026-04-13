@@ -245,14 +245,19 @@ export function parseSummaryXlsx(wb) {
             });
         }
 
-        // Detect "Середня з/п в регіоні" column (for salary region averages)
+        // Detect "Середня з/п в регіоні" column (salary section has its own header row)
         let regionSalaryCol = null;
-        for (let c = 1; c < headerRow.length; c++) {
-            const h = String(headerRow[c] || '').trim().toLowerCase();
-            if (h.includes('середня з/п в регіоні') || h.includes('дані мінфіну')) {
-                regionSalaryCol = c;
-                break;
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row) continue;
+            for (let c = 1; c < row.length; c++) {
+                const h = String(row[c] || '').trim().toLowerCase();
+                if (h.includes('середня з/п в регіоні') || h.includes('дані мінфіну')) {
+                    regionSalaryCol = c;
+                    break;
+                }
             }
+            if (regionSalaryCol) break;
         }
 
         lastGroup = 'finance';
