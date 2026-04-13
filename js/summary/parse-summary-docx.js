@@ -52,6 +52,7 @@ function identifyTable(headerText, firstRowText) {
 const NOTE_PATTERNS = [
     { type: 'general', pattern: /загальна оцінка/i },
     { type: 'events', pattern: /ключові події/i },
+    { type: '_skip', pattern: /основна динаміка показників/i },  // sub-header, not content
     { type: 'positive', pattern: /позитивна/i },
     { type: 'negative', pattern: /негативна|ризикова/i },
     { type: 'decisions', pattern: /питання.*рішення|управлінськ/i },
@@ -399,8 +400,14 @@ function extractNotes(doc, ns) {
 
         if (matchedType) {
             // Save previous note
-            if (currentType && currentContent.length) {
+            if (currentType && currentType !== '_skip' && currentContent.length) {
                 notes.push({ note_type: currentType, content: currentContent.join('\n').trim() });
+            }
+            if (matchedType === '_skip') {
+                // Sub-header like "Основна динаміка показників" — save previous, don't collect
+                currentType = null;
+                currentContent = [];
+                continue;
             }
             currentType = matchedType;
             currentContent = [];
