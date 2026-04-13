@@ -88,26 +88,39 @@ const TABLE_1_ROWS = [
     'Вирощування садивного матеріалу із закритою кореневою системою, млн шт.'
 ];
 
-// Snapshot/average indicators: YTD = last known value (not sum of months)
-// These are point-in-time values, not cumulative totals
-const SNAPSHOT_INDICATORS = new Set([
-    'коефіцієнт фінансової стійкості',
+// Average indicators: YTD = average of months (чисельність, з/п, ціни)
+const AVG_INDICATORS = new Set([
     'середньооблікова чисельність',
     'середня заробітна плата',
-    'дебіторська заборгованість',
-    'кредиторська заборгованість',
-    'залишок коштів на рахунках',
-    'недоїмка перед бюджетом',
-    'недоїмка перед пф',
     'середня цін реалізації',
     'середня ціна реалізації',
     'ціна знеособленого',
     'реалізовано на 1 штатного',
 ]);
 
+// Point-in-time indicators: YTD = last known value (заборгованість, залишки)
+const LAST_VALUE_INDICATORS = new Set([
+    'коефіцієнт фінансової стійкості',
+    'дебіторська заборгованість',
+    'кредиторська заборгованість',
+    'залишок коштів на рахунках',
+    'недоїмка перед бюджетом',
+    'недоїмка перед пф',
+]);
+
 function isSnapshot(name) {
     const lower = name.toLowerCase();
-    return [...SNAPSHOT_INDICATORS].some(s => lower.includes(s));
+    return [...AVG_INDICATORS].some(s => lower.includes(s)) || [...LAST_VALUE_INDICATORS].some(s => lower.includes(s));
+}
+
+function isAvgType(name) {
+    const lower = name.toLowerCase();
+    return [...AVG_INDICATORS].some(s => lower.includes(s));
+}
+
+function isLastValueType(name) {
+    const lower = name.toLowerCase();
+    return [...LAST_VALUE_INDICATORS].some(s => lower.includes(s));
 }
 
 // FIX #4: Sub-indicators (indented with →) — normalized matching
@@ -307,8 +320,11 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
                         if (latest.value_text && /[\/(]/.test(latest.value_text)) {
                             cells += `<td><b>${latest.value_text}</b></td>`;
                         } else {
-                            const val = snapshot ? latest.value_numeric
-                                : monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                            const val = isAvgType(name)
+                                ? monthlyRecords.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecords.length
+                                : isLastValueType(name)
+                                    ? monthlyRecords.sort((a, b) => b.month - a.month)[0].value_numeric
+                                    : monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
                             cells += `<td><b>${fN(val)}</b></td>`;
                         }
                     } else {
@@ -326,7 +342,7 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
                     const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
                     if (monthlyRecords.length) {
                         const val = snapshot
-                            ? monthlyRecords.sort((a, b) => b.month - a.month)[0].value_numeric
+                            ? monthlyRecords.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecords.length
                             : monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
                         cells += `<td>${fN(val)}</td>`;
                     } else {
