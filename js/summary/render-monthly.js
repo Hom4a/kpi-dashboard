@@ -297,11 +297,12 @@ function isSub(name, subSet) {
     return [...subSet].some(s => s.replace(/\s+/g, ' ').trim().toLowerCase() === n);
 }
 
-// Match indicator: collect ALL records with matching name
+// Match indicator: collect ALL records with matching name, deduplicate by (year,month)
 function matchIndicator(name, allData) {
     const lower = name.toLowerCase().replace(/\s+/g, ' ').trim();
     const isVolPriceName = /м3.*ціна|ціна.*грн|сер\.\s*ціна/.test(lower);
-    const result = [];
+    const exact = [];
+    const fuzzy = [];
 
     for (const r of allData) {
         const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -311,17 +312,24 @@ function matchIndicator(name, allData) {
         if (isVolPriceName !== rkIsVolPrice) continue;
 
         if (rk === lower) {
-            result.push(r);
+            exact.push(r);
         } else if (lower.length <= 10) {
             // Short names: also match "ПДФО" → "пдфо  млн. грн" (yearly sheet has units in name)
             if (rk.startsWith(lower + ' ') || rk.startsWith(lower + '\u00A0')) {
-                result.push(r);
+                fuzzy.push(r);
             }
         } else {
             if (rk.includes(lower) || (lower.includes(rk) && rk.length > 10)) {
-                result.push(r);
+                fuzzy.push(r);
             }
         }
+    }
+
+    // Deduplicate: if exact match exists for a (year,month), skip fuzzy for same (year,month)
+    const exactKeys = new Set(exact.map(r => `${r.year}|${r.month}`));
+    const result = [...exact];
+    for (const r of fuzzy) {
+        if (!exactKeys.has(`${r.year}|${r.month}`)) result.push(r);
     }
     return result;
 }
