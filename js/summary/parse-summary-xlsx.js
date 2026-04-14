@@ -163,9 +163,9 @@ export function parseSummaryXlsx(wb) {
 
                 const parsed = parseValue(cellVal);
                 if (parsed.isVolPrice) {
-                    // Store as value with formatted text: "360,6(2318,7)"
-                    const raw = String(cellVal).trim().replace(/\)+$/, ''); // remove trailing ))
-                    const formatted = raw.includes('(') ? raw + ')' : raw.replace(/\//, '(') + ')';
+                    // Store as value with slash format: "360,6/2318,7"
+                    const raw = String(cellVal).trim().replace(/\)+$/, '');
+                    const formatted = raw.includes('/') ? raw : raw.replace(/\(/, '/').replace(/\)$/, '');
                     records.push({
                         year, month: col, indicator_group: finalGroup,
                         indicator_name: name, sub_type: 'value',
@@ -297,7 +297,7 @@ export function parseSummaryXlsx(wb) {
 
                 if (parsed.isVolPrice) {
                     const raw = String(cellVal).trim().replace(/\)+$/, '');
-                    const formatted = raw.includes('(') ? raw + ')' : raw.replace(/\//, '(') + ')';
+                    const formatted = raw.includes('/') ? raw : raw.replace(/\(/, '/').replace(/\)$/, '');
                     records.push({
                         year: yc.year, month, indicator_group: finalGroup,
                         indicator_name: name, sub_type: 'value',

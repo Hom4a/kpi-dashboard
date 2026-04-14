@@ -16,6 +16,20 @@ function fN(v) {
     return v.toLocaleString('uk-UA', { maximumFractionDigits: 4 });
 }
 
+// Normalize vol/price text to slash format: "360,6(2318,7)" → "360,6/2318,7"
+function toSlash(t) { return t ? t.replace(/\(/, '/').replace(/\)$/, '') : t; }
+
+// Check if value_text is vol/price format
+function isVolPriceText(t) { return t && /[\/(]/.test(t) && /\d/.test(t); }
+
+// Extract price from vol/price text: "31/5730" → 5730, "31(5730)" → 5730
+function extractPrice(t) {
+    if (!t) return null;
+    const m = t.match(/[\/(]([\d\s,.]+)\)?$/);
+    if (!m) return null;
+    return parseFloat(m[1].replace(/\s/g, '').replace(',', '.'));
+}
+
 // Темп росту: cur / prev × 100 (скільки % від попереднього)
 function deltaBadge(cur, prev) {
     if (cur == null || prev == null) return '';
@@ -130,9 +144,9 @@ const BOLD_ROWS = new Set([
 // Weighted average: price indicator → volume indicator name mapping
 // YTD price = Σ(volume_i × price_i) / Σ(volume_i)
 const WEIGHTED_PRICE_MAP = [
-    { price: 'середня ціна реалізації 1 м3 лісоматеріалів', volume: 'реалізація лісоматеріалів круглих' },
-    { price: 'середня ціна реалізації 1 м3 деревини дровяної пв', volume: "реалізація деревини дров'яної пв" },
-    { price: 'середня ціна реалізації 1 м3 деревини дровяної нп', volume: "реалізація деревини дров'яної нп" },
+    { price: '1 м3 лісоматеріалів', volume: 'реалізація лісоматеріалів круглих' },
+    { price: '1 м3 деревини дровяної пв', volume: "реалізація деревини дров'яної пв" },
+    { price: '1 м3 деревини дровяної нп', volume: "реалізація деревини дров'яної нп" },
     // Salary weighted by headcount: Σ(чисельність × з/п) / Σ(чисельність)
     { price: 'середня заробітна плата штатного працівника', volume: 'середньооблікова чисельність' },
 ];
@@ -140,9 +154,9 @@ const WEIGHTED_PRICE_MAP = [
 const COMPOSITE_PRICE = {
     price: 'ціна знеособленого',
     pairs: [
-        { price: 'середня ціна реалізації 1 м3 лісоматеріалів', volume: 'реалізація лісоматеріалів круглих' },
-        { price: 'середня ціна реалізації 1 м3 деревини дровяної пв', volume: "реалізація деревини дров'яної пв" },
-        { price: 'середня ціна реалізації 1 м3 деревини дровяної нп', volume: "реалізація деревини дров'яної нп" },
+        { price: '1 м3 лісоматеріалів', volume: 'реалізація лісоматеріалів круглих' },
+        { price: '1 м3 деревини дровяної пв', volume: "реалізація деревини дров'яної пв" },
+        { price: '1 м3 деревини дровяної нп', volume: "реалізація деревини дров'яної нп" },
     ]
 };
 // Derived: реалізовано на 1 штатного = реалізація * 1000000 / чисельність
@@ -371,16 +385,33 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
                 const ann = rows.find(r => r.year === y && r.month === 0);
                 if (ann?.value_text === '-' || ann?.value_text === '*' || ann?.value_text === 'Х') {
                     cells += `<td><b>${ann.value_text}</b></td>`;
+                } else if (ann && isVolPriceText(ann.value_text)) {
+                    // Vol/price annual record from Excel — show as-is with slash
+                    cells += `<td><b>${toSlash(ann.value_text)}</b></td>`;
                 } else {
                     // Current year: sum up to selected month; snapshot = average; weighted for prices
                     const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
                     if (monthlyRecords.length) {
-                        const weightedYtd = getWeightedYtd(name, allData, y, month);
-                        const total = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
-                        const ytd = weightedYtd != null ? weightedYtd : (snapshot ? total / monthlyRecords.length : total);
-                        cells += `<td><b>${fN(ytd)}</b></td>`;
+                        // Vol/price: build "volume/price" from monthly records
+                        const firstVP = monthlyRecords.find(r => isVolPriceText(r.value_text));
+                        if (firstVP) {
+                            const totalVol = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                            // Weighted price from monthly value_text prices
+                            let num = 0, den = 0;
+                            for (const r of monthlyRecords) {
+                                const p = extractPrice(r.value_text);
+                                if (p != null && r.value_numeric) { num += r.value_numeric * p; den += r.value_numeric; }
+                            }
+                            const avgPrice = den > 0 ? Math.round(num / den) : null;
+                            cells += `<td><b>${fN(totalVol)}${avgPrice != null ? '/' + fN(avgPrice) : ''}</b></td>`;
+                        } else {
+                            const weightedYtd = getWeightedYtd(name, allData, y, month);
+                            const total = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                            const ytd = weightedYtd != null ? weightedYtd : (snapshot ? total / monthlyRecords.length : total);
+                            cells += `<td><b>${fN(ytd)}</b></td>`;
+                        }
                     } else {
-                        cells += `<td><b>${ann?.value_text || '—'}</b></td>`;
+                        cells += `<td><b>${ann?.value_text ? toSlash(ann.value_text) : '—'}</b></td>`;
                     }
                 }
             } else {
@@ -389,7 +420,7 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
                 if (ann?.value_text === '-' || ann?.value_text === '*' || ann?.value_text === 'Х') {
                     cells += `<td>${ann.value_text}</td>`;
                 } else if (ann?.value_text && /[\/(]/.test(ann.value_text)) {
-                    cells += `<td>${ann.value_text}</td>`;
+                    cells += `<td>${toSlash(ann.value_text)}</td>`;
                 } else if (ann?.value_numeric != null) {
                     cells += `<td>${fN(ann.value_numeric)}</td>`;
                 } else {
@@ -415,9 +446,9 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
         const curVal = monthRec?.value_numeric;
         const prevVal = prevMonthRec?.value_numeric;
 
-        // Show value_text for volume/price format, else numeric
+        // Show value_text for volume/price format (as slash), else numeric
         const monthDisplay = (monthRec?.value_text && /[\/(]/.test(monthRec.value_text))
-            ? monthRec.value_text
+            ? toSlash(monthRec.value_text)
             : (curVal != null ? fN(curVal) : (monthRec?.value_text || '—'));
         cells += `<td><b>${monthDisplay}</b></td>`;
         cells += `<td class="${deltaCls(curVal, prevVal)}">${deltaBadge(curVal, prevVal) || '—'}</td>`;
