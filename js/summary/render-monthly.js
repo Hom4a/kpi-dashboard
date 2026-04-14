@@ -367,10 +367,10 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             if (y > year) { cells += '<td>—</td>'; continue; }
 
             if (y === year) {
-                // If annual record explicitly says '-', respect that (snapshot indicators like debt/cash)
+                // If annual record has special text ('-', '*', 'Х'), respect it
                 const ann = rows.find(r => r.year === y && r.month === 0);
-                if (ann?.value_text === '-') {
-                    cells += `<td><b>—</b></td>`;
+                if (ann?.value_text === '-' || ann?.value_text === '*' || ann?.value_text === 'Х') {
+                    cells += `<td><b>${ann.value_text}</b></td>`;
                 } else {
                     // Current year: sum up to selected month; snapshot = average; weighted for prices
                     const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
@@ -386,8 +386,8 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             } else {
                 // Past years
                 const ann = rows.find(r => r.year === y && r.month === 0);
-                if (ann?.value_text === '-') {
-                    cells += `<td>—</td>`;
+                if (ann?.value_text === '-' || ann?.value_text === '*' || ann?.value_text === 'Х') {
+                    cells += `<td>${ann.value_text}</td>`;
                 } else if (ann?.value_text && /[\/(]/.test(ann.value_text)) {
                     cells += `<td>${ann.value_text}</td>`;
                 } else if (ann?.value_numeric != null) {
