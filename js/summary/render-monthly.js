@@ -127,6 +127,72 @@ const BOLD_ROWS = new Set([
     'Сплачено податків та зборів всього млн. грн.',
 ]);
 
+// Weighted average: price indicator → volume indicator name mapping
+// YTD price = Σ(volume_i × price_i) / Σ(volume_i)
+const WEIGHTED_PRICE_MAP = [
+    { price: 'середня ціна реалізації 1 м3 лісоматеріалів', volume: 'реалізація лісоматеріалів круглих' },
+    { price: 'середня ціна реалізації 1 м3 деревини дровяної пв', volume: "реалізація деревини дров'яної пв" },
+    { price: 'середня ціна реалізації 1 м3 деревини дровяної нп', volume: "реалізація деревини дров'яної нп" },
+];
+// Composite weighted: ціна знеособленого = (vol1*price1 + vol2*price2 + vol3*price3) / (vol1+vol2+vol3)
+const COMPOSITE_PRICE = {
+    price: 'ціна знеособленого',
+    pairs: [
+        { price: 'середня ціна реалізації 1 м3 лісоматеріалів', volume: 'реалізація лісоматеріалів круглих' },
+        { price: 'середня ціна реалізації 1 м3 деревини дровяної пв', volume: "реалізація деревини дров'яної пв" },
+        { price: 'середня ціна реалізації 1 м3 деревини дровяної нп', volume: "реалізація деревини дров'яної нп" },
+    ]
+};
+// Derived: реалізовано на 1 штатного = реалізація * 1000000 / чисельність
+const DERIVED_PER_EMPLOYEE = {
+    indicator: 'реалізовано на 1 штатного',
+    revenue: 'загальна реалізація',
+    headcount: 'середньооблікова чисельність'
+};
+
+function getWeightedYtd(name, allData, year, month) {
+    const lower = name.toLowerCase().replace(/\s+/g, ' ').trim();
+
+    // Simple weighted: price × volume / volume
+    for (const wp of WEIGHTED_PRICE_MAP) {
+        if (lower.includes(wp.price)) {
+            const priceRows = matchIndicator(name, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
+            const volRows = matchIndicator(wp.volume, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
+            let num = 0, den = 0;
+            for (const vr of volRows) {
+                const pr = priceRows.find(r => r.month === vr.month);
+                if (pr?.value_numeric != null) { num += vr.value_numeric * pr.value_numeric; den += vr.value_numeric; }
+            }
+            return den > 0 ? num / den : null;
+        }
+    }
+
+    // Composite weighted: ціна знеособленого
+    if (lower.includes(COMPOSITE_PRICE.price)) {
+        let totalNum = 0, totalDen = 0;
+        for (const pair of COMPOSITE_PRICE.pairs) {
+            const priceRows = matchIndicator(pair.price, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
+            const volRows = matchIndicator(pair.volume, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
+            for (const vr of volRows) {
+                const pr = priceRows.find(r => r.month === vr.month);
+                if (pr?.value_numeric != null) { totalNum += vr.value_numeric * pr.value_numeric; totalDen += vr.value_numeric; }
+            }
+        }
+        return totalDen > 0 ? totalNum / totalDen : null;
+    }
+
+    // Derived per-employee
+    if (lower.includes(DERIVED_PER_EMPLOYEE.indicator)) {
+        const revRows = matchIndicator(DERIVED_PER_EMPLOYEE.revenue, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
+        const hcRows = matchIndicator(DERIVED_PER_EMPLOYEE.headcount, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
+        const totalRev = revRows.reduce((s, r) => s + r.value_numeric, 0);
+        const avgHc = hcRows.length ? hcRows.reduce((s, r) => s + r.value_numeric, 0) / hcRows.length : 0;
+        return avgHc > 0 ? totalRev * 1000000 / avgHc : null;
+    }
+
+    return null; // not a weighted indicator
+}
+
 const TABLE_2_ROWS = [
     'Сплачено податків та зборів всього млн. грн.',
     'єдиний соціальний внесок  млн. грн',
@@ -291,11 +357,12 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             if (y > year) { cells += '<td>—</td>'; continue; }
 
             if (y === year) {
-                // Current year: sum up to selected month; snapshot = average
+                // Current year: sum up to selected month; snapshot = average; weighted for prices
                 const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
                 if (monthlyRecords.length) {
+                    const weightedYtd = getWeightedYtd(name, allData, y, month);
                     const total = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
-                    const ytd = snapshot ? total / monthlyRecords.length : total;
+                    const ytd = weightedYtd != null ? weightedYtd : (snapshot ? total / monthlyRecords.length : total);
                     cells += `<td><b>${fN(ytd)}</b></td>`;
                 } else {
                     const ann = rows.find(r => r.year === y && r.month === 0);
@@ -311,9 +378,10 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
                 } else {
                     const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
                     if (monthlyRecords.length) {
-                        const val = snapshot
+                        const weightedYtd = getWeightedYtd(name, allData, y, 12);
+                        const val = weightedYtd != null ? weightedYtd : (snapshot
                             ? monthlyRecords.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecords.length
-                            : monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                            : monthlyRecords.reduce((s, r) => s + r.value_numeric, 0));
                         cells += `<td>${fN(val)}</td>`;
                     } else {
                         cells += `<td>—</td>`;

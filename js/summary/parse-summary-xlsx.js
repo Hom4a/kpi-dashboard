@@ -41,6 +41,17 @@ const GROUP_RULES = [
     { group: 'forestry', patterns: ['лісовідновлення'] },
     { group: 'forestry', patterns: ['лісорозведення'] },
     { group: 'forestry', patterns: ['сприяння природному'] },
+    // tax
+    { group: 'tax', patterns: ['сплачено податків'] },
+    { group: 'tax', patterns: ['єдиний соціальний'] },
+    { group: 'tax', patterns: ['рентна плата'] },
+    { group: 'tax', patterns: ['податок на додану'] },
+    { group: 'tax', patterns: ['податок на прибуток'] },
+    { group: 'tax', patterns: ['пдфо'] },
+    { group: 'tax', patterns: ['податок на лісові'] },
+    { group: 'tax', patterns: ['дивіденди'] },
+    // salary
+    { group: 'salary', patterns: ['середня з/п по філіях'] },
 ];
 
 function classifyGroup(name) {
@@ -52,6 +63,8 @@ function classifyGroup(name) {
     }
     // Sub-indicators like "дуб", "інші" without full context → production
     if (/^(дуб|інші|хвойні)$/i.test(name.trim())) return 'production';
+    // "ВЗ  млн. грн" — military tax (too short for pattern matching)
+    if (/^вз\s/i.test(name.trim())) return 'tax';
     return null;
 }
 
