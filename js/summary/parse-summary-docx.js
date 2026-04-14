@@ -55,7 +55,7 @@ const NOTE_PATTERNS = [
     { type: '_skip', pattern: /основна динаміка показників/i },  // sub-header, not content
     { type: 'positive', pattern: /позитивна/i },
     { type: 'negative', pattern: /негативна|ризикова/i },
-    { type: 'decisions', pattern: /питання.*рішення|управлінськ/i },
+    { type: 'decisions', pattern: /питання.*що потребують.*рішення|потребують управлінськ/i },
     { type: 'other', pattern: /виконання протокольних|[ХX][ІI]V[\.\s]/i },
 ];
 
