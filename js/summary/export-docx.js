@@ -92,8 +92,28 @@ export async function exportWeeklyDocx(reportDate) {
 
         sections.push(makeParagraph(`${block.roman}. ${block.name}`, { heading: docx.HeadingLevel.HEADING_3, bold: true, spacing: 200 }));
 
-        // Notes
-        if (block.isText && blockNotes.length) {
+        // Notes — Block I: structured 4-section layout
+        if (block.isText && block.id === 'I') {
+            const noteMap = {};
+            for (const n of blockNotes) noteMap[n.note_type] = n;
+            const allNotes = notes.filter(n => n.note_type === 'decisions');
+            const SECS = [
+                { type: 'general', label: '1. Загальна оцінка тижня' },
+                { type: 'events', label: '2. Ключові події тижня' },
+            ];
+            for (const sec of SECS) {
+                sections.push(makeParagraph(`${sec.label}:`, { bold: true }));
+                sections.push(makeParagraph(noteMap[sec.type]?.content || '—'));
+            }
+            sections.push(makeParagraph('3. Основна динаміка показників', { bold: true }));
+            sections.push(makeParagraph('Позитивна:', { bold: true }));
+            sections.push(makeParagraph(noteMap['positive']?.content || '—'));
+            sections.push(makeParagraph('Негативна / ризикова:', { bold: true }));
+            sections.push(makeParagraph(noteMap['negative']?.content || '—'));
+            sections.push(makeParagraph('4. Питання, що потребують управлінського рішення', { bold: true }));
+            const decisions = allNotes[0];
+            sections.push(makeParagraph(decisions?.content || '—'));
+        } else if (block.isText && blockNotes.length) {
             for (const n of blockNotes) {
                 const label = n.note_type === 'general' ? 'Загальна оцінка' : n.note_type === 'events' ? 'Ключові події' : n.note_type === 'positive' ? 'Позитивна динаміка' : n.note_type === 'negative' ? 'Негативна/ризикова' : 'Інше';
                 sections.push(makeParagraph(`${label}:`, { bold: true }));
@@ -215,7 +235,15 @@ export async function exportMonthlyDocx(year, month) {
     }
 
     const doc = new docx.Document({
-        sections: [{ children: sections }]
+        sections: [{
+            properties: {
+                page: {
+                    size: { orientation: docx.PageOrientation.LANDSCAPE,
+                            width: 16838, height: 11906 } // A4 landscape in twips
+                }
+            },
+            children: sections
+        }]
     });
 
     const blob = await docx.Packer.toBlob(doc);

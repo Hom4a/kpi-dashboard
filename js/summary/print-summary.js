@@ -64,8 +64,24 @@ export function printWeeklyReport(reportDate) {
         html += `<div class="print-block">
             <div class="print-block-header"><span class="roman">${block.roman}.</span> ${block.name}</div>`;
 
-        // Notes (Block I, XIV)
-        if (block.isText && blockNotes.length) {
+        // Notes — Block I: structured 4-section layout
+        if (block.isText && block.id === 'I') {
+            const noteMap = {};
+            for (const n of blockNotes) noteMap[n.note_type] = n;
+            const allDecisions = notes.filter(n => n.note_type === 'decisions');
+            const SECS = [
+                { type: 'general', label: '1. Загальна оцінка тижня' },
+                { type: 'events', label: '2. Ключові події тижня' },
+            ];
+            for (const sec of SECS) {
+                html += `<div class="print-note"><div class="print-note-label">${sec.label}</div><div>${noteMap[sec.type]?.content?.replace(/\n/g, '<br>') || '—'}</div></div>`;
+            }
+            html += `<div class="print-note-label" style="margin-top:6px"><b>3. Основна динаміка показників</b></div>`;
+            html += `<div class="print-note"><div class="print-note-label">Позитивна</div><div>${noteMap['positive']?.content?.replace(/\n/g, '<br>') || '—'}</div></div>`;
+            html += `<div class="print-note"><div class="print-note-label">Негативна / ризикова</div><div>${noteMap['negative']?.content?.replace(/\n/g, '<br>') || '—'}</div></div>`;
+            html += `<div class="print-note-label" style="margin-top:6px"><b>4. Питання, що потребують управлінського рішення</b></div>`;
+            html += `<div class="print-note"><div>${allDecisions[0]?.content?.replace(/\n/g, '<br>') || '—'}</div></div>`;
+        } else if (block.isText && blockNotes.length) {
             html += blockNotes.map(n => `<div class="print-note">
                 <div class="print-note-label">${n.note_type === 'general' ? 'Загальна оцінка' : n.note_type === 'events' ? 'Ключові події' : n.note_type === 'positive' ? 'Позитивна динаміка' : n.note_type === 'negative' ? 'Негативна/ризикова' : n.note_type === 'decisions' ? 'Питання для рішення' : 'Інше'}</div>
                 <div>${n.content.replace(/\n/g, '<br>')}</div>
@@ -171,12 +187,12 @@ export function printMonthlyReport(year, month) {
         html += '</tbody></table></div>';
     }
 
-    doPrint(html);
+    doPrint(html, true); // landscape for monthly
 }
 
 // ===== Print Helper =====
 
-function doPrint(contentHtml) {
+function doPrint(contentHtml, landscape = false) {
     let container = document.getElementById('printContainer');
     if (!container) {
         container = document.createElement('div');
@@ -186,6 +202,7 @@ function doPrint(contentHtml) {
     }
     container.innerHTML = contentHtml;
     container.style.display = 'block';
+    container.classList.toggle('print-landscape', landscape);
 
     // Hide main content
     document.querySelectorAll('body > *:not(#printContainer)').forEach(el => {
@@ -197,6 +214,7 @@ function doPrint(contentHtml) {
 
     // Restore
     container.style.display = 'none';
+    container.classList.remove('print-landscape');
     document.querySelectorAll('body > *:not(#printContainer)').forEach(el => {
         el.style.display = el.dataset.printHidden || '';
         delete el.dataset.printHidden;

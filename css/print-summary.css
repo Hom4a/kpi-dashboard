@@ -1,5 +1,6 @@
 /* ===== Print Stylesheet for Summary Reports (A4) ===== */
 @page { size: A4; margin: 15mm 12mm; }
+@page landscape { size: A4 landscape; margin: 12mm 10mm; }
 
 @media print {
     /* Hide all dashboard chrome */
@@ -17,6 +18,7 @@
     /* Page setup */
     body { background: #fff !important; color: #000 !important; font-size: 10pt; }
     #printContainer { max-width: 100%; padding: 0; }
+    #printContainer.print-landscape { page: landscape; }
 
     /* Print header */
     .print-header {

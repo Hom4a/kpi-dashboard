@@ -37,8 +37,36 @@ function buildWeeklyBlockHtml(block, data, notes, comment) {
             <span style="margin-right:6px">${block.roman}.</span>${block.name}
         </div>`;
 
-    // Notes
-    if (block.isText && notes.length) {
+    // Notes — Block I: structured 4-section layout
+    if (block.isText && block.id === 'I') {
+        const noteMap = {};
+        for (const n of notes) noteMap[n.note_type] = n;
+        const BLOCK_I = [
+            { type: 'general', label: '1. Загальна оцінка тижня' },
+            { type: 'events', label: '2. Ключові події тижня' },
+            { type: 'positive', label: 'Позитивна' },
+            { type: 'negative', label: 'Негативна / ризикова' },
+        ];
+        let showedDynamics = false;
+        for (const sec of BLOCK_I) {
+            if ((sec.type === 'positive' || sec.type === 'negative') && !showedDynamics) {
+                html += `<div style="font-size:10px;font-weight:bold;margin:8px 0 2px">3. Основна динаміка показників</div>`;
+                showedDynamics = true;
+            }
+            const note = noteMap[sec.type];
+            html += `<div style="margin:4px 0;padding:4px 8px;border-left:2px solid #ccc;font-size:10px">
+                <b>${sec.label}:</b> ${note ? note.content.replace(/\n/g, '<br>') : '—'}
+            </div>`;
+        }
+        // Decisions sub-block
+        html += `<div style="font-size:10px;font-weight:bold;margin:8px 0 2px">4. Питання, що потребують управлінського рішення</div>`;
+        const decisions = notes.find(n => n.note_type === 'decisions');
+        if (decisions) {
+            html += `<div style="margin:4px 0;padding:4px 8px;border-left:2px solid #ccc;font-size:10px">${decisions.content.replace(/\n/g, '<br>')}</div>`;
+        } else {
+            html += `<div style="margin:4px 0;padding:4px 8px;font-size:10px;color:#999">—</div>`;
+        }
+    } else if (block.isText && notes.length) {
         for (const n of notes) {
             const label = n.note_type === 'general' ? 'Загальна оцінка' : n.note_type === 'events' ? 'Ключові події' : n.note_type === 'positive' ? 'Позитивна' : n.note_type === 'negative' ? 'Негативна' : 'Інше';
             html += `<div style="margin:4px 0;padding:4px 8px;border-left:2px solid #999;font-size:10px">
@@ -183,15 +211,16 @@ export async function exportMonthlyPdf(year, month) {
     }
 
     const fullHtml = buildPrintHtml('ДП «Ліси України»', 'Основні показники діяльності', `${MO[month-1]} ${year} року`, blocks);
-    await renderToPdf(fullHtml, `Показники_${MO[month-1]}_${year}.pdf`);
+    await renderToPdf(fullHtml, `Показники_${MO[month-1]}_${year}.pdf`, true);
 }
 
 // ===== html2canvas → jsPDF =====
 
-async function renderToPdf(html, filename) {
+async function renderToPdf(html, filename, landscape = false) {
     // Create temp container
+    const containerWidth = landscape ? 1100 : 800;
     const temp = document.createElement('div');
-    temp.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;background:#fff;padding:20px;z-index:9999';
+    temp.style.cssText = `position:fixed;left:-9999px;top:0;width:${containerWidth}px;background:#fff;padding:20px;z-index:9999`;
     temp.innerHTML = html;
     document.body.appendChild(temp);
 
@@ -199,9 +228,10 @@ async function renderToPdf(html, filename) {
         const canvas = await html2canvas(temp, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
 
-        const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pageW = 210;
-        const pageH = 297;
+        const orientation = landscape ? 'landscape' : 'portrait';
+        const pdf = new jspdf.jsPDF({ orientation, unit: 'mm', format: 'a4' });
+        const pageW = landscape ? 297 : 210;
+        const pageH = landscape ? 210 : 297;
         const margin = 10;
         const contentW = pageW - margin * 2;
         const imgW = canvas.width;
