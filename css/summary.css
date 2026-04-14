@@ -175,9 +175,9 @@
 .ws-block-body .tbl tr:hover td:first-child { background: rgba(74,157,111,.12) !important; color: var(--primary) !important; }
 .ws-block-empty { color: var(--text3); font-size: 12px; font-style: italic; padding: 8px 0; }
 .ws-subsection-label {
-    font-size: 12px; font-weight: 600; color: var(--text2);
-    margin: 12px 0 6px; padding-bottom: 4px;
-    border-bottom: 1px dashed var(--border);
+    font-size: 13px; font-weight: 700; color: var(--text1);
+    margin: 14px 0 6px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
 }
 .ws-subsection-label:first-child { margin-top: 0; }
 

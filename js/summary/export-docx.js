@@ -8,9 +8,10 @@ const fN = v => v == null ? '—' : typeof v === 'number' ? v.toLocaleString('uk
 const SECTION_LABELS = {
     kpi: 'Ключові показники', forest_protection: 'Незаконні рубки', raids: 'Рейдова робота',
     mru_raids: 'Спільні рейди з МРУ', demining: 'Розмінування', certification: 'Сертифікація',
-    land_self_forested: 'Самозалісені землі', land_reforestation: 'Лісорозведення',
-    land_reserves: 'Землі запасу', harvesting: 'Заготівля', contracts: 'Договори',
-    sales: 'Реалізація', finance: 'Фінансовий стан', personnel: 'Персонал',
+    land_self_forested: '7.1. Самозалісені землі', land_reforestation: '7.2. Землі під лісорозведення',
+    land_reserves: '7.3. Землі запасу лісогосподарського призначення',
+    harvesting: 'Заготівля', contracts: '9.1. Укладені договори',
+    sales: '9.2. Реалізація деревини', finance: 'Фінансовий стан', personnel: 'Персонал',
     legal: 'Правові питання', procurement: 'Закупівлі', zsu: 'Допомога ЗСУ'
 };
 

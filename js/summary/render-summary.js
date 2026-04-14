@@ -341,9 +341,11 @@ const SECTION_LABELS = {
     mru_raids: 'Спільні рейди з МРУ', fires: 'Лісові пожежі',
     forestry_campaign: 'Лісокультурна кампанія',
     demining: 'Розмінування', certification: 'Сертифікація',
-    land_self_forested: 'Самозалісені землі', land_reforestation: 'Лісорозведення',
-    land_reserves: 'Землі запасу', harvesting: 'Заготівля', harvesting_extra: 'Додаткові показники', contracts: 'Договори',
-    sales: 'Реалізація', finance: 'Фінанси', personnel: 'Персонал',
+    land_self_forested: '7.1. Самозалісені землі', land_reforestation: '7.2. Землі під лісорозведення',
+    land_reserves: '7.3. Землі запасу лісогосподарського призначення',
+    harvesting: 'Заготівля', harvesting_extra: 'Додаткові показники',
+    contracts: '9.1. Укладені договори', sales: '9.2. Реалізація деревини',
+    finance: 'Фінанси', personnel: 'Персонал',
     legal: 'Правові питання', procurement: 'Закупівлі', zsu: 'Допомога ЗСУ'
 };
 
