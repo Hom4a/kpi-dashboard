@@ -74,6 +74,11 @@ function extractUnit(name) {
     return m ? m[1].trim() : '';
 }
 
+function normalizeName(name) {
+    // Fix known typos in Excel: "цін реалізації" → "ціна реалізації"
+    return name.replace(/\bцін реалізації\b/gi, 'ціна реалізації');
+}
+
 // ===== Value Parsing =====
 
 function parseValue(val) {
@@ -144,7 +149,7 @@ export function parseSummaryXlsx(wb) {
         for (let i = 3; i < rows.length; i++) {
             const r = rows[i];
             if (!r || !r[0]) continue;
-            const name = String(r[0]).trim().replace(/\*+$/, '').trim(); // strip trailing asterisks
+            const name = normalizeName(String(r[0]).trim().replace(/\*+$/, '').trim());
             if (!name) continue;
 
             // Skip non-data rows
@@ -277,7 +282,7 @@ export function parseSummaryXlsx(wb) {
         for (let i = 3; i < rows.length; i++) {
             const r = rows[i];
             if (!r || !r[0]) continue;
-            const name = String(r[0]).trim().replace(/\*+$/, '').trim(); // strip trailing asterisks
+            const name = normalizeName(String(r[0]).trim().replace(/\*+$/, '').trim());
             if (!name) continue;
             if (/^довідково/i.test(name)) break;
             if (/^чисельність\/кількість/i.test(name)) continue;

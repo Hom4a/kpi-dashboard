@@ -77,7 +77,7 @@ const TABLE_1_ROWS = [
     'дуб',
     'інші',
     'Реалізація лісоматеріалів круглих, тис. м3',
-    'Середня цін реалізації 1 м3 лісоматеріалів круглих, грн/м3',
+    'Середня ціна реалізації 1 м3 лісоматеріалів круглих, грн/м3',
     // FIX #4: volume/price sub-indicators
     'В.т.ч: вільха, береза тис. м3/сер. ціна грн',
     'сосна тис. м3/сер. ціна грн',
@@ -381,22 +381,20 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             if (y > year) { cells += '<td>—</td>'; continue; }
 
             if (y === year) {
-                // If annual record has special text ('-', '*', 'Х'), respect it
                 const ann = rows.find(r => r.year === y && r.month === 0);
                 if (ann?.value_text === '-' || ann?.value_text === '*' || ann?.value_text === 'Х') {
                     cells += `<td><b>${ann.value_text}</b></td>`;
                 } else if (ann && isVolPriceText(ann.value_text)) {
-                    // Vol/price annual record from Excel — show as-is with slash
                     cells += `<td><b>${toSlash(ann.value_text)}</b></td>`;
+                } else if (ann?.value_numeric != null && snapshot) {
+                    // Snapshot/weighted: use Excel's annual value (already computed correctly)
+                    cells += `<td><b>${fN(ann.value_numeric)}</b></td>`;
                 } else {
-                    // Current year: sum up to selected month; snapshot = average; weighted for prices
                     const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
                     if (monthlyRecords.length) {
-                        // Vol/price: build "volume/price" from monthly records
                         const firstVP = monthlyRecords.find(r => isVolPriceText(r.value_text));
                         if (firstVP) {
                             const totalVol = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
-                            // Weighted price from monthly value_text prices
                             let num = 0, den = 0;
                             for (const r of monthlyRecords) {
                                 const p = extractPrice(r.value_text);

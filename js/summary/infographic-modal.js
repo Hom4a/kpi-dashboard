@@ -15,6 +15,15 @@ function filterByType(history, indicatorName) {
         return isVP === rkIsVP;
     });
 }
+// Snapshot indicators: use average instead of sum for YTD
+const SNAPSHOT_KEYS = ['середньооблікова чисельність', 'середня заробітна плата',
+    'середня ціна реалізації', 'середня цін реалізації', 'ціна знеособленого',
+    'реалізовано на 1 штатного', 'коефіцієнт фінансової стійкості'];
+function isSnapshotIndicator(name) {
+    const lower = name.toLowerCase();
+    return SNAPSHOT_KEYS.some(s => lower.includes(s));
+}
+
 let _chart = null;
 
 export function initIndicatorModal() {
@@ -303,27 +312,29 @@ async function loadAndDrawMonthlyYTD(indicatorName) {
         const labels = [];
         const values = [];
 
+        const isSnap = isSnapshotIndicator(indicatorName);
         for (const y of years) {
-            const ytdRecords = history.filter(r => r.year === y && r.month > 0 && r.month <= upToMonth);
+            const ytdRecords = history.filter(r => r.year === y && r.month > 0 && r.month <= upToMonth && r.value_numeric != null);
             if (ytdRecords.length) {
                 labels.push(`${y} (${MO_SHORT[0]}-${MO_SHORT[upToMonth - 1]})`);
-                values.push(ytdRecords.reduce((s, r) => s + (r.value_numeric || 0), 0));
+                const total = ytdRecords.reduce((s, r) => s + r.value_numeric, 0);
+                values.push(isSnap ? total / ytdRecords.length : total);
             }
         }
         drawChart(labels, values, indicatorName, 'bar');
     } catch (e) { console.error('infographic YTD error:', e); }
 }
 
-// Extract price from value_text like "360,6(2318,7)" → 2318.7
+// Extract price from value_text like "360,6/2318,7" or "360,6(2318,7)" → 2318.7
 function extractPrice(text) {
     if (!text) return null;
-    const m = text.match(/\(([^)]+)\)/);
+    const m = text.match(/[\/(]([\d\s,.]+)\)?$/);
     if (!m) return null;
     return parseFloat(m[1].replace(/\s/g, '').replace(',', '.'));
 }
 
 function isVolPrice(records) {
-    return records.some(r => r.value_text && /\([\d,.]+\)/.test(r.value_text));
+    return records.some(r => r.value_text && /[\/(][\d,.]+/.test(r.value_text));
 }
 
 // Dual-axis chart: bars for volume (left Y) + line for price (right Y)
