@@ -359,21 +359,28 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             if (y > year) { cells += '<td>—</td>'; continue; }
 
             if (y === year) {
-                // Current year: sum up to selected month; snapshot = average; weighted for prices
-                const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
-                if (monthlyRecords.length) {
-                    const weightedYtd = getWeightedYtd(name, allData, y, month);
-                    const total = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
-                    const ytd = weightedYtd != null ? weightedYtd : (snapshot ? total / monthlyRecords.length : total);
-                    cells += `<td><b>${fN(ytd)}</b></td>`;
+                // If annual record explicitly says '-', respect that (snapshot indicators like debt/cash)
+                const ann = rows.find(r => r.year === y && r.month === 0);
+                if (ann?.value_text === '-') {
+                    cells += `<td><b>—</b></td>`;
                 } else {
-                    const ann = rows.find(r => r.year === y && r.month === 0);
-                    cells += `<td><b>${ann?.value_text || '—'}</b></td>`;
+                    // Current year: sum up to selected month; snapshot = average; weighted for prices
+                    const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
+                    if (monthlyRecords.length) {
+                        const weightedYtd = getWeightedYtd(name, allData, y, month);
+                        const total = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
+                        const ytd = weightedYtd != null ? weightedYtd : (snapshot ? total / monthlyRecords.length : total);
+                        cells += `<td><b>${fN(ytd)}</b></td>`;
+                    } else {
+                        cells += `<td><b>${ann?.value_text || '—'}</b></td>`;
+                    }
                 }
             } else {
                 // Past years
                 const ann = rows.find(r => r.year === y && r.month === 0);
-                if (ann?.value_text && /[\/(]/.test(ann.value_text)) {
+                if (ann?.value_text === '-') {
+                    cells += `<td>—</td>`;
+                } else if (ann?.value_text && /[\/(]/.test(ann.value_text)) {
                     cells += `<td>${ann.value_text}</td>`;
                 } else if (ann?.value_numeric != null) {
                     cells += `<td>${fN(ann.value_numeric)}</td>`;
