@@ -314,13 +314,13 @@ function isSub(name, subSet) {
 // Match indicator: collect ALL records with matching name, deduplicate by (year,month)
 function matchIndicator(name, allData) {
     const lower = name.toLowerCase().replace(/\s+/g, ' ').trim();
-    const isVolPriceName = /м3.*ціна|ціна.*грн|сер\.\s*ціна/.test(lower);
+    const isVolPriceName = /м3.*цін|цін.*грн|сер\.\s*цін/.test(lower);
     const exact = [];
     const fuzzy = [];
 
     for (const r of allData) {
         const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
-        const rkIsVolPrice = /м3.*ціна|ціна.*грн|сер\.\s*ціна/.test(rk);
+        const rkIsVolPrice = /м3.*цін|цін.*грн|сер\.\s*цін/.test(rk);
 
         // Don't mix vol/price indicators with regular ones
         if (isVolPriceName !== rkIsVolPrice) continue;

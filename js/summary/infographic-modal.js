@@ -9,9 +9,9 @@ const MODAL_ID = 'indicatorModal';
 
 // Filter history to same indicator type (vol/price vs regular)
 function filterByType(history, indicatorName) {
-    const isVP = /м3.*ціна|ціна.*грн|сер\.\s*ціна/i.test(indicatorName);
+    const isVP = /м3.*цін|цін.*грн|сер\.\s*цін/i.test(indicatorName);
     return history.filter(r => {
-        const rkIsVP = /м3.*ціна|ціна.*грн|сер\.\s*ціна/i.test(r.indicator_name);
+        const rkIsVP = /м3.*цін|цін.*грн|сер\.\s*цін/i.test(r.indicator_name);
         return isVP === rkIsVP;
     });
 }
