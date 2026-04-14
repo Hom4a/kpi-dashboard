@@ -388,18 +388,22 @@ function renderWeeklySectionTabs(data, date) {
 
         // Text blocks (I, XIV) — show notes
         if (block.isText && block.noteTypes) {
-            if (blockNotes.length) {
-                html += renderBlockNotes(blockNotes);
+            if (block.id === 'I') {
+                // Block I: always render 4 numbered sections matching Word structure
+                html += renderBlockI(blockNotes, latestNotes, block, date);
             } else {
-                html += '<div class="ws-block-empty">Немає текстових даних</div>';
-            }
-            // Sub-blocks (e.g., "Питання для рішення" structured table)
-            if (block.subBlocks) {
-                for (const sub of block.subBlocks) {
-                    html += `<div class="ws-subsection-label">${sub.name}</div>`;
-                    if (sub.isStructured) {
-                        const subNotes = latestNotes.filter(n => n.note_type === sub.noteType);
-                        html += renderStructuredDecisions(sub, subNotes, date);
+                if (blockNotes.length) {
+                    html += renderBlockNotes(blockNotes);
+                } else {
+                    html += '<div class="ws-block-empty">Немає текстових даних</div>';
+                }
+                if (block.subBlocks) {
+                    for (const sub of block.subBlocks) {
+                        html += `<div class="ws-subsection-label">${sub.name}</div>`;
+                        if (sub.isStructured) {
+                            const subNotes = latestNotes.filter(n => n.note_type === sub.noteType);
+                            html += renderStructuredDecisions(sub, subNotes, date);
+                        }
                     }
                 }
             }
@@ -576,6 +580,55 @@ function formatParagraphs(text) {
             return `<div class="ws-para-item ws-para-header">${t}</div>`;
         return `<div class="ws-para-item">${t}</div>`;
     }).join('');
+}
+
+// Block I: 4 numbered sections matching Word structure
+function renderBlockI(blockNotes, latestNotes, block, date) {
+    const SECTIONS = [
+        { type: 'general', label: '1. Загальна оцінка тижня', cls: 'summary-alert-info' },
+        { type: 'events', label: '2. Ключові події тижня', cls: 'summary-alert-neutral' },
+        { type: 'dynamics', label: '3. Основна динаміка показників', isGroup: true,
+          children: [
+              { type: 'positive', label: 'Позитивна', cls: 'summary-alert-success' },
+              { type: 'negative', label: 'Негативна / ризикова', cls: 'summary-alert-danger' },
+          ]
+        },
+    ];
+    const noteMap = {};
+    for (const n of blockNotes) noteMap[n.note_type] = n;
+
+    let html = '';
+    for (const sec of SECTIONS) {
+        if (sec.isGroup) {
+            html += `<div class="ws-block-i-group"><div class="ws-block-i-label">${sec.label}</div>`;
+            for (const ch of sec.children) {
+                const note = noteMap[ch.type];
+                html += `<div class="summary-alert ${ch.cls}"><div>
+                    <div class="note-label">${ch.label}</div>
+                    <div class="note-text">${note ? formatParagraphs(note.content) : '<span class="ws-empty-note">—</span>'}</div>
+                </div></div>`;
+            }
+            html += `</div>`;
+        } else {
+            const note = noteMap[sec.type];
+            html += `<div class="summary-alert ${sec.cls}"><div>
+                <div class="note-label">${sec.label}</div>
+                <div class="note-text">${note ? formatParagraphs(note.content) : '<span class="ws-empty-note">—</span>'}</div>
+            </div></div>`;
+        }
+    }
+
+    // Sub-block 4: "Питання, що потребують управлінського рішення"
+    if (block.subBlocks) {
+        for (const sub of block.subBlocks) {
+            html += `<div class="ws-block-i-label" style="margin-top:12px">4. ${sub.name}</div>`;
+            if (sub.isStructured) {
+                const subNotes = latestNotes.filter(n => n.note_type === sub.noteType);
+                html += renderStructuredDecisions(sub, subNotes, date);
+            }
+        }
+    }
+    return html;
 }
 
 function renderBlockNotes(notes) {

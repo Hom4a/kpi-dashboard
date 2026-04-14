@@ -446,9 +446,6 @@ function extractNotes(doc, ns) {
         fullText = fullText.trim();
         if (!fullText) continue;
 
-        // Check if this is a section header for notes
-        const isBold = paragraphs[i].getElementsByTagNameNS(ns, 'b').length > 0;
-
         // Check if this paragraph starts a new note type
         let matchedType = null;
         for (const np of NOTE_PATTERNS) {
@@ -492,8 +489,8 @@ function extractNotes(doc, ns) {
                 }
                 currentType = null;
                 currentContent = [];
-            } else if (currentType === 'other' || !isBold || currentContent.length === 0) {
-                // Collect all content; for 'other' (XIV) — include bold sub-headers too
+            } else {
+                // Collect all content including bold paragraphs
                 currentContent.push(fullText);
             }
         }

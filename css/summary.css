@@ -180,6 +180,9 @@
     border-bottom: 1px solid var(--border);
 }
 .ws-subsection-label:first-child { margin-top: 0; }
+.ws-block-i-label { font-size: 13px; font-weight: 700; color: var(--text1); margin: 12px 0 6px; }
+.ws-block-i-group { margin: 4px 0; }
+.ws-empty-note { color: var(--text3); font-style: italic; }
 
 /* Block comment area */
 /* FIX #9: monthly comment full width */
