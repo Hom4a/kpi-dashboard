@@ -384,16 +384,12 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
                 const ann = rows.find(r => r.year === y && r.month === 0);
                 if (ann?.value_text === '-' || ann?.value_text === '*' || ann?.value_text === 'Х') {
                     cells += `<td><b>${ann.value_text}</b></td>`;
-                } else if (ann && isVolPriceText(ann.value_text)) {
-                    cells += `<td><b>${toSlash(ann.value_text)}</b></td>`;
-                } else if (ann?.value_numeric != null && snapshot) {
-                    // Snapshot/weighted: use Excel's annual value (already computed correctly)
-                    cells += `<td><b>${fN(ann.value_numeric)}</b></td>`;
                 } else {
                     const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
                     if (monthlyRecords.length) {
                         const firstVP = monthlyRecords.find(r => isVolPriceText(r.value_text));
                         if (firstVP) {
+                            // Vol/price: sum volumes + weighted avg price
                             const totalVol = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
                             let num = 0, den = 0;
                             for (const r of monthlyRecords) {
