@@ -339,11 +339,16 @@ function matchIndicator(name, allData) {
         }
     }
 
-    // Deduplicate: if exact match exists for a (year,month), skip fuzzy for same (year,month)
-    const exactKeys = new Set(exact.map(r => `${r.year}|${r.month}`));
-    const result = [...exact];
+    // Deduplicate by (year,month): exact first, then fuzzy — only one record per (year,month)
+    const seen = new Set();
+    const result = [];
+    for (const r of exact) {
+        const key = `${r.year}|${r.month}`;
+        if (!seen.has(key)) { seen.add(key); result.push(r); }
+    }
     for (const r of fuzzy) {
-        if (!exactKeys.has(`${r.year}|${r.month}`)) result.push(r);
+        const key = `${r.year}|${r.month}`;
+        if (!seen.has(key)) { seen.add(key); result.push(r); }
     }
     return result;
 }
