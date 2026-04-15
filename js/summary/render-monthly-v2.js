@@ -6,7 +6,7 @@ import { openMonthlyIndicatorModal } from './infographic-modal.js';
 import { initCellAnnotations } from './cell-annotations.js';
 import { TABLE_1, TABLE_2, SALARY_TABLE, ANIMALS_TABLE, REFERENCE_BLOCK, normalizeLookup } from './indicators-config.js';
 import { fN, toSlash, isVolPriceText, findMonthRecord, findAnnualRecord, findMonthlyRecords,
-         computeYtd, getPastYearValue, deltaBadge } from './monthly-compute.js';
+         computeYtd, getPastYearValue, deltaBadge, nameMatches } from './monthly-compute.js';
 
 const MO = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
             'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
@@ -187,8 +187,7 @@ function renderSalaryTableV2(allData, showYears, year, month) {
     const { title, id, branches, legacyBranches } = SALARY_TABLE;
     const allBranches = [...branches, ...legacyBranches];
     const salaryData = allData.filter(r => {
-        const norm = normalizeLookup(r.indicator_name);
-        return allBranches.some(b => normalizeLookup(b) === norm);
+        return allBranches.some(b => nameMatches(b, r.indicator_name));
     });
     if (!salaryData.length) return '';
 
@@ -211,7 +210,7 @@ function renderSalaryTableV2(allData, showYears, year, month) {
     for (const branch of [...branches, ...legacyBranches]) {
         const norm = normalizeLookup(branch);
         if (shown.has(norm)) continue;
-        const branchRecords = salaryData.filter(r => normalizeLookup(r.indicator_name) === norm);
+        const branchRecords = salaryData.filter(r => nameMatches(branch, r.indicator_name));
         if (!branchRecords.length) continue;
         shown.add(norm);
 
@@ -233,7 +232,7 @@ function renderSalaryTableV2(allData, showYears, year, month) {
         cells += `<td><b>${curMonth?.value_numeric != null ? fN(curMonth.value_numeric) : '—'}</b></td>`;
         // Region salary
         if (regionData.length) {
-            const region = regionData.find(r => normalizeLookup(r.indicator_name) === norm);
+            const region = regionData.find(r => nameMatches(branch, r.indicator_name));
             cells += `<td>${region?.value_numeric != null ? fN(region.value_numeric) : '—'}</td>`;
         }
         html += `<tr class="clickable-row" data-indicator="${branch.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;

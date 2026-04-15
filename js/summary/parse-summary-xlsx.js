@@ -79,6 +79,7 @@ function normalizeName(name) {
         .replace(/\bцін реалізації\b/gi, 'ціна реалізації')  // typo "цін" → "ціна"
         .replace(/\s*\(без ПДВ\)\s*/gi, '')                   // remove "(без ПДВ)" suffix
         .replace(/Лісовідновлення\(/gi, 'Лісовідновлення (')  // missing space before (
+        .replace(/\*+$/, '')                                   // trailing asterisks (зарплати)
         .replace(/\s+/g, ' ').trim();                          // normalize whitespace
 }
 

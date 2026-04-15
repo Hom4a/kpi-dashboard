@@ -28,26 +28,43 @@ export function isVolPriceText(t) {
 // ===== Record lookup =====
 
 /**
- * Find DB records matching an indicator config by exact name.
+ * Match indicator name: exact first, then startsWith for short names.
+ * Handles DB variants like "ПДФО  млн. грн" matching config "ПДФО".
+ */
+export function nameMatches(configName, dbName) {
+    const cn = normalizeLookup(configName);
+    const dn = normalizeLookup(dbName);
+    if (cn === dn) return true;
+    // Short config names (<=10 chars): match if DB name starts with config name
+    if (cn.length <= 10 && (dn.startsWith(cn + ' ') || dn === cn)) return true;
+    // DB name starts with config name (for names with extra suffixes)
+    if (dn.startsWith(cn + ' ') || dn.startsWith(cn + ',')) return true;
+    return false;
+}
+
+/**
+ * Find DB records matching an indicator config by name.
  * Returns records for given year, months 1..month.
+ * Deduplicates by month (keeps first match).
  */
 export function findMonthlyRecords(indicatorName, allData, year, month) {
-    const norm = normalizeLookup(indicatorName);
-    return allData.filter(r =>
-        r.year === year && r.month > 0 && r.month <= month &&
-        r.value_numeric != null &&
-        normalizeLookup(r.indicator_name) === norm
-    );
+    const seen = new Set();
+    return allData.filter(r => {
+        if (r.year !== year || r.month <= 0 || r.month > month || r.value_numeric == null) return false;
+        if (!nameMatches(indicatorName, r.indicator_name)) return false;
+        if (seen.has(r.month)) return false;
+        seen.add(r.month);
+        return true;
+    });
 }
 
 /**
  * Find annual record (month=0) for a given year.
  */
 export function findAnnualRecord(indicatorName, allData, year) {
-    const norm = normalizeLookup(indicatorName);
     return allData.find(r =>
         r.year === year && r.month === 0 &&
-        normalizeLookup(r.indicator_name) === norm
+        nameMatches(indicatorName, r.indicator_name)
     );
 }
 
@@ -55,10 +72,9 @@ export function findAnnualRecord(indicatorName, allData, year) {
  * Find monthly record for specific month.
  */
 export function findMonthRecord(indicatorName, allData, year, month) {
-    const norm = normalizeLookup(indicatorName);
     return allData.find(r =>
         r.year === year && r.month === month &&
-        normalizeLookup(r.indicator_name) === norm
+        nameMatches(indicatorName, r.indicator_name)
     );
 }
 
