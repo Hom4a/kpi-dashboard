@@ -225,7 +225,7 @@ export function parseSummaryXlsx(wb) {
         for (let i = 3; i < rows.length; i++) {
             const r = rows[i];
             const name = r ? String(r[0] || '').trim() : '';
-            if (/^чисельність\/кількість/i.test(name)) { inAnimalSection = true; continue; }
+            if (/^чисельність\/кількість/i.test(name)) { inAnimalSection = true; }
             if (inAnimalSection) {
                 if (!name && (!r || !r[1])) { inAnimalSection = false; continue; }
                 // Each cell = "Олень благор. 3787/*" — parse all year columns

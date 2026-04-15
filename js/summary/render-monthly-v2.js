@@ -199,18 +199,19 @@ function renderSalaryTableV2(allData, showYears, year, month) {
             BRANCH_KEYWORDS.some(kw => lower.includes(kw));
     });
 
-    // Branch names in config order, then any extras from data
+    // Show only branches that have data for selected year
+    // Use config order, skip branches without data
     const configOrder = SALARY_TABLE.order || [];
-    const allBranchNames = [...new Set(salaryRows.map(r => r.indicator_name))];
+    const yearBranches = new Set(salaryRows
+        .filter(r => r.year === year && r.value_numeric != null)
+        .map(r => r.indicator_name));
+
     const branchNames = [];
     for (const co of configOrder) {
-        // Exact match or startsWith for short names like "Карпатський"
-        const match = allBranchNames.find(n =>
-            n === co || n.toLowerCase() === co.toLowerCase());
-        if (match && !branchNames.includes(match)) branchNames.push(match);
+        if (yearBranches.has(co) && !branchNames.includes(co)) branchNames.push(co);
     }
-    // Add any branches from data not in config
-    for (const n of allBranchNames) {
+    // Add any branches from data not in config order
+    for (const n of yearBranches) {
         if (!branchNames.includes(n)) branchNames.push(n);
     }
     if (!branchNames.length) return '';
