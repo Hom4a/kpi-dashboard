@@ -75,8 +75,11 @@ function extractUnit(name) {
 }
 
 function normalizeName(name) {
-    // Fix known typos in Excel: "цін реалізації" → "ціна реалізації"
-    return name.replace(/\bцін реалізації\b/gi, 'ціна реалізації');
+    return name
+        .replace(/\bцін реалізації\b/gi, 'ціна реалізації')  // typo "цін" → "ціна"
+        .replace(/\s*\(без ПДВ\)\s*/gi, '')                   // remove "(без ПДВ)" suffix
+        .replace(/Лісовідновлення\(/gi, 'Лісовідновлення (')  // missing space before (
+        .replace(/\s+/g, ' ').trim();                          // normalize whitespace
 }
 
 // ===== Value Parsing =====

@@ -9,6 +9,7 @@ import { saveBlockComment, deleteBlockComment } from './db-summary.js';
 import { initCellAnnotations } from './cell-annotations.js';
 import { openWeeklyIndicatorModal, openMonthlyIndicatorModal } from './infographic-modal.js';
 import { renderMonthlyReport } from './render-monthly.js';
+import { renderMonthlyV2 } from './render-monthly-v2.js';
 
 const MO = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 
@@ -39,8 +40,15 @@ export function renderSummaryDashboard() {
 
     // Lazy tab render — only render active tab
     if (_activeTab === 'monthly') {
-        const monthlyContainer = $('monthlyReportContainer');
-        if (monthlyContainer) renderMonthlyReport(monthlyContainer, selYear);
+        // V2 (config-driven) is default; V1 (legacy) is fallback
+        const v2Container = $('monthlyReportContainerV2');
+        const v1Container = $('monthlyReportContainer');
+        const isV2 = v2Container && v2Container.style.display !== 'none';
+        if (isV2 && v2Container) {
+            renderMonthlyV2(v2Container, selYear);
+        } else if (v1Container) {
+            renderMonthlyReport(v1Container, selYear);
+        }
         renderCharts(selYear);
         initChartBlockToggles();
     } else {

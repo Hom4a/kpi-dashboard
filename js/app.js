@@ -399,6 +399,17 @@ function _getActiveTab() { return document.querySelector('.summary-tab.active')?
 window._summaryPrint = () => _getActiveTab() === 'weekly' ? printWeeklyReport() : printMonthlyReport();
 window._summaryDocx = () => _getActiveTab() === 'weekly' ? exportWeeklyDocx() : exportMonthlyDocx();
 window._summaryPdf = () => _getActiveTab() === 'weekly' ? exportWeeklyPdf() : exportMonthlyPdf();
+// Monthly version toggle (v1 legacy / v2 config-driven)
+window._switchMonthlyVersion = (version) => {
+    const v1 = document.getElementById('monthlyReportContainer');
+    const v2 = document.getElementById('monthlyReportContainerV2');
+    if (!v1 || !v2) return;
+    document.querySelectorAll('.monthly-version-btn').forEach(b => b.classList.toggle('active', b.dataset.version === version));
+    v1.style.display = version === 'v1' ? '' : 'none';
+    v2.style.display = version === 'v2' ? '' : 'none';
+    // Trigger re-render
+    if (typeof renderSummaryDashboard === 'function') renderSummaryDashboard();
+};
 window.openGisAdmin = openGisAdmin;
 window.closeGisAdmin = closeGisAdmin;
 window.saveGisAdmin = saveGisAdmin;
