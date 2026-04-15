@@ -76,8 +76,11 @@ export const TABLE_2 = {
 export const SALARY_TABLE = {
     title: 'Середня з/п по філіях одного штатного працівника, грн',
     id: 'monthly_salary',
-    branches: [
+    // Fixed order from Excel (rows 70-89 of summary sheet)
+    order: [
         'Карпатський лісовий офіс',
+        'Південний', 'Північний', 'Подільський', 'Поліський',
+        'Слобожанський', 'Столичний', 'Східний', 'Центральний',
         'філія "Лісовий навчальний центр"',
         'філія "Лісові репродуктивні ресурси"',
         'філія "Східний лісовий офіс"',
@@ -89,15 +92,16 @@ export const SALARY_TABLE = {
         'Філія "Столичний лісовий офіс"',
         'Філія "Центральний лісовий офіс"',
         'Філія "Слобожанський лісовий офіс"',
-    ],
-    legacyBranches: [
-        'Південний', 'Північний', 'Подільський', 'Поліський',
-        'Слобожанський', 'Столичний', 'Східний', 'Центральний',
     ]
 };
 
 // ===== ANIMALS & REFERENCE =====
-export const ANIMALS_TABLE = { title: 'Чисельність / кількість лімітів тварин', id: 'monthly_animals' };
+export const ANIMALS_TABLE = {
+    title: 'Чисельність / кількість лімітів тварин',
+    id: 'monthly_animals',
+    // Fixed order from Excel (row 44-49)
+    order: ['Олень благор.', 'Олень плямистий', 'Козуля', 'Кабан', 'Лань', 'Муфлон']
+};
 export const REFERENCE_BLOCK = { title: 'Довідково', id: 'monthly_reference' };
 
 // ===== Build lookup index =====

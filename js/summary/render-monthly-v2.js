@@ -199,16 +199,19 @@ function renderSalaryTableV2(allData, showYears, year, month) {
             BRANCH_KEYWORDS.some(kw => lower.includes(kw));
     });
 
-    // Branch names in original order (from current year first, fallback to all)
-    const seen = new Set();
-    let branchNames = salaryRows
-        .filter(r => r.year === year && r.value_numeric != null)
-        .map(r => r.indicator_name)
-        .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
-    if (!branchNames.length) {
-        seen.clear();
-        branchNames = salaryRows.map(r => r.indicator_name)
-            .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
+    // Branch names in config order, then any extras from data
+    const configOrder = SALARY_TABLE.order || [];
+    const allBranchNames = [...new Set(salaryRows.map(r => r.indicator_name))];
+    const branchNames = [];
+    for (const co of configOrder) {
+        // Exact match or startsWith for short names like "Карпатський"
+        const match = allBranchNames.find(n =>
+            n === co || n.toLowerCase() === co.toLowerCase());
+        if (match && !branchNames.includes(match)) branchNames.push(match);
+    }
+    // Add any branches from data not in config
+    for (const n of allBranchNames) {
+        if (!branchNames.includes(n)) branchNames.push(n);
     }
     if (!branchNames.length) return '';
 
@@ -277,7 +280,18 @@ function renderAnimalTableV2(allData, showYears, year) {
     const animalData = allData.filter(r => r.indicator_group === 'animals');
     if (!animalData.length) return '';
 
-    const animalNames = [...new Set(animalData.map(r => r.indicator_name))];
+    // Use config order, then add any extras not in config
+    const configOrder = ANIMALS_TABLE.order || [];
+    const allAnimalNames = [...new Set(animalData.map(r => r.indicator_name))];
+    const orderedNames = [];
+    for (const prefix of configOrder) {
+        const match = allAnimalNames.find(n => n.startsWith(prefix));
+        if (match && !orderedNames.includes(match)) orderedNames.push(match);
+    }
+    for (const n of allAnimalNames) {
+        if (!orderedNames.includes(n)) orderedNames.push(n);
+    }
+
     const visibleYears = showYears.filter(y => y <= year);
 
     let html = `<div class="monthly-table-block">
@@ -289,7 +303,7 @@ function renderAnimalTableV2(allData, showYears, year) {
         <div class="tbl-wrap"><table class="tbl monthly-tbl">
             <thead><tr><th>Тварина</th>${visibleYears.map(y=>`<th>${y}</th>`).join('')}</tr></thead><tbody>`;
 
-    for (const name of animalNames) {
+    for (const name of orderedNames) {
         let cells = `<td>${name}</td>`;
         for (const y of visibleYears) {
             const rec = animalData.find(r => r.indicator_name === name && r.year === y);
