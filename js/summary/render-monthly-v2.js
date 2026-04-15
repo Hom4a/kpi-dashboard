@@ -4,9 +4,9 @@ import { summaryIndicators, summaryBlockComments } from './state-summary.js';
 import { saveBlockComment } from './db-summary.js';
 import { openMonthlyIndicatorModal } from './infographic-modal.js';
 import { initCellAnnotations } from './cell-annotations.js';
-import { TABLE_1, TABLE_2, SALARY_TABLE, ANIMALS_TABLE, REFERENCE_BLOCK, normalizeLookup } from './indicators-config.js';
-import { fN, toSlash, isVolPriceText, findMonthRecord, findAnnualRecord, findMonthlyRecords,
-         computeYtd, getPastYearValue, deltaBadge, nameMatches } from './monthly-compute.js';
+import { TABLE_1, TABLE_2, SALARY_TABLE, ANIMALS_TABLE, REFERENCE_BLOCK } from './indicators-config.js';
+import { fN, toSlash, isVolPriceText, findMonthRecord,
+         computeYtd, getPastYearValue, deltaBadge } from './monthly-compute.js';
 
 const MO = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
             'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
@@ -182,60 +182,89 @@ function renderTableV2(tableConfig, allData, showYears, year, month) {
 }
 
 // ===== Salary table =====
+// Dynamic branch list from data (same logic as v1) — no hardcoded config
 
 function renderSalaryTableV2(allData, showYears, year, month) {
-    const { title, id, branches, legacyBranches } = SALARY_TABLE;
-    const allBranches = [...branches, ...legacyBranches];
-    const salaryData = allData.filter(r => {
-        return allBranches.some(b => nameMatches(b, r.indicator_name));
+    const EXCLUDE = ['середня з/п по філіях', 'середня з/п по лісових', 'середня заробітна плата штатного'];
+    const BRANCH_KEYWORDS = ['філія', 'лісовий офіс', 'навчальний центр', 'репродуктивні', 'пожежний',
+        'карпатський', 'південний', 'північний', 'подільський', 'поліський',
+        'слобожанський', 'столичний', 'східний', 'центральний'];
+
+    const salaryRows = allData.filter(r => {
+        const lower = r.indicator_name.toLowerCase();
+        if (EXCLUDE.some(ex => lower.includes(ex))) return false;
+        if (lower.startsWith('*') || lower.startsWith('довідково')) return false;
+        if (lower.includes('прожитковий') || lower.includes('мінімальна заробітна') || lower.includes('середня заробітна плата в країні')) return false;
+        return r.indicator_group === 'salary_by_branch' || r.indicator_group === 'salary' ||
+            BRANCH_KEYWORDS.some(kw => lower.includes(kw));
     });
-    if (!salaryData.length) return '';
+
+    // Branch names in original order (from current year first, fallback to all)
+    const seen = new Set();
+    let branchNames = salaryRows
+        .filter(r => r.year === year && r.value_numeric != null)
+        .map(r => r.indicator_name)
+        .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
+    if (!branchNames.length) {
+        seen.clear();
+        branchNames = salaryRows.map(r => r.indicator_name)
+            .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
+    }
+    if (!branchNames.length) return '';
 
     const regionData = allData.filter(r => r.indicator_group === 'region_salary');
-    const visibleYears = showYears.filter(y => y <= year);
 
     let html = `<div class="monthly-table-block">
-        <div class="monthly-table-header" data-collapse-target="mt_${id}">
+        <div class="monthly-table-header" data-collapse-target="mt_${SALARY_TABLE.id}">
             <span class="ws-block-chevron">▼</span>
-            <span class="monthly-table-title">${title}</span>
+            <span class="monthly-table-title">${SALARY_TABLE.title}</span>
         </div>
-        <div class="monthly-table-body" id="mt_${id}">
+        <div class="monthly-table-body" id="mt_${SALARY_TABLE.id}">
         <div class="tbl-wrap"><table class="tbl monthly-tbl">
-            <thead><tr><th>Філія</th>${visibleYears.map(y=>`<th>${y}</th>`).join('')}<th>${MO[month-1]} ${year}</th>
-            ${regionData.length ? '<th>Середня з/п в регіоні</th>' : ''}
+            <thead><tr><th>Філія</th>${showYears.map(y=>`<th>${y} рік</th>`).join('')}
+            <th>${MO[month-1]} ${year}</th><th>%Δ до попер.місяця</th>
+            <th>Сер. з/п в регіоні</th>
             </tr></thead><tbody>`;
 
-    // Show branches in config order, skip empty
-    const shown = new Set();
-    for (const branch of [...branches, ...legacyBranches]) {
-        const norm = normalizeLookup(branch);
-        if (shown.has(norm)) continue;
-        const branchRecords = salaryData.filter(r => nameMatches(branch, r.indicator_name));
-        if (!branchRecords.length) continue;
-        shown.add(norm);
+    for (const name of branchNames) {
+        const rows = salaryRows.filter(r => r.indicator_name === name);
+        let cells = `<td class="ind-name">${name}</td>`;
 
-        let cells = `<td>${branch}</td>`;
-        for (const y of visibleYears) {
-            const ann = branchRecords.find(r => r.year === y && r.month === 0);
-            const monthlyRecs = branchRecords.filter(r => r.year === y && r.month > 0 && r.month <= (y === year ? month : 12) && r.value_numeric != null);
+        for (const y of showYears) {
+            if (y > year) { cells += '<td>—</td>'; continue; }
+            const ann = rows.find(r => r.year === y && r.month === 0);
             if (ann?.value_numeric != null) {
-                cells += `<td>${fN(ann.value_numeric)}</td>`;
-            } else if (monthlyRecs.length) {
-                const avg = monthlyRecs.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecs.length;
-                cells += `<td>${fN(avg)}</td>`;
+                const isCur = y === year;
+                cells += `<td>${isCur ? '<b>' : ''}${fN(ann.value_numeric)}${isCur ? '</b>' : ''}</td>`;
+            } else if (y === year) {
+                const monthlyRecs = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
+                cells += monthlyRecs.length
+                    ? `<td><b>${fN(monthlyRecs.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecs.length)}</b></td>`
+                    : '<td>—</td>';
             } else {
                 cells += '<td>—</td>';
             }
         }
-        // Current month
-        const curMonth = branchRecords.find(r => r.year === year && r.month === month);
-        cells += `<td><b>${curMonth?.value_numeric != null ? fN(curMonth.value_numeric) : '—'}</b></td>`;
+
+        // Current month + delta
+        const cur = rows.find(r => r.year === year && r.month === month);
+        const prev = month > 1
+            ? rows.find(r => r.year === year && r.month === month - 1)
+            : rows.find(r => r.year === year - 1 && r.month === 12);
+        const curVal = cur?.value_numeric;
+        const prevVal = prev?.value_numeric;
+        cells += `<td><b>${curVal != null ? fN(curVal) : '—'}</b></td>`;
+        const delta = deltaBadge(curVal, prevVal);
+        cells += `<td class="${delta.cls}">${delta.html || '—'}</td>`;
+
         // Region salary
-        if (regionData.length) {
-            const region = regionData.find(r => nameMatches(branch, r.indicator_name));
-            cells += `<td>${region?.value_numeric != null ? fN(region.value_numeric) : '—'}</td>`;
-        }
-        html += `<tr class="clickable-row" data-indicator="${branch.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
+        const regionRec = regionData.find(r => r.indicator_name === name);
+        cells += `<td>${regionRec?.value_numeric != null ? fN(regionRec.value_numeric) : '—'}</td>`;
+
+        const safeName = name.replace(/"/g, '&quot;');
+        cells = cells.replace(/^<td>/, `<td><span class="cell-text">`);
+        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${safeName}"></span></td>`);
+        html += `<tr class="clickable-row" data-indicator="${safeName}" style="cursor:pointer">${cells}</tr>`;
     }
 
     html += '</tbody></table></div></div></div>';
