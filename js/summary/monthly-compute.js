@@ -35,10 +35,17 @@ export function nameMatches(configName, dbName) {
     const cn = normalizeLookup(configName);
     const dn = normalizeLookup(dbName);
     if (cn === dn) return true;
-    // Short config names (<=10 chars): match if DB name starts with config name
-    if (cn.length <= 10 && (dn.startsWith(cn + ' ') || dn === cn)) return true;
-    // DB name starts with config name (for names with extra suffixes)
-    if (dn.startsWith(cn + ' ') || dn.startsWith(cn + ',')) return true;
+    // Don't match short generic names with vol/price indicators from another block
+    // e.g. "дуб" should NOT match "дуб тис. м3/сер. ціна грн"
+    if (dn.includes('м3/сер') || dn.includes('тис. м3/')) {
+        // Only match if config name also looks like vol/price
+        if (!cn.includes('м3/сер') && !cn.includes('тис. м3/')) return false;
+    }
+    // Short config names (<=10 chars): match DB name with unit suffix
+    // e.g. "ПДФО" → "ПДФО  млн. грн", "ВЗ" → "ВЗ  млн. грн"
+    if (cn.length <= 10 && dn.startsWith(cn + ' ')) return true;
+    // Longer names with extra suffixes
+    if (cn.length > 10 && (dn.startsWith(cn + ' ') || dn.startsWith(cn + ','))) return true;
     return false;
 }
 
