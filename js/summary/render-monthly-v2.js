@@ -185,15 +185,19 @@ function renderTableV2(tableConfig, allData, showYears, year, month) {
 // Dynamic branch list from data (same logic as v1) — no hardcoded config
 
 function renderSalaryTableV2(allData, showYears, year, month) {
-    // Filter salary records strictly by indicator_group from parser
-    const salaryRows = allData.filter(r => r.indicator_group === 'salary');
+    // Use config branch list — exact names from Excel summary sheet
+    const configBranches = SALARY_TABLE.order || [];
 
-    // Branch names from data — only those with data, in DB order (= Excel order)
-    const seen = new Set();
-    const branchNames = salaryRows
-        .filter(r => r.value_numeric != null)
-        .map(r => r.indicator_name)
-        .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
+    // Collect salary data: only annual records (month=0) for exact branch names
+    const branchNames = [];
+    const salaryRows = [];
+    for (const branch of configBranches) {
+        const records = allData.filter(r => r.indicator_name === branch && r.month === 0 && r.value_numeric != null);
+        if (records.length) {
+            branchNames.push(branch);
+            salaryRows.push(...allData.filter(r => r.indicator_name === branch));
+        }
+    }
     if (!branchNames.length) return '';
 
     const regionData = allData.filter(r => r.indicator_group === 'region_salary');
