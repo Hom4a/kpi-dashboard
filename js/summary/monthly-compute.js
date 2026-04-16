@@ -242,7 +242,6 @@ export function getPastYearValue(config, allData, year) {
     if (monthly.length) {
         return computeYtd(config, allData, year, 12);
     }
-    if (ann.value_text) return { value: null, display: ann.value_text };
     return { value: null, display: '—' };
 }
 
