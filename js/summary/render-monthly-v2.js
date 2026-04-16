@@ -220,8 +220,8 @@ function renderSalaryTableV2(allData, showYears, year, month) {
 
         for (const y of showYears) {
             if (y > year) { cells += '<td>—</td>'; continue; }
-            // Show exact value from Excel (annual record) — no formulas
-            const ann = rows.find(r => r.year === y && r.month === 0);
+            // Show exact value from Excel (annual record) — take latest if duplicates
+            const ann = rows.findLast(r => r.year === y && r.month === 0);
             const isCur = y === year;
             if (ann?.value_numeric != null) {
                 cells += `<td>${isCur ? '<b>' : ''}${fN(ann.value_numeric)}${isCur ? '</b>' : ''}</td>`;

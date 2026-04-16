@@ -69,7 +69,8 @@ export function findMonthlyRecords(indicatorName, allData, year, month) {
  * Find annual record (month=0) for a given year.
  */
 export function findAnnualRecord(indicatorName, allData, year) {
-    return allData.find(r =>
+    // Use findLast to get latest record when duplicates exist (newer upload wins)
+    return allData.findLast(r =>
         r.year === year && r.month === 0 &&
         nameMatches(indicatorName, r.indicator_name)
     );
@@ -79,7 +80,7 @@ export function findAnnualRecord(indicatorName, allData, year) {
  * Find monthly record for specific month.
  */
 export function findMonthRecord(indicatorName, allData, year, month) {
-    return allData.find(r =>
+    return allData.findLast(r =>
         r.year === year && r.month === month &&
         nameMatches(indicatorName, r.indicator_name)
     );
