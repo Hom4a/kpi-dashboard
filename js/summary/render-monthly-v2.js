@@ -236,17 +236,13 @@ function renderSalaryTableV2(allData, showYears, year, month) {
 
         for (const y of showYears) {
             if (y > year) { cells += '<td>—</td>'; continue; }
+            // Show exact value from Excel (annual record) — no formulas
             const ann = rows.find(r => r.year === y && r.month === 0);
+            const isCur = y === year;
             if (ann?.value_numeric != null) {
-                const isCur = y === year;
                 cells += `<td>${isCur ? '<b>' : ''}${fN(ann.value_numeric)}${isCur ? '</b>' : ''}</td>`;
-            } else if (y === year) {
-                const monthlyRecs = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
-                cells += monthlyRecs.length
-                    ? `<td><b>${fN(monthlyRecs.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecs.length)}</b></td>`
-                    : '<td>—</td>';
             } else {
-                cells += '<td>—</td>';
+                cells += `<td>${isCur ? '<b>' : ''}—${isCur ? '</b>' : ''}</td>`;
             }
         }
 
