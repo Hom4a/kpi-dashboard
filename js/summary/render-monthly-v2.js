@@ -185,35 +185,15 @@ function renderTableV2(tableConfig, allData, showYears, year, month) {
 // Dynamic branch list from data (same logic as v1) — no hardcoded config
 
 function renderSalaryTableV2(allData, showYears, year, month) {
-    const EXCLUDE = ['середня з/п по філіях', 'середня з/п по лісових', 'середня заробітна плата штатного'];
-    const BRANCH_KEYWORDS = ['філія', 'лісовий офіс', 'навчальний центр', 'репродуктивні', 'пожежний',
-        'карпатський', 'південний', 'північний', 'подільський', 'поліський',
-        'слобожанський', 'столичний', 'східний', 'центральний'];
+    // Filter salary records strictly by indicator_group from parser
+    const salaryRows = allData.filter(r => r.indicator_group === 'salary');
 
-    const salaryRows = allData.filter(r => {
-        const lower = r.indicator_name.toLowerCase();
-        if (EXCLUDE.some(ex => lower.includes(ex))) return false;
-        if (lower.startsWith('*') || lower.startsWith('довідково')) return false;
-        if (lower.includes('прожитковий') || lower.includes('мінімальна заробітна') || lower.includes('середня заробітна плата в країні')) return false;
-        return r.indicator_group === 'salary_by_branch' || r.indicator_group === 'salary' ||
-            BRANCH_KEYWORDS.some(kw => lower.includes(kw));
-    });
-
-    // Show only branches that have data for selected year
-    // Use config order, skip branches without data
-    const configOrder = SALARY_TABLE.order || [];
-    const yearBranches = new Set(salaryRows
-        .filter(r => r.year === year && r.value_numeric != null)
-        .map(r => r.indicator_name));
-
-    const branchNames = [];
-    for (const co of configOrder) {
-        if (yearBranches.has(co) && !branchNames.includes(co)) branchNames.push(co);
-    }
-    // Add any branches from data not in config order
-    for (const n of yearBranches) {
-        if (!branchNames.includes(n)) branchNames.push(n);
-    }
+    // Branch names from data — only those with data, in DB order (= Excel order)
+    const seen = new Set();
+    const branchNames = salaryRows
+        .filter(r => r.value_numeric != null)
+        .map(r => r.indicator_name)
+        .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
     if (!branchNames.length) return '';
 
     const regionData = allData.filter(r => r.indicator_group === 'region_salary');
