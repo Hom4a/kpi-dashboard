@@ -192,13 +192,8 @@ function renderSalaryTableV2(allData, showYears, year, month) {
     const branchNames = [];
     const salaryRows = [];
     for (const branch of configBranches) {
-        const hasYearData = allData.some(r => r.indicator_name === branch && r.year === year && r.value_numeric != null);
-        if (hasYearData) {
-            // Debug: log annual record for first branch
-            if (branchNames.length < 2) {
-                const annuals = allData.filter(r => r.indicator_name === branch && r.month === 0);
-                console.log(`[salary debug] ${branch}: annuals=`, annuals.map(r => ({y:r.year, v:r.value_numeric})));
-            }
+        if (!allData.some(r => r.indicator_name === branch && r.year === year && r.value_numeric != null)) continue;
+        {
             branchNames.push(branch);
             salaryRows.push(...allData.filter(r => r.indicator_name === branch));
         }

@@ -222,21 +222,6 @@ function computeDerived(formulaId, allData, year, month) {
 
 export function getPastYearValue(config, allData, year) {
     const ann = findAnnualRecord(config.name, allData, year);
-    if (!ann && config.id === 'price_round') {
-        const annuals = allData.filter(r => r.year === year && r.month === 0);
-        // Find names containing 'ціна' or 'цін'
-        const priceNames = annuals.filter(r => r.indicator_name.toLowerCase().includes('цін')).map(r => r.indicator_name);
-        console.warn(`[v2 debug] price_round year=${year}: NOT FOUND. ${annuals.length} annual records. Price-like names:`, priceNames);
-        // Show what normalizeLookup does
-        const cn = normalizeLookup(config.name);
-        console.warn(`[v2 debug] Looking for normalized: [${cn}]`);
-        if (priceNames.length) {
-            priceNames.forEach(n => {
-                const dn = normalizeLookup(n);
-                console.warn(`[v2 debug]   DB: [${dn}] match=${cn === dn} nameMatches=${nameMatches(config.name, n)}`);
-            });
-        }
-    }
     if (ann) {
         if (ann.value_text === '-' || ann.value_text === '*' || ann.value_text === 'Х') {
             return { value: null, display: ann.value_text };
