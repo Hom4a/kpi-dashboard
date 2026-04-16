@@ -188,12 +188,12 @@ function renderSalaryTableV2(allData, showYears, year, month) {
     // Use config branch list — exact names from Excel summary sheet
     const configBranches = SALARY_TABLE.order || [];
 
-    // Collect salary data: only annual records (month=0) for exact branch names
+    // Show only branches that have data for the selected year
     const branchNames = [];
     const salaryRows = [];
     for (const branch of configBranches) {
-        const records = allData.filter(r => r.indicator_name === branch && r.month === 0 && r.value_numeric != null);
-        if (records.length) {
+        const hasYearData = allData.some(r => r.indicator_name === branch && r.year === year && r.value_numeric != null);
+        if (hasYearData) {
             branchNames.push(branch);
             salaryRows.push(...allData.filter(r => r.indicator_name === branch));
         }
