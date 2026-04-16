@@ -191,8 +191,14 @@ function renderSalaryTableV2(allData, showYears, year, month) {
     // Show only branches that have data for the selected year
     const branchNames = [];
     const salaryRows = [];
+    console.log(`[salary debug] year=${year}, configBranches=${configBranches.length}`);
     for (const branch of configBranches) {
-        const hasYearData = allData.some(r => r.indicator_name === branch && r.year === year && r.value_numeric != null);
+        const branchRecords = allData.filter(r => r.indicator_name === branch);
+        const yearRecords = branchRecords.filter(r => r.year === year && r.value_numeric != null);
+        const hasYearData = yearRecords.length > 0;
+        if (branch === 'Південний' || branch === 'Північний') {
+            console.log(`[salary debug] ${branch}: total=${branchRecords.length}, year${year}=${yearRecords.length}, hasData=${hasYearData}`, yearRecords);
+        }
         if (hasYearData) {
             branchNames.push(branch);
             salaryRows.push(...allData.filter(r => r.indicator_name === branch));
