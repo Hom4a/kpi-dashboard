@@ -222,15 +222,25 @@ function computeDerived(formulaId, allData, year, month) {
 
 export function getPastYearValue(config, allData, year) {
     const ann = findAnnualRecord(config.name, allData, year);
-    if (!ann) return { value: null, display: '—' };
-    if (ann.value_text === '-' || ann.value_text === '*' || ann.value_text === 'Х') {
-        return { value: null, display: ann.value_text };
+    if (ann) {
+        if (ann.value_text === '-' || ann.value_text === '*' || ann.value_text === 'Х') {
+            return { value: null, display: ann.value_text };
+        }
+        if (isVolPriceText(ann.value_text)) {
+            return { value: ann.value_numeric, display: toSlash(ann.value_text) };
+        }
+        if (ann.value_numeric != null) {
+            return { value: ann.value_numeric, display: fN(ann.value_numeric) };
+        }
+        if (ann.value_text) return { value: null, display: ann.value_text };
     }
-    if (isVolPriceText(ann.value_text)) {
-        return { value: ann.value_numeric, display: toSlash(ann.value_text) };
-    }
-    if (ann.value_numeric != null) {
-        return { value: ann.value_numeric, display: fN(ann.value_numeric) };
+    // Fallback: compute from monthly records (if no annual record)
+    const monthly = allData.filter(r =>
+        r.year === year && r.month > 0 && r.value_numeric != null &&
+        nameMatches(config.name, r.indicator_name)
+    );
+    if (monthly.length) {
+        return computeYtd(config, allData, year, 12);
     }
     if (ann.value_text) return { value: null, display: ann.value_text };
     return { value: null, display: '—' };
