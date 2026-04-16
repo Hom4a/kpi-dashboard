@@ -76,10 +76,10 @@ function extractUnit(name) {
 
 function normalizeName(name) {
     return name
-        .replace(/\bцін реалізації\b/gi, 'ціна реалізації')  // typo "цін" → "ціна"
-        .replace(/\s*\(без ПДВ\)\s*/gi, '')                   // remove "(без ПДВ)" suffix
+        .replace(/цін реалізації/gi, 'ціна реалізації')       // typo "цін" → "ціна" (no \b — broken with Cyrillic in JS)
+        .replace(/\(без ПДВ\)/gi, '')                          // remove "(без ПДВ)" suffix
         .replace(/Лісовідновлення\(/gi, 'Лісовідновлення (')  // missing space before (
-        .replace(/\*+$/, '')                                   // trailing asterisks (зарплати)
+        .replace(/\*+$/, '')                                   // trailing asterisks
         .replace(/\s+/g, ' ').trim();                          // normalize whitespace
 }
 

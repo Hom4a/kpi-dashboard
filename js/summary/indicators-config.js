@@ -112,9 +112,9 @@ const _byId = new Map(_allIndicators.map(i => [i.id, i]));
 const _byName = new Map();
 function _norm(s) {
     return s.toLowerCase()
-        .replace(/\bцін реалізації\b/g, 'ціна реалізації')  // typo in some Excel sheets
-        .replace(/\s*\(без пдв\)\s*/g, '')                    // remove "(без ПДВ)" suffix
-        .replace(/\*+$/, '')                                   // trailing asterisks
+        .replace(/цін реалізації/g, 'ціна реалізації')  // typo in some Excel sheets (no \b — broken with Cyrillic in JS)
+        .replace(/\(без пдв\)/g, '')                     // remove "(без ПДВ)" suffix
+        .replace(/\*+$/, '')                              // trailing asterisks
         .replace(/\s+/g, ' ').trim();
 }
 for (const ind of _allIndicators) {
