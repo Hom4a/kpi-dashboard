@@ -222,6 +222,11 @@ function computeDerived(formulaId, allData, year, month) {
 
 export function getPastYearValue(config, allData, year) {
     const ann = findAnnualRecord(config.name, allData, year);
+    if (!ann && config.id === 'price_round') {
+        console.warn(`[v2 debug] price_round year=${year}: no annual record found. Searching in ${allData.filter(r => r.year === year && r.month === 0).length} annual records.`);
+        const candidates = allData.filter(r => r.year === year && r.month === 0).map(r => r.indicator_name).slice(0, 5);
+        console.warn(`[v2 debug] Sample annual names for ${year}:`, candidates);
+    }
     if (ann) {
         if (ann.value_text === '-' || ann.value_text === '*' || ann.value_text === 'Х') {
             return { value: null, display: ann.value_text };
