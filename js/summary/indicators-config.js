@@ -110,7 +110,13 @@ const _byId = new Map(_allIndicators.map(i => [i.id, i]));
 
 // Name lookup: normalized name → config
 const _byName = new Map();
-function _norm(s) { return s.toLowerCase().replace(/\s+/g, ' ').trim(); }
+function _norm(s) {
+    return s.toLowerCase()
+        .replace(/\bцін реалізації\b/g, 'ціна реалізації')  // typo in some Excel sheets
+        .replace(/\s*\(без пдв\)\s*/g, '')                    // remove "(без ПДВ)" suffix
+        .replace(/\*+$/, '')                                   // trailing asterisks
+        .replace(/\s+/g, ' ').trim();
+}
 for (const ind of _allIndicators) {
     _byName.set(_norm(ind.name), ind);
 }
