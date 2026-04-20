@@ -31,10 +31,17 @@ export function isVolPriceText(t) {
  * Match indicator name: exact first, then startsWith for short names.
  * Handles DB variants like "ПДФО  млн. грн" matching config "ПДФО".
  */
+// Processing sub-types: short generic names used in multiple blocks.
+// Must match EXACTLY to avoid cross-block match with tax "інші млн. грн" etc.
+const SUBITEM_EXACT_ONLY = new Set(['інші', 'дуб', 'хвойні']);
+
 export function nameMatches(configName, dbName) {
     const cn = normalizeLookup(configName);
     const dn = normalizeLookup(dbName);
     if (cn === dn) return true;
+    // Sub-items (processing sub-types) — exact match only to prevent
+    // cross-block collision with "інші млн. грн" (tax) etc.
+    if (SUBITEM_EXACT_ONLY.has(cn)) return false;
     // Don't match short generic names with vol/price indicators from another block
     // e.g. "дуб" should NOT match "дуб тис. м3/сер. ціна грн"
     if (dn.includes('м3/сер') || dn.includes('тис. м3/')) {
