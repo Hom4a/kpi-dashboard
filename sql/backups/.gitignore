@@ -1,0 +1,7 @@
+# Binary pg_dump archives — never commit DB snapshots
+*.dump
+*.sql.gz
+*.tar.gz
+# Allow README
+!README.md
+!.gitignore
