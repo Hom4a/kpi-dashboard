@@ -12,15 +12,38 @@ from etl.db.code_mapper import (
     species_python_to_db,
 )
 
+# ``etl/metrics.py`` predates migration 15 for these three names. The
+# code_mapper bridges to the post-mig15 DB vocabulary; the rest of the
+# mapping is identity.
+_KNOWN_RENAMES: dict[str, str] = {
+    "arrears_budget_mln":  "budget_overdue_mln",
+    "arrears_pf_mln":      "pf_overdue_mln",
+    "avg_wood_price_grn":  "avg_unit_price_grn",
+}
 
-def test_python_to_db_identity_for_all_known_codes() -> None:
-    """Post-migration-15 mapping is identity for every Python code."""
+
+def test_python_to_db_resolves_every_entry() -> None:
+    """``python_to_db`` returns the value declared in the map for each key."""
     for py_code, db_code in CODE_MAP_PYTHON_TO_DB.items():
         assert python_to_db(py_code) == db_code
+
+
+def test_python_to_db_identity_outside_known_renames() -> None:
+    """All entries not in ``_KNOWN_RENAMES`` are identity."""
+    for py_code, db_code in CODE_MAP_PYTHON_TO_DB.items():
+        if py_code in _KNOWN_RENAMES:
+            continue
         assert py_code == db_code, (
             f"Identity invariant broken for {py_code!r} → {db_code!r}; "
-            f"if you changed the DB schema, sync the mapping."
+            f"if you intentionally renamed, add to _KNOWN_RENAMES."
         )
+
+
+def test_known_renames_match_mapping() -> None:
+    """The 3 documented mig15 renames resolve to the expected DB codes."""
+    for py_code, expected_db in _KNOWN_RENAMES.items():
+        assert python_to_db(py_code) == expected_db
+        assert db_to_python(expected_db) == py_code
 
 
 def test_round_trip_preserves_metric_code() -> None:

@@ -23,8 +23,14 @@ class UnknownMetricError(KeyError):
     behaviour.
     """
 
-# Identity map for all 39 metric codes (post-migration-15 vocabulary).
-# Order mirrors etl/metrics.py::METRIC_ALIASES.
+# Mapping of all 39 Python-side metric codes to their DB-side
+# ``indicator.code`` equivalents. Most entries are identity — migration 15
+# applied the rename DB-side first, so Python and DB agreed on those.
+#
+# Three rows are NOT identity — Python's ``etl/metrics.py`` predates the
+# rename and still emits the historical names. ``code_mapper`` is the
+# one place that bridges the gap. If we ever rename ``etl/metrics.py``
+# keys to match the DB, these three lines become identity again.
 CODE_MAP_PYTHON_TO_DB: dict[str, str] = {
     # M_FIN
     "fin_stability_coef":      "fin_stability_coef",
@@ -34,8 +40,8 @@ CODE_MAP_PYTHON_TO_DB: dict[str, str] = {
     "receivables_mln":         "receivables_mln",
     "payables_mln":            "payables_mln",
     "cash_balance_mln":        "cash_balance_mln",
-    "budget_overdue_mln":      "budget_overdue_mln",
-    "pf_overdue_mln":          "pf_overdue_mln",
+    "arrears_budget_mln":      "budget_overdue_mln",   # rename: pre-mig15 → mig15
+    "arrears_pf_mln":          "pf_overdue_mln",
     # M_REV
     "revenue_total_mln":       "revenue_total_mln",
     "revenue_roundwood_mln":   "revenue_roundwood_mln",
@@ -51,7 +57,7 @@ CODE_MAP_PYTHON_TO_DB: dict[str, str] = {
     "sale_pv_firewood_price_grn": "sale_pv_firewood_price_grn",
     "sale_np_firewood_km3":    "sale_np_firewood_km3",
     "sale_np_firewood_price_grn": "sale_np_firewood_price_grn",
-    "avg_unit_price_grn":      "avg_unit_price_grn",
+    "avg_wood_price_grn":      "avg_unit_price_grn",   # rename: pre-mig15 → mig15
     # M_FOR
     "harvest_total_km3":       "harvest_total_km3",
     "harvest_main_km3":        "harvest_main_km3",
