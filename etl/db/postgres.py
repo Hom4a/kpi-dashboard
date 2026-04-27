@@ -47,6 +47,15 @@ class PostgresRepository(Repository):
     """
 
     def __init__(self, conn: PgConnection) -> None:
+        # Register psycopg2 UUID adapter at module level (idempotent).
+        # Without this, execute_values() in _bulk_insert_revisions cannot
+        # bind Python uuid.UUID objects to SQL UUID columns (indicator_id,
+        # upload_batch_id, etc.) and raises:
+        #   ProgrammingError: can't adapt type 'UUID'
+        # Note: registration is GLOBAL to psycopg2 — first Repository
+        # instantiation suffices for all downstream code.
+        from psycopg2.extras import register_uuid  # type: ignore[import-untyped]
+        register_uuid()
         self._conn = conn
         # Per-instance cache so tests can spin up a fresh repo without
         # leaking indicator-id resolutions from a prior run.
@@ -334,7 +343,7 @@ class PostgresRepository(Repository):
         the same WriteBatch is replayed, duplicate revisions collide on the
         partial unique indexes from migration 17 and are silently skipped.
         """
-        from psycopg2.extras import execute_values  # type: ignore[import-untyped]  # lazy import
+        from psycopg2.extras import execute_values  # lazy import
 
         cols = ", ".join(cls._INSERT_REVISION_COLS)
         sql = f"INSERT INTO fact_revisions ({cols}) VALUES %s ON CONFLICT DO NOTHING"
