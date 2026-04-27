@@ -98,9 +98,24 @@ def open_connection(
         ssh_username=cfg["SSH_USER"],
         ssh_pkey=ssh_key,
         remote_bind_address=(cfg["DB_HOST"], int(cfg["DB_PORT"])),
+        # Keepalive prevents firewall/NAT idle-timeout from killing the
+        # tunnel during a long write_batch transaction.
+        set_keepalive=10.0,
         # local_bind_port omitted → sshtunnel picks a free port.
     )
     tunnel.start()
+    # ``start()`` returns asynchronously while internal checkup channels
+    # are still tearing down (DEBUG logs show "EOF in transport thread"
+    # right after start). A psycopg2.connect() racing with that cleanup
+    # surfaces as "connection already closed". ``check_tunnels()`` makes
+    # the wait deterministic — it actively probes the forwarded socket
+    # instead of relying on a magic time.sleep(0.5).
+    tunnel.check_tunnels()
+    if not tunnel.is_active:
+        tunnel.stop()
+        raise RuntimeError(
+            f"SSH tunnel to {cfg['DB_HOST']}:{cfg['DB_PORT']} did not come up"
+        )
     try:
         conn = psycopg2.connect(
             host="127.0.0.1",
@@ -108,6 +123,9 @@ def open_connection(
             dbname=cfg["DB_NAME"],
             user=cfg["DB_USER"],
             password=cfg["DB_PASSWORD"],
+            # Surface tunnel/network failures as a clean error instead
+            # of an indefinite hang.
+            connect_timeout=10,
         )
         try:
             yield conn
