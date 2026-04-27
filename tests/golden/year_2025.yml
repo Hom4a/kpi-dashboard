@@ -1,0 +1,67 @@
+source_file: 2025_рік.xlsx
+year: 2025
+
+monthly:
+  revenue_total_mln:
+    "2025-01": 1283.893896
+    "2025-02": 2048.6638200000002
+    "2025-03": 2488.1653793800001
+    "2025-06": 2739.9727819999998
+    "2025-12": 2749.8090793033298
+
+  revenue_roundwood_mln:
+    "2025-01": 1277.46902
+    "2025-12": 2717.00261744
+
+  harvest_total_km3:
+    "2025-01": 401.38200000000001
+    "2025-06": 1052.1869999999999
+    "2025-12": 1244.0920000000001
+
+  headcount:
+    "2025-01": 20671
+    "2025-06": 22863
+    "2025-12": 21641
+
+  payroll_fund_mln:
+    "2025-01": 455.06099999999998
+    "2025-12": 1132.4549999999999
+
+  sale_roundwood_km3:
+    "2025-01": 249
+    "2025-12": 367
+
+  sale_roundwood_price_grn:
+    "2025-03": 3881
+    "2025-12": 5175
+
+  tax_total_mln:
+    "2025-01": 388.54349999999999
+    "2025-12": 913.14483500000097
+
+annual_ytd:
+  revenue_total_mln: 29870.534018819999
+  revenue_roundwood_mln: 29670.762130822
+  harvest_total_km3: 11549.830000000002
+  sale_roundwood_km3: 4992
+  headcount: 22192.333333333332
+  payroll_fund_mln: 8169.6479999999992
+  tax_total_mln: 15816.794135
+
+species_monthly:
+  oak:
+    "2025-03": {volume_km3: 51, avg_price_grn: 10902}
+    "2025-12": {volume_km3: 34, avg_price_grn: 14820}
+  pine:
+    "2025-03": {volume_km3: 275, avg_price_grn: 3149}
+    "2025-12": {volume_km3: 213, avg_price_grn: 4054}
+  alder_birch:
+    "2025-03": {volume_km3: 36, avg_price_grn: 3313}
+  other:
+    "2025-03": {volume_km3: 137, avg_price_grn: 2882}
+
+species_annual:
+  oak: {volume_km3: 437, avg_price_grn: 13082.60}
+  pine: {volume_km3: 2970, avg_price_grn: 3536.30}
+  alder_birch: {volume_km3: 366, avg_price_grn: 4907.95}
+  other: {volume_km3: 1219, avg_price_grn: 3414.00}

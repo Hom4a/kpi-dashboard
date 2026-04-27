@@ -1,0 +1,132 @@
+source_file: Основні_показники_березень_2026_остання.xlsx
+report_period:
+  year: 2026
+  month: 3
+  label: березень 2026
+
+operational:
+  payroll_fund_mln:
+    y2022: 8436.5
+    y2023: 7511.9702489999991
+    y2024: 6953.6727680000004
+    y2025: 8169.6479999999992
+    y2026_ytd: 2475.0940819999996
+    march_2026: 1282.1579999999999
+  headcount:
+    y2022: 36033
+    y2023: 29818.333333333332
+    y2024: 23627.883333333331
+    y2025: 22192.333333333332
+    y2026_ytd: 21494.666666666668
+    march_2026: 21896
+  avg_salary_grn:
+    y2022: 19511
+    y2023: 20993.670854060703
+    y2024: 24524.969848477049
+    y2025: 30677.212100274872
+    y2026_ytd: 38383.167204267724
+    march_2026: 58557
+  revenue_total_mln:
+    y2022: 23309
+    y2023: 23044.804234169998
+    y2024: 23102.176261199998
+    y2025: 29870.534018819999
+    y2026_ytd: 8595.366
+    march_2026: 3476.2959999999998
+  revenue_roundwood_mln:
+    y2022: 18828
+    y2023: 20214.283982000004
+    y2024: 22664.437236199999
+    y2025: 29670.762130822
+    y2026_ytd: 8557.2360000000008
+    march_2026: 3455.81
+  harvest_total_km3:
+    y2022: 13511.9
+    y2023: 12810.801853999999
+    y2024: 12331.195
+    y2025: 11549.830000000002
+    y2026_ytd: 2922.2950000000001
+    march_2026: 1232.2190000000001
+  sale_roundwood_km3:
+    y2022: 4188.1000000000004
+    y2023: 5050.4070000000002
+    y2024: 5757
+    y2025: 4992
+    y2026_ytd: 1042
+    march_2026: 442
+  sale_roundwood_price_grn:
+    y2022: 3055.6
+    y2023: 2739.1413322253038
+    y2024: 2874.4806322737536
+    y2025: 4443.9707532051279
+    y2026_ytd: 5961.8848368522076
+    march_2026: 5626
+  receivables_mln:
+    y2022: null
+    y2023: 341.72087000000198
+    y2024: 222.70767000000001
+    y2025: 529.11058000000003
+    y2026_ytd: null
+    march_2026: 973.36879999999996
+  payables_mln:
+    y2022: null
+    y2023: 3232.3313240100001
+    y2024: 2447.7364299999999
+    y2025: 4428.12183
+    y2026_ytd: null
+    march_2026: 5941.8217000000004
+  cash_balance_mln:
+    y2022: 285.39999999999998
+    y2023: 1045.03
+    y2024: 1315.53024968
+    y2025: 3573.91874426
+    y2026_ytd: null
+    march_2026: 5024.4589288699999
+
+species:
+  alder_birch:
+    y2022: {volume_km3: 360.6, avg_price_grn: 2318.7}
+    y2023: {volume_km3: 366.82, avg_price_grn: 3189.61}
+    y2024: {volume_km3: 426, avg_price_grn: 2279.68}
+    y2025: {volume_km3: 366, avg_price_grn: 4907.95}
+    y2026_ytd: {volume_km3: 102, avg_price_grn: 5552}
+    march_2026: {volume_km3: 31, avg_price_grn: 5730}
+  pine:
+    y2024: {volume_km3: 3597, avg_price_grn: 2078.18}
+    y2025: {volume_km3: 2970, avg_price_grn: 3536.30}
+    march_2026: {volume_km3: 253, avg_price_grn: 4357}
+  oak:
+    y2024: {volume_km3: 441, avg_price_grn: 11005.66}
+    y2025: {volume_km3: 437, avg_price_grn: 13082.60}
+    march_2026: {volume_km3: 35, avg_price_grn: 18600}
+  other:
+    y2025: {volume_km3: 1219, avg_price_grn: 3414.00}
+    march_2026: {volume_km3: 123, avg_price_grn: 4487}
+
+text_only:
+  # Pending markers preserved from the Excel cell verbatim. Numeric value
+  # is null — these facts exist to surface the pending status downstream.
+  fin_stability_coef:
+    y2026_ytd:
+      value: null
+      value_text: "до 01.03.2027"
+    march_2026:
+      value: null
+      value_text: "до 25.04.2026"
+
+taxes:
+  tax_total_mln:
+    y2022: 9647.9
+    y2023: 10556.375555989998
+    y2024: 8996.5969999999998
+    y2025: 15816.794135
+    y2026_ytd: 4060.3996009699995
+    march_2026: 2337.0499009699997
+  tax_vat_mln:
+    y2023: 3337.3395699999996
+    y2025: 4364.4391999999998
+    march_2026: 458.28730000000007
+  tax_profit_mln:
+    y2024: 822.37829999999997
+    y2025: 1612.88219
+    march_2026: 97.063199999999995
