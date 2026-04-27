@@ -6,10 +6,22 @@ insurance: if the DB schema later diverges (e.g. a sister project with
 different conventions), only this file changes — the rest of the ETL is
 oblivious to the rename.
 
-Unknown code → ``KeyError`` with a clear message. We deliberately avoid
-silent fallback: a typo in metric_code is a bug that should fail loudly.
+Unknown code → ``UnknownMetricError`` (subclass of ``KeyError``) with a
+clear message. We deliberately avoid silent fallback: a typo in metric_code
+is a bug that should fail loudly. Callers that need to react specifically
+to unknown-metric failures (e.g. CLI exit codes) can ``except`` the
+narrower class without resorting to message-substring matching.
 """
 from __future__ import annotations
+
+
+class UnknownMetricError(KeyError):
+    """Raised when a metric_code / species_code has no DB-side mapping.
+
+    Inherits from ``KeyError`` so that legacy ``except KeyError`` handlers
+    keep working; new code can ``except UnknownMetricError`` for precise
+    behaviour.
+    """
 
 # Identity map for all 39 metric codes (post-migration-15 vocabulary).
 # Order mirrors etl/metrics.py::METRIC_ALIASES.
@@ -84,7 +96,7 @@ def python_to_db(metric_code: str) -> str:
     try:
         return CODE_MAP_PYTHON_TO_DB[metric_code]
     except KeyError as exc:
-        raise KeyError(
+        raise UnknownMetricError(
             f"Unknown Python metric_code: {metric_code!r}. "
             f"Add it to CODE_MAP_PYTHON_TO_DB in etl/db/code_mapper.py."
         ) from exc
@@ -95,7 +107,7 @@ def db_to_python(db_code: str) -> str:
     try:
         return CODE_MAP_DB_TO_PYTHON[db_code]
     except KeyError as exc:
-        raise KeyError(
+        raise UnknownMetricError(
             f"Unknown DB indicator.code: {db_code!r}. "
             f"Add reverse mapping to CODE_MAP_PYTHON_TO_DB."
         ) from exc
@@ -106,7 +118,7 @@ def species_python_to_db(species_code: str) -> str:
     try:
         return SPECIES_CODE_MAP_PYTHON_TO_DB[species_code]
     except KeyError as exc:
-        raise KeyError(
+        raise UnknownMetricError(
             f"Unknown Python species code: {species_code!r}. "
             f"Add it to SPECIES_CODE_MAP_PYTHON_TO_DB."
         ) from exc
@@ -117,7 +129,7 @@ def species_db_to_python(db_code: str) -> str:
     try:
         return SPECIES_CODE_MAP_DB_TO_PYTHON[db_code]
     except KeyError as exc:
-        raise KeyError(
+        raise UnknownMetricError(
             f"Unknown DB species indicator.code: {db_code!r}. "
             f"Add reverse mapping to SPECIES_CODE_MAP_PYTHON_TO_DB."
         ) from exc
