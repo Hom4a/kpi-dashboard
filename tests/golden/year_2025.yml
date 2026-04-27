@@ -65,3 +65,17 @@ species_annual:
   pine: {volume_km3: 2970, avg_price_grn: 3536.30}
   alder_birch: {volume_km3: 366, avg_price_grn: 4907.95}
   other: {volume_km3: 1219, avg_price_grn: 3414.00}
+
+# «Довідково» reference text rows — content is asserted via substring
+# match (content_contains) so we tolerate minor formatting drift between
+# Excel exports.
+reference:
+  - category: subsistence_minimum
+    month: 0
+    content_contains: "3028"
+  - category: electricity_population
+    month: 0
+    content_contains: "для населення"
+  - category: gas_population
+    month: 0
+    content_contains: "для населення"

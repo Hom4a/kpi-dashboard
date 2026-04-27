@@ -5,7 +5,7 @@ from datetime import datetime
 
 from etl.db.batch import build_batch_from_canonical
 from etl.db.fake import FakeRepository
-from etl.models import AnnualValue, MonthlyValue, SpeciesAnnual
+from etl.models import AnnualValue, MonthlyValue, ReferenceText, SpeciesAnnual
 
 
 def _annual(
@@ -389,3 +389,136 @@ def test_text_only_annual_value_round_trips() -> None:
     assert canonical is not None
     assert canonical.value is None
     assert canonical.value_text == "до 25.04.2026"
+
+
+# ---------------------------------------------------------------------
+# Reference text — canonical resolution + history
+# ---------------------------------------------------------------------
+
+def _reference(
+    *,
+    category: str = "subsistence_minimum",
+    year: int = 2025,
+    month: int = 0,
+    content: str,
+    priority: int,
+    vintage: datetime,
+    source_row: int = 92,
+) -> ReferenceText:
+    return ReferenceText(
+        category=category,
+        year=year,
+        month=month,
+        content=content,
+        source_file="src.xlsx",
+        source_row=source_row,
+        vintage_date=vintage,
+        report_type="accounting_ytd" if priority == 20 else "operational",
+        source_priority=priority,
+    )
+
+
+def test_write_reference_creates_canonical() -> None:
+    repo = FakeRepository()
+    fact = _reference(
+        content="Прожитковий мінімум - 3028 грн.",
+        priority=10,
+        vintage=datetime(2026, 1, 31),
+    )
+    repo.write_batch(build_batch_from_canonical(
+        source_file="src.xlsx",
+        vintage_date=fact.vintage_date,
+        reference=[fact],
+    ))
+
+    canonical = repo.get_canonical_reference("subsistence_minimum", 2025, 0)
+    assert canonical is not None
+    assert canonical.content == fact.content
+
+
+def test_write_reference_supersedes_older_vintage() -> None:
+    repo = FakeRepository()
+    older = _reference(
+        content="old content",
+        priority=10,
+        vintage=datetime(2026, 1, 31),
+    )
+    newer = _reference(
+        content="new content",
+        priority=10,
+        vintage=datetime(2026, 4, 30),
+    )
+    repo.write_batch(build_batch_from_canonical(
+        source_file="a.xlsx",
+        vintage_date=older.vintage_date,
+        reference=[older],
+    ))
+    res = repo.write_batch(build_batch_from_canonical(
+        source_file="b.xlsx",
+        vintage_date=newer.vintage_date,
+        reference=[newer],
+    ))
+
+    assert res.rows_to_canonical == 1
+    assert res.rows_superseded == 1
+    canonical = repo.get_canonical_reference("subsistence_minimum", 2025, 0)
+    assert canonical is not None
+    assert canonical.content == "new content"
+
+
+def test_write_reference_higher_priority_wins_over_newer_vintage() -> None:
+    """Priority outranks vintage — accounting_ytd snapshot taken with an
+    older vintage_date still beats a newer operational note."""
+    repo = FakeRepository()
+
+    operational_newer = _reference(
+        content="operational note",
+        priority=10,
+        vintage=datetime(2026, 4, 30),
+    )
+    accounting_older = _reference(
+        content="accounting close",
+        priority=20,
+        vintage=datetime(2026, 1, 31),
+    )
+    repo.write_batch(build_batch_from_canonical(
+        source_file="a.xlsx",
+        vintage_date=operational_newer.vintage_date,
+        reference=[operational_newer],
+    ))
+    repo.write_batch(build_batch_from_canonical(
+        source_file="b.xlsx",
+        vintage_date=accounting_older.vintage_date,
+        reference=[accounting_older],
+    ))
+
+    canonical = repo.get_canonical_reference("subsistence_minimum", 2025, 0)
+    assert canonical is not None
+    assert canonical.content == "accounting close"
+    assert canonical.source_priority == 20
+
+
+def test_get_revision_history_reference() -> None:
+    repo = FakeRepository()
+    v1 = _reference(
+        content="content v1",
+        priority=10,
+        vintage=datetime(2026, 1, 31),
+    )
+    v2 = _reference(
+        content="content v2",
+        priority=10,
+        vintage=datetime(2026, 3, 31),
+    )
+    for fact in (v1, v2):
+        repo.write_batch(build_batch_from_canonical(
+            source_file="src.xlsx",
+            vintage_date=fact.vintage_date,
+            reference=[fact],
+        ))
+
+    history = repo.get_revision_history(
+        "reference", "subsistence_minimum", 2025, month=0
+    )
+    contents = [r.content for r in history]  # type: ignore[union-attr]
+    assert contents == ["content v1", "content v2"]  # oldest first

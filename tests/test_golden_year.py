@@ -214,6 +214,47 @@ def test_species_annual_matches_golden(
 
 
 # ---------------------------------------------------------------------------
+# Reference («Довідково») rows — substring assertion (year-file → month=0)
+# ---------------------------------------------------------------------------
+
+def _gather_reference_cases() -> list[tuple[str, int, str]]:
+    items = _golden.get("reference", [])
+    return [(it["category"], it["month"], it["content_contains"]) for it in items]
+
+
+_REFERENCE_CASES = _gather_reference_cases()
+
+
+@pytest.mark.parametrize(
+    "category,month,content_contains",
+    _REFERENCE_CASES,
+    ids=[f"{c[0]}/m{c[1]}" for c in _REFERENCE_CASES],
+)
+def test_reference_matches_golden(
+    category: str,
+    month: int,
+    content_contains: str,
+    parsed: ParseResult,
+) -> None:
+    """Each reference golden entry must surface as a ParseResult.reference
+    row whose ``content`` contains the expected substring."""
+    match = next(
+        (
+            r for r in parsed.reference
+            if r.category == category and r.month == month
+        ),
+        None,
+    )
+    assert match is not None, (
+        f"parser missing reference fact for {category}/m{month}"
+    )
+    assert content_contains in match.content, (
+        f"content for {category}/m{month} does not contain "
+        f"{content_contains!r}; got {match.content!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Health invariants
 # ---------------------------------------------------------------------------
 

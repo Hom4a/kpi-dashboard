@@ -17,7 +17,15 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from .metrics import is_ignored, resolve_metric, resolve_species
-from .models import AnnualValue, MonthlyValue, ParseResult, SpeciesAnnual, SpeciesMonthly
+from .models import (
+    AnnualValue,
+    MonthlyValue,
+    ParseResult,
+    ReferenceText,
+    SpeciesAnnual,
+    SpeciesMonthly,
+)
+from .parsers_reference import extract_reference_block
 from .report_metadata import infer_report_metadata
 from .utils import parse_composite_cell, safe_number
 
@@ -83,6 +91,7 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
     monthly: list[MonthlyValue] = []
     species_annual: list[SpeciesAnnual] = []
     species_monthly: list[SpeciesMonthly] = []
+    reference: list[ReferenceText] = []
     warnings: list[str] = list(meta.warnings)
     errors: list[str] = []
 
@@ -90,6 +99,14 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
         warnings.append(
             f"could not parse current month header: '{current_month_header}'"
         )
+
+    # Pick coordinates for reference rows: monthly snapshot if the header
+    # carried a current-month label, otherwise fall back to the last YTD
+    # year with month=0 (annual snapshot).
+    if current_year is not None and current_month is not None:
+        ref_year, ref_month = current_year, current_month
+    else:
+        ref_year, ref_month = ANNUAL_COLUMNS[-1][1], 0
 
     for row_idx in range(header_row + 1, ws.max_row + 1):
         a_raw = ws.cell(row_idx, 1).value
@@ -199,11 +216,27 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
             if warn and warn != "empty_marker":
                 warnings.append(f"row {row_idx} col 7 {metric_code}: {warn}")
 
+    # «Довідково» — extracted post-loop, independent of metric scanning.
+    # ws here is worksheets[0] only (osnovni multi-sheet copies on
+    # year-sheets are not iterated, satisfying edge-case E1).
+    ref_rows, ref_warns = extract_reference_block(
+        ws,
+        year=ref_year,
+        month=ref_month,
+        source_file=path_str,
+        vintage_date=meta.vintage_date,
+        report_type=meta.report_type,
+        source_priority=meta.source_priority,
+    )
+    reference.extend(ref_rows)
+    warnings.extend(ref_warns)
+
     return ParseResult(
         annual=annual,
         monthly=monthly,
         species_annual=species_annual,
         species_monthly=species_monthly,
+        reference=reference,
         warnings=warnings,
         errors=errors,
     )

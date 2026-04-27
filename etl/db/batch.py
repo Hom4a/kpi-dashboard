@@ -4,7 +4,13 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import uuid4
 
-from etl.models import AnnualValue, MonthlyValue, SpeciesAnnual, SpeciesMonthly
+from etl.models import (
+    AnnualValue,
+    MonthlyValue,
+    ReferenceText,
+    SpeciesAnnual,
+    SpeciesMonthly,
+)
 
 from .interface import WriteBatch
 
@@ -17,6 +23,7 @@ def build_batch_from_canonical(
     monthly: list[MonthlyValue] | None = None,
     species_annual: list[SpeciesAnnual] | None = None,
     species_monthly: list[SpeciesMonthly] | None = None,
+    reference: list[ReferenceText] | None = None,
 ) -> WriteBatch:
     """Pack canonical-resolution output into a single ``WriteBatch``.
 
@@ -32,4 +39,5 @@ def build_batch_from_canonical(
         monthly=list(monthly or []),
         species_annual=list(species_annual or []),
         species_monthly=list(species_monthly or []),
+        reference=list(reference or []),
     )

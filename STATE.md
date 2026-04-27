@@ -63,6 +63,15 @@ Tracking here so future sessions don't conflate them with our work.
    always NULL — text content cannot be charted). Frontend should
    skip modal opening for indicator_group='reference' or render
    text-only info card. Deferred to post-pipeline UI rework.
+6. v_admin_revisions ORDER BY clause is wrong: uses
+   ``vintage_date DESC, source_priority DESC`` but the design
+   contract (set in step 4.5) is priority-first, vintage as tie-
+   breaker. Edge case: an operational report with newer vintage
+   would falsely win over an earlier accounting_ytd close.
+   Python repository (etl/db/) uses correct order
+   (priority DESC, vintage DESC). Fix via migration 17 — recreate
+   v_admin_revisions with swapped ORDER BY. Discovered during
+   sub-step 5.3.2 review.
 
 Impact: profile fetch fails for fresh logins → some downstream
 features may be partially broken. NOT blocking summary tab
@@ -71,3 +80,34 @@ indicators-loader receives 49 active codes correctly).
 
 Decision: deferred. Address after pipeline stable.
 Out of scope for current sub-step 5.3.x.
+
+## Sub-step 5.3.4 — Reference text propagation (DONE)
+
+Завершено 28.04.2026. Reference block ("Довідково") тепер парситься,
+canonical-резолвиться, пишеться через write_batch у reference_text.
+
+- 14 slug-категорій (subsistence_minimum, min_wage, country_avg_salary,
+  electricity_population/business, gas_population/business,
+  fuel_diesel/a95/a92, food_bread_rye/eggs/pork/lard).
+- Migration 18 (idx_fact_revisions_unique_reference) applied.
+- 8 tests for extract_reference_block + 4 tests for FakeRepository
+  reference branch + 1 test for CLI summary + golden YAML expansions.
+- Both parsers (osnovni + annual_monthly) integrated.
+- 13 reference rows confirmed on 2025_рік.xlsx and Основні_*_2026.
+
+## Issue 7 (deferred) — canonical_* tie-breaker inconsistency in Python
+
+canonical_reference uses (priority, vintage, source_row) for
+deterministic tie-breaks. canonical_annual / canonical_monthly /
+canonical_species_* use only (priority, vintage) — same-vintage same-
+priority facts give non-deterministic output.
+
+Related to Issue 6 (v_admin_revisions ORDER BY in SQL): both stem
+from inconsistent tie-breaker semantics. SQL view and Python
+canonical_reference now both use (priority, vintage) — fix Issue 6
+SQL side first, then mirror in canonical_annual / monthly / species
+to make the entire stack consistent.
+
+Not critical today (production data doesn't hit this case yet),
+but warrants refactor when adding next polymorphic entity.
+See etl/canonical.py:69-104 for the pattern to apply.

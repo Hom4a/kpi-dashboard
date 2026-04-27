@@ -15,11 +15,19 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import Literal, TypeVar
 
-from etl.models import AnnualValue, MonthlyValue, SpeciesAnnual, SpeciesMonthly
+from etl.models import (
+    AnnualValue,
+    MonthlyValue,
+    ReferenceText,
+    SpeciesAnnual,
+    SpeciesMonthly,
+)
 
 from .interface import Repository, WriteBatch, WriteResult
 
-FactKind = Literal["annual", "monthly", "species_annual", "species_monthly"]
+FactKind = Literal[
+    "annual", "monthly", "species_annual", "species_monthly", "reference",
+]
 
 # Type aliases for revision keys per kind. Each key is enough to identify
 # a single canonical slot in the underlying fact table.
@@ -27,7 +35,8 @@ AnnualKey = tuple[Literal["annual"], str, int]                  # (kind, metric,
 MonthlyKey = tuple[Literal["monthly"], str, int, int]           # (kind, metric, year, month)
 SpAnnualKey = tuple[Literal["species_annual"], str, int]
 SpMonthlyKey = tuple[Literal["species_monthly"], str, int, int]
-RevisionKey = AnnualKey | MonthlyKey | SpAnnualKey | SpMonthlyKey
+ReferenceKey = tuple[Literal["reference"], str, int, int]       # (kind, category, year, month)
+RevisionKey = AnnualKey | MonthlyKey | SpAnnualKey | SpMonthlyKey | ReferenceKey
 
 
 _FactType = TypeVar(
@@ -49,7 +58,7 @@ class _Revision:
 
     kind: FactKind
     key: RevisionKey
-    fact: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly
+    fact: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText
     is_canonical: bool = False
     superseded_at: float | None = None  # monotonic timestamp; None = current
 
@@ -70,27 +79,46 @@ def _species_monthly_key(f: SpeciesMonthly) -> SpMonthlyKey:
     return ("species_monthly", f.species, f.year, f.month)
 
 
+def _reference_key(f: ReferenceText) -> ReferenceKey:
+    return ("reference", f.category, f.year, f.month)
+
+
 def _is_higher(
-    candidate: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly,
-    current: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly,
+    candidate: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
+    current: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
 ) -> bool:
-    """``candidate`` outranks ``current`` for canonical purposes."""
-    return (candidate.source_priority, candidate.vintage_date) > (
+    """``candidate`` outranks ``current`` for canonical purposes.
+
+    Reference rows extend the comparison with ``source_row ASC`` as a
+    final tie-breaker (smaller wins) — mirrors ``canonical_reference``
+    in etl/canonical.py. For other kinds the source_row component
+    collapses harmlessly because their inputs already differ on
+    (priority, vintage).
+    """
+    return (
+        candidate.source_priority,
+        candidate.vintage_date,
+        -candidate.source_row,
+    ) > (
         current.source_priority,
         current.vintage_date,
+        -current.source_row,
     )
 
 
 def _fact_signature(
-    f: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly,
+    f: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
 ) -> tuple[object, ...]:
     """Business-identity tuple — used to dedupe identical re-inserts.
 
-    Mirrors the partial unique indexes in ``sql/17-fact-revisions-unique-key.sql``:
+    Mirrors the partial unique indexes in
+    ``sql/17-fact-revisions-unique-key.sql`` and
+    ``sql/18-reference-revisions-unique.sql``:
     ``source_file`` / ``source_row`` are audit metadata only and NOT part
     of identity; re-uploading the same content from a different filename
     is a no-op. ``value_text`` participates for AnnualValue/MonthlyValue
-    (KORREKCJIA 2: species do not carry text values).
+    (KORREKCJIA 2: species do not carry text values). Reference rows use
+    ``content`` as their dedupe payload (mirrors sql/18 unique key).
     """
     if isinstance(f, AnnualValue):
         return (
@@ -110,9 +138,15 @@ def _fact_signature(
             f.volume_km3, f.avg_price_grn,
             f.vintage_date, f.source_priority, f.report_type,
         )
+    if isinstance(f, SpeciesMonthly):
+        return (
+            "species_monthly", f.species, f.year, f.month,
+            f.volume_km3, f.avg_price_grn,
+            f.vintage_date, f.source_priority, f.report_type,
+        )
     return (
-        "species_monthly", f.species, f.year, f.month,
-        f.volume_km3, f.avg_price_grn,
+        "reference", f.category, f.year, f.month,
+        f.content,
         f.vintage_date, f.source_priority, f.report_type,
     )
 
@@ -132,6 +166,7 @@ class FakeRepository(Repository):
         self._canon_monthly: dict[tuple[str, int, int], MonthlyValue] = {}
         self._canon_sp_annual: dict[tuple[str, int], SpeciesAnnual] = {}
         self._canon_sp_monthly: dict[tuple[str, int, int], SpeciesMonthly] = {}
+        self._canon_reference: dict[tuple[str, int, int], ReferenceText] = {}
 
     # ---- Repository protocol -----------------------------------------
 
@@ -159,6 +194,10 @@ class FakeRepository(Repository):
             if self._append(_species_monthly_key(fsm), "species_monthly", fsm):
                 rows_to_revisions += 1
                 affected_keys.add(_species_monthly_key(fsm))
+        for fr in batch.reference:
+            if self._append(_reference_key(fr), "reference", fr):
+                rows_to_revisions += 1
+                affected_keys.add(_reference_key(fr))
 
         for key in affected_keys:
             applied, superseded = self._reapply_canonical(key)
@@ -197,20 +236,32 @@ class FakeRepository(Repository):
     ) -> SpeciesMonthly | None:
         return self._canon_sp_monthly.get((species, year, month))
 
+    def get_canonical_reference(
+        self, category: str, year: int, month: int
+    ) -> ReferenceText | None:
+        return self._canon_reference.get((category, year, month))
+
     def get_revision_history(
         self,
         kind: str,
         entity: str,
         year: int,
         month: int | None = None,
-    ) -> list[AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly]:
-        if kind not in ("annual", "monthly", "species_annual", "species_monthly"):
+    ) -> list[AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText]:
+        valid = (
+            "annual", "monthly", "species_annual", "species_monthly", "reference",
+        )
+        if kind not in valid:
             raise ValueError(f"Unknown kind: {kind!r}")
 
         def _matches(rev: _Revision) -> bool:
             if rev.kind != kind:
                 return False
             f = rev.fact
+            if isinstance(f, ReferenceText):
+                if f.category != entity or f.year != year:
+                    return False
+                return not (month is not None and f.month != month)
             if isinstance(f, (AnnualValue, MonthlyValue)):
                 if f.metric_code != entity or f.year != year:
                     return False
@@ -234,7 +285,7 @@ class FakeRepository(Repository):
         self,
         key: RevisionKey,
         kind: FactKind,
-        fact: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly,
+        fact: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
     ) -> bool:
         """Insert revision unless an identical signature already present."""
         sig = _fact_signature(fact)
@@ -281,7 +332,7 @@ class FakeRepository(Repository):
     def _set_canonical(
         self,
         key: RevisionKey,
-        fact: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly,
+        fact: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
     ) -> None:
         kind = key[0]
         if kind == "annual":
@@ -299,6 +350,11 @@ class FakeRepository(Repository):
             assert isinstance(fact, SpeciesMonthly)
             self._canon_sp_monthly[
                 (fact.species, fact.year, fact.month)
+            ] = fact
+        elif kind == "reference":
+            assert isinstance(fact, ReferenceText)
+            self._canon_reference[
+                (fact.category, fact.year, fact.month)
             ] = fact
 
     # ---- Test helpers (not part of Repository ABC) -------------------

@@ -11,7 +11,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
-from etl.models import AnnualValue, MonthlyValue, SpeciesAnnual, SpeciesMonthly
+from etl.models import (
+    AnnualValue,
+    MonthlyValue,
+    ReferenceText,
+    SpeciesAnnual,
+    SpeciesMonthly,
+)
 
 
 @dataclass(frozen=True)
@@ -29,6 +35,7 @@ class WriteBatch:
     monthly: list[MonthlyValue] = field(default_factory=list)
     species_annual: list[SpeciesAnnual] = field(default_factory=list)
     species_monthly: list[SpeciesMonthly] = field(default_factory=list)
+    reference: list[ReferenceText] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -94,16 +101,23 @@ class Repository(ABC):
         """Read back current canonical species monthly (volume/price)."""
 
     @abstractmethod
+    def get_canonical_reference(
+        self, category: str, year: int, month: int
+    ) -> ReferenceText | None:
+        """Read back current canonical reference text for a category-period."""
+
+    @abstractmethod
     def get_revision_history(
         self,
         kind: str,
         entity: str,
         year: int,
         month: int | None = None,
-    ) -> list[AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly]:
+    ) -> list[AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText]:
         """All historical revisions for an ``(entity, period)``, oldest first.
 
         ``kind`` is one of: ``annual`` / ``monthly`` / ``species_annual`` /
-        ``species_monthly``. ``entity`` is the ``metric_code`` for scalar
-        kinds, or the species code for species kinds.
+        ``species_monthly`` / ``reference``. ``entity`` is the
+        ``metric_code`` for scalar kinds, the species code for species
+        kinds, or the category slug for reference.
         """

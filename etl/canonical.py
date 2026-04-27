@@ -8,7 +8,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TypeVar
 
-from .models import AnnualValue, MonthlyValue, SpeciesAnnual, SpeciesMonthly
+from .models import (
+    AnnualValue,
+    MonthlyValue,
+    ReferenceText,
+    SpeciesAnnual,
+    SpeciesMonthly,
+)
 
 _F = TypeVar(
     "_F",
@@ -57,3 +63,42 @@ def canonical_species_monthly(
 ) -> list[SpeciesMonthly]:
     """One row per ``(species, year, month)``."""
     return _pick_canonical(facts, lambda f: (f.species, f.year, f.month))
+
+
+def canonical_reference(
+    facts: Iterable[ReferenceText],
+) -> list[ReferenceText]:
+    """One row per ``(category, year, month)`` — highest priority,
+    newest vintage, smallest source_row, with deterministic ordering.
+
+    Resolution rule (lexicographic):
+
+        1. Highest ``source_priority`` wins.
+        2. Tie-break by latest ``vintage_date``.
+        3. Final tie-break by smallest ``source_row`` (first occurrence
+           in source). If everything ties, input order decides — the
+           earlier fact stays (the loop's ``>`` comparison preserves it).
+
+    Inlines its own picker rather than reusing ``_pick_canonical`` because
+    that helper does not consider ``source_row`` and we want the contract
+    fully deterministic for reference data (where rerunning a parser on
+    the same workbook must yield byte-identical output for diffing).
+
+    Output is sorted by ``(category, year, month)``.
+    """
+    best: dict[tuple[str, int, int], ReferenceText] = {}
+    for f in facts:
+        k = (f.category, f.year, f.month)
+        current = best.get(k)
+        if current is None:
+            best[k] = f
+            continue
+        # source_row is negated so that the lexicographic ``>`` favours the
+        # smaller (earlier) row when priority and vintage are tied.
+        if (f.source_priority, f.vintage_date, -f.source_row) > (
+            current.source_priority,
+            current.vintage_date,
+            -current.source_row,
+        ):
+            best[k] = f
+    return sorted(best.values(), key=lambda r: (r.category, r.year, r.month))

@@ -89,6 +89,31 @@ class SpeciesMonthly(BaseModel):
     source_priority: int
 
 
+class ReferenceText(BaseModel):
+    """Довідково — text-only contextual reference data.
+
+    Each row is one free-text fact about a stable category — minimum wage,
+    fuel price, food price, energy tariff, etc. The numeric value (when
+    one exists) is embedded in ``content``; we never split it out — the
+    source treats the whole sentence as the value.
+
+    ``month`` uses 0 to mean "annual snapshot" (yearly Excel files dump
+    one row per category for the whole year), and 1..12 for monthly
+    snapshots (osnovni-style files attach Довідково to the current
+    month).
+    """
+
+    category: str
+    year: int
+    month: int = Field(ge=0, le=12)
+    content: str
+    source_file: str
+    source_row: int
+    vintage_date: datetime
+    report_type: ReportType
+    source_priority: int
+
+
 class ParseResult(BaseModel):
     """Output of any parser: typed rows + diagnostics."""
 
@@ -96,5 +121,6 @@ class ParseResult(BaseModel):
     monthly: list[MonthlyValue] = Field(default_factory=list)
     species_annual: list[SpeciesAnnual] = Field(default_factory=list)
     species_monthly: list[SpeciesMonthly] = Field(default_factory=list)
+    reference: list[ReferenceText] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)

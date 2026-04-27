@@ -23,7 +23,15 @@ from openpyxl import load_workbook
 from openpyxl.utils.datetime import from_excel
 
 from .metrics import is_ignored, resolve_metric, resolve_species
-from .models import AnnualValue, MonthlyValue, ParseResult, SpeciesAnnual, SpeciesMonthly
+from .models import (
+    AnnualValue,
+    MonthlyValue,
+    ParseResult,
+    ReferenceText,
+    SpeciesAnnual,
+    SpeciesMonthly,
+)
+from .parsers_reference import extract_reference_block
 from .report_metadata import ReportMetadata, infer_report_metadata
 from .utils import parse_composite_cell, safe_number
 
@@ -114,6 +122,7 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
     monthly: list[MonthlyValue] = []
     species_annual: list[SpeciesAnnual] = []
     species_monthly: list[SpeciesMonthly] = []
+    reference: list[ReferenceText] = []
     warnings: list[str] = list(base_meta.warnings)
 
     sheet_year = next(iter(month_map.values()))[0]
@@ -232,11 +241,27 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
         if warn and warn != "empty_marker":
             warnings.append(f"row {row_idx} col {YTD_COL} {metric_code}: {warn}")
 
+    # «Довідково» — extracted independently of the main metric loop so the
+    # SALARY_SECTION_MARKER break above can't mask it. The extractor scans
+    # the sheet for its own header (single sheet only — no roaming).
+    ref_rows, ref_warns = extract_reference_block(
+        ws,
+        year=sheet_year,
+        month=0,  # annual snapshot — yearly file
+        source_file=path_str,
+        vintage_date=ytd_meta.vintage_date,
+        report_type=ytd_meta.report_type,
+        source_priority=ytd_meta.source_priority,
+    )
+    reference.extend(ref_rows)
+    warnings.extend(ref_warns)
+
     return ParseResult(
         annual=annual,
         monthly=monthly,
         species_annual=species_annual,
         species_monthly=species_monthly,
+        reference=reference,
         warnings=warnings,
     )
 
