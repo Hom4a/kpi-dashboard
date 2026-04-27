@@ -42,3 +42,24 @@ current network. Resuming Monday 28.04.
 - AUDIT.md — full audit
 - ZVEDENA_DATA_FIRST.md — original 5-step plan
 - CLAUDE.md — Claude Code working rules
+
+## Pre-existing frontend issues — NOT caused by migration 15
+
+Discovered during post-apply visual check (28.04.2026).
+All confirmed pre-existing via grep + git log + DB inspection.
+Tracking here so future sessions don't conflate them with our work.
+
+1. js/auth.js: ReferenceError 'freshProfile is not defined'
+   at line 186 — undefined variable in fresh-login flow
+2. RLS infinite recursion on public.profiles — policy
+   self-references its own table
+3. RPC get_executive_metrics() — called from frontend,
+   does not exist in DB (404)
+
+Impact: profile fetch fails for fresh logins → some downstream
+features may be partially broken. NOT blocking summary tab
+functionality (v_summary_indicators returns 56 rows correctly,
+indicators-loader receives 49 active codes correctly).
+
+Decision: deferred. Address after pipeline stable.
+Out of scope for current sub-step 5.3.x.
