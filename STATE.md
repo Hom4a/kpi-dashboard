@@ -55,10 +55,14 @@ Tracking here so future sessions don't conflate them with our work.
    self-references its own table
 3. RPC get_executive_metrics() — called from frontend,
    does not exist in DB (404)
-4. Generic chart modal misuses template for animals: shows
-   population as "Об'єм, тис. м³" with phantom price axis.
-   Likely affects all groups except revenue/production where
-   the volume+price template was originally designed.
+4. ~Generic chart modal misuses template for animals~ —
+   FIXED via migration 16 (NULL::text in view).
+   Real fix (frontend uses indicators.value_kind directly) deferred.
+   See sql/16-fix-animals-chart-bug.sql header for context.
+5. Reference category modal renders empty chart (value_numeric is
+   always NULL — text content cannot be charted). Frontend should
+   skip modal opening for indicator_group='reference' or render
+   text-only info card. Deferred to post-pipeline UI rework.
 
 Impact: profile fetch fails for fresh logins → some downstream
 features may be partially broken. NOT blocking summary tab
