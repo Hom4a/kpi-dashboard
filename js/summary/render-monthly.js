@@ -612,15 +612,52 @@ function renderSalaryTable(showYears, year, month, allData) {
     return html;
 }
 
+const REFERENCE_CATEGORY_ORDER = [
+    'subsistence_minimum', 'min_wage', 'country_avg_salary',
+    'electricity_population', 'electricity_business',
+    'gas_population', 'gas_business',
+    'fuel_diesel', 'fuel_a95', 'fuel_a92',
+    'food_bread_rye', 'food_eggs', 'food_pork', 'food_lard',
+];
+
+/**
+ * Render the «Довідково» block.
+ *
+ * Backend post-5.3.4 emits N rows per (year, month) — one per
+ * reference category (subsistence_minimum, min_wage, fuel_diesel,
+ * food_bread_rye, etc.). Legacy data (pre-5.3.4) was a single row
+ * with all categories joined by '\n' in value_text.
+ *
+ * This function handles both: filter all matching rows, join their
+ * value_text by '\n', then let the existing split-and-classify
+ * regex below treat each line uniformly (top-level/header/bullet).
+ *
+ * Categories ordered by REFERENCE_CATEGORY_ORDER list (subsistence →
+ * tariffs → fuel → food); unknown categories sink to the end stably.
+ *
+ * If no rows match the requested (year, month), fall back to the
+ * newest available period — better than empty block.
+ */
 function renderReferenceBlock(allData, year, month) {
-    // Try to get reference text for selected month, fallback to latest available
-    let refRecord = allData.find(r => r.indicator_group === 'reference' && r.year === year && r.month === month);
-    if (!refRecord) {
-        // Fallback: latest reference record
-        refRecord = allData.filter(r => r.indicator_group === 'reference')
-            .sort((a, b) => b.year - a.year || b.month - a.month)[0];
+    let refRows = allData.filter(
+        r => r.indicator_group === 'reference' && r.year === year && r.month === month
+    );
+
+    if (refRows.length === 0) {
+        const all = allData.filter(r => r.indicator_group === 'reference');
+        if (all.length > 0) {
+            const newest = all.sort((a, b) => b.year - a.year || b.month - a.month)[0];
+            refRows = all.filter(r => r.year === newest.year && r.month === newest.month);
+        }
     }
-    const refText = refRecord?.value_text || '';
+
+    refRows.sort((a, b) => {
+        const ai = REFERENCE_CATEGORY_ORDER.indexOf(a.indicator_name);
+        const bi = REFERENCE_CATEGORY_ORDER.indexOf(b.indicator_name);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+
+    const refText = refRows.map(r => r.value_text).filter(Boolean).join('\n');
 
     let content = '';
     if (refText) {
