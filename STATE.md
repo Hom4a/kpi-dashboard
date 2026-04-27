@@ -55,6 +55,10 @@ Tracking here so future sessions don't conflate them with our work.
    self-references its own table
 3. RPC get_executive_metrics() — called from frontend,
    does not exist in DB (404)
+4. Generic chart modal misuses template for animals: shows
+   population as "Об'єм, тис. м³" with phantom price axis.
+   Likely affects all groups except revenue/production where
+   the volume+price template was originally designed.
 
 Impact: profile fetch fails for fresh logins → some downstream
 features may be partially broken. NOT blocking summary tab
