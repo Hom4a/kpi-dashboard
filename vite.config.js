@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
-  base: '/kpi-dashboard/',
+// VITE_BASE override дозволяє зібрати для кореневого деплою (on-prem nginx),
+// при цьому default '/kpi-dashboard/' залишається для GitHub Pages.
+export default defineConfig(({ mode }) => ({
+  base: process.env.VITE_BASE || '/kpi-dashboard/',
   root: '.',
   build: {
     outDir: 'dist',
@@ -11,4 +13,4 @@ export default defineConfig({
     port: 3000,
     open: true
   }
-});
+}));

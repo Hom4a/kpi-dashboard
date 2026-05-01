@@ -1,8 +1,11 @@
-// ===== Monthly Compute — shared logic for render, exports, infographics =====
-import { getById, normalizeLookup } from './indicators-config.js';
+// ===== Monthly Compute — DB-driven (code-based, no name matching) =====
+// Формули беруться з `indicators` metadata (preloaded через indicators-loader.js):
+//   ytd_formula: 'sum' | 'avg' | 'weighted' | 'last' | 'volprice' | 'derived' | 'text'
+//   weight_by_code: код iншого indicator-а для 'weighted' і 'volprice' пар
+//   derived_formula: 'per_employee' | 'avg_wood_price' | 'sales_other_residual'
+import { getIndicatorByCode } from './indicators-loader.js';
 
 // ===== Formatting =====
-
 export function fN(v) {
     if (v == null) return '—';
     if (typeof v === 'string') return v;
@@ -10,6 +13,7 @@ export function fN(v) {
     return v.toLocaleString('uk-UA', { maximumFractionDigits: 4 });
 }
 
+// Normalize vol/price text to slash format: "360,6(2318,7)" → "360,6/2318,7"
 export function toSlash(t) {
     return t ? t.replace(/\(/, '/').replace(/\)$/, '') : t;
 }
@@ -25,249 +29,183 @@ export function isVolPriceText(t) {
     return t && /[\/(]/.test(t) && /\d/.test(t) && !/^\(без/i.test(t);
 }
 
-// ===== Record lookup =====
+// ===== Record lookup (by indicator_code, NOT by name) =====
 
-/**
- * Match indicator name: exact first, then startsWith for short names.
- * Handles DB variants like "ПДФО  млн. грн" matching config "ПДФО".
- */
-// Processing sub-types: short generic names used in multiple blocks.
-// Must match EXACTLY to avoid cross-block match with tax "інші млн. грн" etc.
-const SUBITEM_EXACT_ONLY = new Set(['інші', 'дуб', 'хвойні']);
-
-export function nameMatches(configName, dbName) {
-    const cn = normalizeLookup(configName);
-    const dn = normalizeLookup(dbName);
-    if (cn === dn) return true;
-    // Sub-items (processing sub-types) — exact match only to prevent
-    // cross-block collision with "інші млн. грн" (tax) etc.
-    if (SUBITEM_EXACT_ONLY.has(cn)) return false;
-    // Don't match short generic names with vol/price indicators from another block
-    // e.g. "дуб" should NOT match "дуб тис. м3/сер. ціна грн"
-    if (dn.includes('м3/сер') || dn.includes('тис. м3/')) {
-        // Only match if config name also looks like vol/price
-        if (!cn.includes('м3/сер') && !cn.includes('тис. м3/')) return false;
-    }
-    // Short config names (<=10 chars): match DB name with unit suffix
-    // e.g. "ПДФО" → "ПДФО  млн. грн", "ВЗ" → "ВЗ  млн. грн"
-    if (cn.length <= 10 && dn.startsWith(cn + ' ')) return true;
-    // Longer names with extra suffixes
-    if (cn.length > 10 && (dn.startsWith(cn + ' ') || dn.startsWith(cn + ','))) return true;
-    return false;
-}
-
-/**
- * Find DB records matching an indicator config by name.
- * Returns records for given year, months 1..month.
- * Deduplicates by month (keeps first match).
- */
-export function findMonthlyRecords(indicatorName, allData, year, month) {
-    const seen = new Set();
-    return allData.filter(r => {
-        if (r.year !== year || r.month <= 0 || r.month > month || r.value_numeric == null) return false;
-        if (!nameMatches(indicatorName, r.indicator_name)) return false;
-        if (seen.has(r.month)) return false;
-        seen.add(r.month);
-        return true;
-    });
-}
-
-/**
- * Find annual record (month=0) for a given year.
- */
-export function findAnnualRecord(indicatorName, allData, year) {
-    // Use findLast to get latest record when duplicates exist (newer upload wins)
-    return allData.findLast(r =>
-        r.year === year && r.month === 0 &&
-        nameMatches(indicatorName, r.indicator_name)
+/** Знайти всі рядки з `allData` за даним кодом для (year, month). */
+export function findByCode(code, allData, year, month) {
+    return allData.filter(r =>
+        r.indicator_code === code &&
+        r.year === year && r.month === month
     );
 }
 
-/**
- * Find monthly record for specific month.
- */
-export function findMonthRecord(indicatorName, allData, year, month) {
+/** Останній запис за місяць (month) для коду. */
+export function findMonthRecord(code, allData, year, month) {
     return allData.findLast(r =>
-        r.year === year && r.month === month &&
-        nameMatches(indicatorName, r.indicator_name)
+        r.indicator_code === code && r.year === year && r.month === month
+    );
+}
+
+/** Усі monthly записи (1..month) за даним кодом у заданому році. */
+export function findMonthlyRecords(code, allData, year, month) {
+    return allData
+        .filter(r =>
+            r.indicator_code === code && r.year === year &&
+            r.month >= 1 && r.month <= month && r.value_numeric != null
+        )
+        .sort((a, b) => a.month - b.month);
+}
+
+/** Annual snapshot (month=0) — для yearly Excel (2022-2025) які не мають
+ *  розбивки по місяцях. Використовується як fallback коли monthly breakdown відсутнє. */
+export function findAnnualRecord(code, allData, year) {
+    return allData.find(r =>
+        r.indicator_code === code && r.year === year && r.month === 0
     );
 }
 
 // ===== YTD Computation =====
 
 /**
- * Compute YTD value for an indicator config.
- * Returns { value: number|string|null, display: string }
+ * Обчислити YTD значення для indicator-а за формулою з БД.
+ * Повертає число або null.
  */
-export function computeYtd(config, allData, year, month) {
-    const { ytd, name } = config;
+export function computeYtd(indicator, allData, year, month) {
+    if (!indicator) return null;
+    const code = indicator.code;
+    const f = indicator.ytd_formula;
 
-    // Check annual record first for special text markers
-    const ann = findAnnualRecord(name, allData, year);
-    if (ann?.value_text === '-' || ann?.value_text === '*' || ann?.value_text === 'Х') {
-        return { value: null, display: ann.value_text };
+    if (f === 'text') {
+        const last = findMonthlyRecords(code, allData, year, month).pop();
+        if (last) return last.value_text ?? null;
+        const ann = findAnnualRecord(code, allData, year);
+        return ann?.value_text ?? null;
     }
 
-    if (ytd === 'text') {
-        // Text-only indicators (коефіцієнт, садивний матеріал)
-        if (ann?.value_text) return { value: null, display: ann.value_text };
-        const monthRec = findMonthRecord(name, allData, year, month);
-        return { value: null, display: monthRec?.value_text || '—' };
+    if (f === 'sum') {
+        const rows = findMonthlyRecords(code, allData, year, month);
+        if (rows.length) return rows.reduce((s, r) => s + r.value_numeric, 0);
+        const ann = findAnnualRecord(code, allData, year);
+        return ann?.value_numeric ?? null;
     }
 
-    if (ytd === 'last') {
-        // Snapshot: show "—" for YTD (these are point-in-time values)
-        return { value: null, display: '—' };
+    if (f === 'avg') {
+        const rows = findMonthlyRecords(code, allData, year, month);
+        if (rows.length) return rows.reduce((s, r) => s + r.value_numeric, 0) / rows.length;
+        const ann = findAnnualRecord(code, allData, year);
+        return ann?.value_numeric ?? null;
     }
 
-    const records = findMonthlyRecords(name, allData, year, month);
-    if (!records.length) {
-        // No monthly data — check annual
-        if (ann && isVolPriceText(ann.value_text)) return { value: ann.value_numeric, display: toSlash(ann.value_text) };
-        if (ann?.value_numeric != null) return { value: ann.value_numeric, display: fN(ann.value_numeric) };
-        if (ann?.value_text) return { value: null, display: ann.value_text };
-        return { value: null, display: '—' };
+    if (f === 'last') {
+        const rows = findMonthlyRecords(code, allData, year, month);
+        if (rows.length) return rows[rows.length - 1].value_numeric;
+        const ann = findAnnualRecord(code, allData, year);
+        return ann?.value_numeric ?? null;
     }
 
-    if (ytd === 'sum') {
-        const total = records.reduce((s, r) => s + r.value_numeric, 0);
-        return { value: total, display: fN(total) };
-    }
-
-    if (ytd === 'avg') {
-        const total = records.reduce((s, r) => s + r.value_numeric, 0);
-        const avg = total / records.length;
-        return { value: avg, display: fN(avg) };
-    }
-
-    if (ytd === 'weighted') {
-        const weightConfig = getById(config.weightBy);
-        if (!weightConfig) return { value: null, display: '—' };
-        const weightRecords = findMonthlyRecords(weightConfig.name, allData, year, month);
+    if (f === 'weighted') {
+        // Σ(weight_i × value_i) / Σ(weight_i)
+        const weightCode = indicator.weight_by_code;
+        if (!weightCode) return null;
+        const valRows = findMonthlyRecords(code, allData, year, month);
+        const weightRows = findMonthlyRecords(weightCode, allData, year, month);
         let num = 0, den = 0;
-        for (const wr of weightRecords) {
-            const vr = records.find(r => r.month === wr.month);
-            if (vr?.value_numeric != null && wr.value_numeric) {
+        for (const vr of valRows) {
+            const wr = weightRows.find(r => r.month === vr.month);
+            if (wr?.value_numeric != null && vr.value_numeric != null) {
                 num += wr.value_numeric * vr.value_numeric;
                 den += wr.value_numeric;
             }
         }
-        if (den > 0) {
-            const weighted = num / den;
-            return { value: weighted, display: fN(weighted) };
-        }
-        // Fallback to simple average
-        const avg = records.reduce((s, r) => s + r.value_numeric, 0) / records.length;
-        return { value: avg, display: fN(avg) };
+        if (den > 0) return num / den;
+        const ann = findAnnualRecord(code, allData, year);
+        return ann?.value_numeric ?? null;
     }
 
-    if (ytd === 'volprice') {
-        const totalVol = records.reduce((s, r) => s + r.value_numeric, 0);
-        let pNum = 0, pDen = 0;
-        for (const r of records) {
-            const p = extractPrice(r.value_text);
-            if (p != null && r.value_numeric) {
-                pNum += r.value_numeric * p;
-                pDen += r.value_numeric;
-            }
-        }
-        const avgPrice = pDen > 0 ? Math.round(pNum / pDen) : null;
-        const display = `${fN(totalVol)}${avgPrice != null ? '/' + fN(avgPrice) : ''}`;
-        return { value: totalVol, display };
+    if (f === 'volprice') {
+        // Total volume = SUM; avg price = weighted by volume
+        const rows = findMonthlyRecords(code, allData, year, month);
+        if (rows.length) return rows.reduce((s, r) => s + (r.value_numeric || 0), 0);
+        const ann = findAnnualRecord(code, allData, year);
+        return ann?.value_numeric ?? null;
     }
 
-    if (ytd === 'derived') {
-        const val = computeDerived(config.derivedFormula, allData, year, month);
-        return { value: val, display: val != null ? fN(val) : '—' };
-    }
-
-    return { value: null, display: '—' };
-}
-
-// ===== Derived formulas =====
-
-function computeDerived(formulaId, allData, year, month) {
-    if (formulaId === 'per_employee') {
-        const revConfig = getById('total_sales');
-        const hcConfig = getById('headcount');
-        if (!revConfig || !hcConfig) return null;
-        const revRecords = findMonthlyRecords(revConfig.name, allData, year, month);
-        const hcRecords = findMonthlyRecords(hcConfig.name, allData, year, month);
-        if (!revRecords.length || !hcRecords.length) return null;
-        const totalRev = revRecords.reduce((s, r) => s + r.value_numeric, 0);
-        const avgHc = hcRecords.reduce((s, r) => s + r.value_numeric, 0) / hcRecords.length;
-        return avgHc > 0 ? totalRev * 1000000 / avgHc : null;
-    }
-
-    if (formulaId === 'avg_wood_price') {
-        const pairs = [
-            ['vol_round', 'price_round'],
-            ['vol_firewood_pv', 'price_firewood_pv'],
-            ['vol_firewood_np', 'price_firewood_np'],
-        ];
-        let totalNum = 0, totalDen = 0;
-        for (const [volId, priceId] of pairs) {
-            const volConfig = getById(volId);
-            const priceConfig = getById(priceId);
-            if (!volConfig || !priceConfig) continue;
-            const volRecs = findMonthlyRecords(volConfig.name, allData, year, month);
-            const priceRecs = findMonthlyRecords(priceConfig.name, allData, year, month);
-            for (const vr of volRecs) {
-                const pr = priceRecs.find(r => r.month === vr.month);
-                if (pr?.value_numeric != null && vr.value_numeric) {
-                    totalNum += vr.value_numeric * pr.value_numeric;
-                    totalDen += vr.value_numeric;
-                }
-            }
-        }
-        return totalDen > 0 ? totalNum / totalDen : null;
+    if (f === 'derived') {
+        return computeDerived(indicator, allData, year, month);
     }
 
     return null;
 }
 
-// ===== Past year value =====
-
-export function getPastYearValue(config, allData, year) {
-    const ann = findAnnualRecord(config.name, allData, year);
+/** Для volprice: повертає {volume, avgPrice} за YTD period. Annual fallback. */
+export function computeVolpriceYtd(indicator, allData, year, month) {
+    const code = indicator.code;
+    const rows = findMonthlyRecords(code, allData, year, month);
+    if (rows.length) {
+        let vol = 0, num = 0, den = 0;
+        for (const r of rows) {
+            const p = extractPrice(r.value_text);
+            vol += (r.value_numeric || 0);
+            if (p != null && r.value_numeric) {
+                num += r.value_numeric * p;
+                den += r.value_numeric;
+            }
+        }
+        return { volume: vol, avgPrice: den > 0 ? Math.round(num / den) : null };
+    }
+    // Annual fallback (yearly file single snapshot)
+    const ann = findAnnualRecord(code, allData, year);
     if (ann) {
-        if (ann.value_text === '-' || ann.value_text === '*' || ann.value_text === 'Х') {
-            return { value: null, display: ann.value_text };
-        }
-        if (isVolPriceText(ann.value_text)) {
-            return { value: ann.value_numeric, display: toSlash(ann.value_text) };
-        }
-        if (ann.value_numeric != null) {
-            return { value: ann.value_numeric, display: fN(ann.value_numeric) };
-        }
-        if (ann.value_text) return { value: null, display: ann.value_text };
+        const price = extractPrice(ann.value_text);
+        return { volume: ann.value_numeric, avgPrice: price };
     }
-    // Fallback: compute from monthly records (if no annual record)
-    const monthly = allData.filter(r =>
-        r.year === year && r.month > 0 && r.value_numeric != null &&
-        nameMatches(config.name, r.indicator_name)
-    );
-    if (monthly.length) {
-        return computeYtd(config, allData, year, 12);
-    }
-    return { value: null, display: '—' };
+    return { volume: null, avgPrice: null };
 }
 
-// ===== Delta badge =====
+// ===== Derived formulas =====
 
-export function deltaBadge(cur, prev) {
-    if (cur == null || prev == null) return { html: '', cls: '' };
-    if (typeof cur === 'string' || typeof prev === 'string') return { html: '', cls: '' };
-    if (prev === 0 || Math.abs(prev) < 0.01) {
-        if (cur === 0) return { html: '', cls: '' };
-        return { html: '<span class="pivot-badge-orange">—</span>', cls: 'cell-orange' };
+function computeDerived(indicator, allData, year, month) {
+    const f = indicator.derived_formula;
+
+    if (f === 'per_employee') {
+        // total_sales × 1_000_000 / avg(headcount)
+        const rev = findMonthlyRecords('total_sales', allData, year, month);
+        const hc  = findMonthlyRecords('headcount', allData, year, month);
+        const totalRev = rev.reduce((s, r) => s + r.value_numeric, 0);
+        const avgHc = hc.length ? hc.reduce((s, r) => s + r.value_numeric, 0) / hc.length : 0;
+        return avgHc > 0 ? totalRev * 1_000_000 / avgHc : null;
     }
-    const pct = Math.round((cur / prev) * 1000) / 10;
-    if (pct === 100) return { html: '', cls: '' };
-    if (pct > 9999 || pct < 0) return { html: '<span class="pivot-badge-orange">—</span>', cls: 'cell-orange' };
-    const html = pct > 100
-        ? `<span class="pivot-badge-up">${pct}%</span>`
-        : `<span class="pivot-badge-down">${pct}%</span>`;
-    const cls = pct > 100 ? 'cell-up' : 'cell-down';
-    return { html, cls };
+
+    if (f === 'avg_wood_price') {
+        // (vol_round × price_round + vol_fw_pv × price_fw_pv + vol_fw_np × price_fw_np)
+        // / (vol_round + vol_fw_pv + vol_fw_np)
+        const pairs = [
+            ['vol_round',       'price_round'],
+            ['vol_firewood_pv', 'price_firewood_pv'],
+            ['vol_firewood_np', 'price_firewood_np'],
+        ];
+        let num = 0, den = 0;
+        for (const [volCode, priceCode] of pairs) {
+            const vols   = findMonthlyRecords(volCode, allData, year, month);
+            const prices = findMonthlyRecords(priceCode, allData, year, month);
+            for (const vr of vols) {
+                const pr = prices.find(r => r.month === vr.month);
+                if (pr?.value_numeric != null && vr.value_numeric != null) {
+                    num += vr.value_numeric * pr.value_numeric;
+                    den += vr.value_numeric;
+                }
+            }
+        }
+        return den > 0 ? num / den : null;
+    }
+
+    if (f === 'sales_other_residual') {
+        // total_sales - sales_round - sales_processed (YTD)
+        const total = computeYtd(getIndicatorByCode('total_sales'), allData, year, month) || 0;
+        const round = computeYtd(getIndicatorByCode('sales_round'),  allData, year, month) || 0;
+        const proc  = computeYtd(getIndicatorByCode('sales_processed'), allData, year, month) || 0;
+        return total - round - proc;
+    }
+
+    return null;
 }

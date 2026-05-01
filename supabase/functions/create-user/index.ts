@@ -72,15 +72,16 @@ Deno.serve(async (req: Request) => {
     })
 
     if (authError) {
-      return new Response(JSON.stringify({ error: authError.message }), {
+      console.error('createUser authError:', JSON.stringify(authError))
+      return new Response(JSON.stringify({ error: authError.message, detail: authError.status || authError.code || '' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     const userId = authData.user.id
 
-    // Step 2: Insert profile
-    const { error: profileError } = await adminClient.from('profiles').insert({
+    // Step 2: Update profile (trigger handle_new_user already inserted a basic profile)
+    const { error: profileError } = await adminClient.from('profiles').upsert({
       id: userId,
       email,
       full_name,
@@ -91,8 +92,7 @@ Deno.serve(async (req: Request) => {
     })
 
     if (profileError) {
-      // Rollback: delete auth user if profile insert failed
-      await adminClient.auth.admin.deleteUser(userId)
+      console.error('createUser profileError:', JSON.stringify(profileError))
       return new Response(JSON.stringify({ error: 'Профіль не створено: ' + profileError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })

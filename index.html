@@ -693,15 +693,8 @@
                             <select id="summaryYearSelect" class="filter-select" style="width:auto;min-width:80px"></select>
                         </div>
                     </div>
-                    <!-- Version toggle -->
-                    <div style="display:flex;gap:6px;margin-bottom:8px">
-                        <button class="btn btn-sm monthly-version-btn active" data-version="v2" onclick="window._switchMonthlyVersion('v2')">Нова версія</button>
-                        <button class="btn btn-sm monthly-version-btn" data-version="v1" onclick="window._switchMonthlyVersion('v1')">Стара версія</button>
-                    </div>
-                    <!-- Monthly report V2 (config-driven) -->
-                    <div id="monthlyReportContainerV2"></div>
-                    <!-- Monthly report V1 (legacy) -->
-                    <div id="monthlyReportContainer" style="display:none"></div>
+                    <!-- Monthly report (єдина версія, DB-driven) -->
+                    <div id="monthlyReportContainer"></div>
                     <!-- Charts -->
                     <div id="summaryChartsContainer">
 

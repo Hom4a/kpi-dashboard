@@ -34,6 +34,7 @@ import { populateMarketFilters, applyMarketFilter, initMarketFilterEvents, setRe
 import { renderMarketDashboard } from './market/render-market.js';
 // Summary modules
 import { setSummaryIndicators, setSummaryWeekly, setSummaryWeeklyNotes, setSummaryBlockComments } from './summary/state-summary.js';
+import { preloadIndicators } from './summary/indicators-loader.js';
 import { loadSummaryIndicators, loadSummaryWeekly, loadSummaryWeeklyNotes, loadBlockComments, clearSummaryIndicators, clearSummaryWeekly } from './summary/db-summary.js';
 import { renderSummaryDashboard } from './summary/render-summary.js';
 import { initWeeklyEntry } from './summary/weekly-entry.js';
@@ -213,6 +214,8 @@ async function loadMarketDataAndRender() {
 // ===== Load & Render Summary =====
 async function loadSummaryDataAndRender() {
     try {
+        // Preload indicators metadata (один раз, ідемпотентно)
+        await preloadIndicators().catch(e => console.warn('preloadIndicators:', e.message));
         const [indicators, weekly, notes, comments] = await Promise.all([
             loadSummaryIndicators(), loadSummaryWeekly(), loadSummaryWeeklyNotes(),
             loadBlockComments('weekly').catch(() => [])
@@ -328,7 +331,9 @@ setAuthLoadAndRender(async () => {
 
     // ProZorro sync (non-blocking)
     syncProzorro().catch(e => console.warn('ProZorro bg sync:', e.message));
-    // Start Realtime subscriptions
+    // Start Realtime subscriptions.
+    // On-prem summary tables мапляться на той самий handler, що й cloud summary_indicators/weekly.
+    const summaryReload = async () => { await loadSummaryDataAndRender(); await renderExecutiveDashboard(); };
     startRealtime({
         kpi_records: async () => { await loadAndRender(); showRoleButtons(); },
         forest_prices: async () => { await loadForestDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
@@ -336,8 +341,14 @@ setAuthLoadAndRender(async () => {
         harvesting_plan_fact: async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
         harvesting_zsu: async () => { await loadHarvestingDataAndRender(); await renderExecutiveDashboard(); renderGisMap(); },
         market_prices: async () => { await loadMarketDataAndRender(); await renderExecutiveDashboard(); },
-        summary_indicators: async () => { await loadSummaryDataAndRender(); await renderExecutiveDashboard(); },
-        summary_weekly: async () => { await loadSummaryDataAndRender(); }
+        summary_indicators: summaryReload,
+        summary_weekly: async () => { await loadSummaryDataAndRender(); },
+        indicator_values: summaryReload,
+        indicator_volprice_values: summaryReload,
+        salary_values: summaryReload,
+        animal_values: summaryReload,
+        weekly_indicator_values: async () => { await loadSummaryDataAndRender(); },
+        weekly_notes: async () => { await loadSummaryDataAndRender(); }
     });
 });
 setHideButtonsCallback(hideButtons);
@@ -399,17 +410,6 @@ function _getActiveTab() { return document.querySelector('.summary-tab.active')?
 window._summaryPrint = () => _getActiveTab() === 'weekly' ? printWeeklyReport() : printMonthlyReport();
 window._summaryDocx = () => _getActiveTab() === 'weekly' ? exportWeeklyDocx() : exportMonthlyDocx();
 window._summaryPdf = () => _getActiveTab() === 'weekly' ? exportWeeklyPdf() : exportMonthlyPdf();
-// Monthly version toggle (v1 legacy / v2 config-driven)
-window._switchMonthlyVersion = (version) => {
-    const v1 = document.getElementById('monthlyReportContainer');
-    const v2 = document.getElementById('monthlyReportContainerV2');
-    if (!v1 || !v2) return;
-    document.querySelectorAll('.monthly-version-btn').forEach(b => b.classList.toggle('active', b.dataset.version === version));
-    v1.style.display = version === 'v1' ? '' : 'none';
-    v2.style.display = version === 'v2' ? '' : 'none';
-    // Trigger re-render
-    if (typeof renderSummaryDashboard === 'function') renderSummaryDashboard();
-};
 window.openGisAdmin = openGisAdmin;
 window.closeGisAdmin = closeGisAdmin;
 window.saveGisAdmin = saveGisAdmin;

@@ -1,36 +1,26 @@
-// ===== Monthly Report — "Дод 1 до ТЗ" format =====
-import { $, fmt } from '../utils.js';
-import { summaryIndicators, summaryFilterState, summaryBlockComments } from './state-summary.js';
+// ===== Monthly Report — DB-driven (indicator_code matching) =====
+// Render тягне список показників з indicators-loader (preloaded з БД) і
+// матчить значення в summaryIndicators через r.indicator_code. Без fuzzy
+// name matching — одна чиста реалізація.
+import { summaryIndicators, summaryBlockComments } from './state-summary.js';
 import { saveBlockComment } from './db-summary.js';
 import { openMonthlyIndicatorModal } from './infographic-modal.js';
 import { initCellAnnotations } from './cell-annotations.js';
+import {
+    getIndicatorsByBlocks, getIndicatorByCode,
+    getAllBranches, getAllSpecies,
+    MONTHLY_TABLE_1_BLOCKS, MONTHLY_TABLE_2_BLOCKS,
+} from './indicators-loader.js';
+import {
+    fN, toSlash, isVolPriceText, extractPrice,
+    findMonthRecord, findMonthlyRecords,
+    computeYtd, computeVolpriceYtd,
+} from './monthly-compute.js';
 
 const MO = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
             'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 
-function fN(v) {
-    if (v == null) return '—';
-    if (typeof v === 'string') return v;
-    if (Math.abs(v) >= 1000) return v.toLocaleString('uk-UA', { maximumFractionDigits: 2 });
-    if (Math.abs(v) >= 1) return v.toLocaleString('uk-UA', { maximumFractionDigits: 2 });
-    return v.toLocaleString('uk-UA', { maximumFractionDigits: 4 });
-}
-
-// Normalize vol/price text to slash format: "360,6(2318,7)" → "360,6/2318,7"
-function toSlash(t) { return t ? t.replace(/\(/, '/').replace(/\)$/, '') : t; }
-
-// Check if value_text is vol/price format
-function isVolPriceText(t) { return t && /[\/(]/.test(t) && /\d/.test(t); }
-
-// Extract price from vol/price text: "31/5730" → 5730, "31(5730)" → 5730
-function extractPrice(t) {
-    if (!t) return null;
-    const m = t.match(/[\/(]([\d\s,.]+)\)?$/);
-    if (!m) return null;
-    return parseFloat(m[1].replace(/\s/g, '').replace(',', '.'));
-}
-
-// Темп росту: cur / prev × 100 (скільки % від попереднього)
+// Темп росту: cur / prev × 100
 function deltaBadge(cur, prev) {
     if (cur == null || prev == null) return '';
     if (typeof cur === 'string' || typeof prev === 'string') return '';
@@ -54,213 +44,23 @@ function deltaCls(cur, prev) {
     return pct > 100 ? 'cell-up' : pct < 100 ? 'cell-down' : '';
 }
 
-// ===== Table definitions (exact names from "Дод 1 до ТЗ") =====
-
-const TABLE_1_ROWS = [
-    'Коефіцієнт фінансової стійкості (станом на кінець кварталу)',
-    'Фонд оплати праці, млн. грн',
-    'Середньооблікова чисельність штатних працівників',
-    'Середня заробітна плата штатного працівника, грн',
-    'Дебіторська заборгованість, млн. грн',
-    'Кредиторська заборгованість,  млн. грн',
-    'Залишок коштів на рахунках, млн. грн',
-    'Недоїмка перед бюджетом, млн. грн',
-    'Недоїмка перед ПФ, млн. грн',
-    // FIX #5: removed duplicate 'Недоїмка перед бюджетом млн. грн'
-    'Загальна реалізація, млн. грн',
-    'в т.ч: лісоматеріали в круглому вигляді, млн. грн',
-    'продукція переробки,  млн. грн',
-    'інша реалізація (послуги, побічне користування тощо), млн грн',
-    'Обсяг переробки, всього, тис. м3',
-    // FIX #4: sub-indicators for processing
-    'В т.ч: хвойні',
-    'дуб',
-    'інші',
-    'Реалізація лісоматеріалів круглих, тис. м3',
-    'Середня ціна реалізації 1 м3 лісоматеріалів круглих, грн/м3',
-    // FIX #4: volume/price sub-indicators
-    'В.т.ч: вільха, береза тис. м3/сер. ціна грн',
-    'сосна тис. м3/сер. ціна грн',
-    'дуб тис. м3/сер. ціна грн',
-    'інші тис. м3/сер. ціна грн',
-    "Реалізація деревини дров'яної ПВ  тис. м3",
-    'Середня ціна реалізації 1 м3 деревини дровяної ПВ, грн/м3',
-    "Реалізація деревини дров'яної НП  тис. м3",
-    'Середня ціна реалізації 1 м3 деревини дровяної НП, грн/м3',
-    'Реалізовано на експорт, млн. грн',
-    // FIX #4: export sub-indicators
-    'У т.ч.: продукція переробки (дрова), м3/сер. ціна, грн',
-    'продукція переробки (тріска) м3(насипний)/сер. ціна, грн',
-    'Реалізовано на 1 штатного, грн',
-    'Заготівля деревини, всього  тис. м3',
-    'Рубки головного користування',
-    'Рубки формування і оздоровлення лісів',
-    'Ціна знеособленого 1 м3 реалізованої деревини, грн.',
-    'Лісовідновлення (га)',
-    'Лісорозведення (га)',
-    'Сприяння природному поновленню (га)',
-    'Вирощування садивного матеріалу із закритою кореневою системою, млн шт.'
-];
-
-// Snapshot indicators (past years only): use average instead of sum
-const SNAPSHOT_INDICATORS = new Set([
-    'середньооблікова чисельність', 'середня заробітна плата',
-    'середня цін реалізації', 'середня ціна реалізації',
-    'ціна знеособленого', 'реалізовано на 1 штатного',
-    'коефіцієнт фінансової стійкості',
-    'дебіторська заборгованість', 'кредиторська заборгованість',
-    'залишок коштів на рахунках', 'недоїмка перед бюджетом', 'недоїмка перед пф',
-]);
-function isSnapshot(name) {
-    const lower = name.toLowerCase();
-    return [...SNAPSHOT_INDICATORS].some(s => lower.includes(s));
-}
-
-// FIX #4: Sub-indicators (indented with →) — normalized matching
-const SUB_INDICATORS = new Set([
-    'в т.ч: лісоматеріали в круглому вигляді, млн. грн',
-    'продукція переробки,  млн. грн',
-    'інша реалізація (послуги, побічне користування тощо), млн грн',
-    'В т.ч: хвойні', 'дуб', 'інші',
-    'В.т.ч: вільха, береза тис. м3/сер. ціна грн',
-    'сосна тис. м3/сер. ціна грн',
-    'дуб тис. м3/сер. ціна грн',
-    'інші тис. м3/сер. ціна грн',
-    'У т.ч.: продукція переробки (дрова), м3/сер. ціна, грн',
-    'продукція переробки (тріска) м3(насипний)/сер. ціна, грн',
-    'Рубки головного користування',
-    'Рубки формування і оздоровлення лісів'
-]);
-
-// FIX #6: Bold indicators (group headers / totals)
-const BOLD_ROWS = new Set([
-    'Загальна реалізація, млн. грн',
-    'Обсяг переробки, всього, тис. м3',
-    'Реалізація лісоматеріалів круглих, тис. м3',
-    'Заготівля деревини, всього  тис. м3',
-    'Сплачено податків та зборів всього млн. грн.',
-]);
-
-// Weighted average: price indicator → volume indicator name mapping
-// YTD price = Σ(volume_i × price_i) / Σ(volume_i)
-const WEIGHTED_PRICE_MAP = [
-    { price: '1 м3 лісоматеріалів', volume: 'реалізація лісоматеріалів круглих' },
-    { price: '1 м3 деревини дровяної пв', volume: "реалізація деревини дров'яної пв" },
-    { price: '1 м3 деревини дровяної нп', volume: "реалізація деревини дров'яної нп" },
-    // Salary weighted by headcount: Σ(чисельність × з/п) / Σ(чисельність)
-    { price: 'середня заробітна плата штатного працівника', volume: 'середньооблікова чисельність' },
-];
-// Composite weighted: ціна знеособленого = (vol1*price1 + vol2*price2 + vol3*price3) / (vol1+vol2+vol3)
-const COMPOSITE_PRICE = {
-    price: 'ціна знеособленого',
-    pairs: [
-        { price: '1 м3 лісоматеріалів', volume: 'реалізація лісоматеріалів круглих' },
-        { price: '1 м3 деревини дровяної пв', volume: "реалізація деревини дров'яної пв" },
-        { price: '1 м3 деревини дровяної нп', volume: "реалізація деревини дров'яної нп" },
-    ]
-};
-// Derived: реалізовано на 1 штатного = реалізація * 1000000 / чисельність
-const DERIVED_PER_EMPLOYEE = {
-    indicator: 'реалізовано на 1 штатного',
-    revenue: 'загальна реалізація',
-    headcount: 'середньооблікова чисельність'
-};
-
-function getWeightedYtd(name, allData, year, month) {
-    const lower = name.toLowerCase().replace(/\s+/g, ' ').trim();
-
-    // Simple weighted: price × volume / volume
-    for (const wp of WEIGHTED_PRICE_MAP) {
-        if (lower.includes(wp.price)) {
-            const priceRows = matchIndicator(name, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
-            const volRows = matchIndicator(wp.volume, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
-            let num = 0, den = 0;
-            for (const vr of volRows) {
-                const pr = priceRows.find(r => r.month === vr.month);
-                if (pr?.value_numeric != null) { num += vr.value_numeric * pr.value_numeric; den += vr.value_numeric; }
-            }
-            return den > 0 ? num / den : null;
-        }
-    }
-
-    // Composite weighted: ціна знеособленого
-    if (lower.includes(COMPOSITE_PRICE.price)) {
-        let totalNum = 0, totalDen = 0;
-        for (const pair of COMPOSITE_PRICE.pairs) {
-            const priceRows = matchIndicator(pair.price, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
-            const volRows = matchIndicator(pair.volume, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
-            for (const vr of volRows) {
-                const pr = priceRows.find(r => r.month === vr.month);
-                if (pr?.value_numeric != null) { totalNum += vr.value_numeric * pr.value_numeric; totalDen += vr.value_numeric; }
-            }
-        }
-        return totalDen > 0 ? totalNum / totalDen : null;
-    }
-
-    // Derived per-employee
-    if (lower.includes(DERIVED_PER_EMPLOYEE.indicator)) {
-        const revRows = matchIndicator(DERIVED_PER_EMPLOYEE.revenue, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
-        const hcRows = matchIndicator(DERIVED_PER_EMPLOYEE.headcount, allData).filter(r => r.year === year && r.month > 0 && r.month <= month && r.value_numeric != null);
-        const totalRev = revRows.reduce((s, r) => s + r.value_numeric, 0);
-        const avgHc = hcRows.length ? hcRows.reduce((s, r) => s + r.value_numeric, 0) / hcRows.length : 0;
-        return avgHc > 0 ? totalRev * 1000000 / avgHc : null;
-    }
-
-    return null; // not a weighted indicator
-}
-
-const TABLE_2_ROWS = [
-    'Сплачено податків та зборів всього млн. грн.',
-    'єдиний соціальний внесок  млн. грн',
-    'рентна плата за спеціальне використання лісових ресурсів млн. грн',
-    'податок на додану вартість  млн. грн',
-    'податок на прибуток  млн. грн',
-    'ПДФО',
-    'ВЗ',
-    'податок на лісові землі   млн. грн',
-    'дивіденди  млн. грн',
-    'інші   млн. грн',
-    'Недоїмка перед бюджетом  млн. грн',
-    'Недоїмка перед ПФ  млн. грн',
-    'Дебіторська заборгованість млн. грн',
-    'Кредиторська заборгованість млн. грн',
-    'Залишок коштів на рахунках  млн. грн'
-];
-
-const TABLE_2_SUB = new Set([
-    'єдиний соціальний внесок  млн. грн',
-    'рентна плата за спеціальне використання лісових ресурсів млн. грн',
-    'податок на додану вартість  млн. грн',
-    'податок на прибуток  млн. грн',
-    'ПДФО', 'ВЗ',
-    'податок на лісові землі   млн. грн',
-    'дивіденди  млн. грн',
-    'інші   млн. грн'
-]);
-
-// Animal names detected dynamically from indicator_group='animals' in DB
-
-// ===== Rendering =====
+// ===== Main renderer =====
 
 export function renderMonthlyReport(container, year, month) {
     if (!container) return;
     if (!month) month = getLatestMonth(year);
     if (!month) {
-        // Fallback: find latest month across all years
         const allMonths = summaryIndicators
-            .filter(r => r.month > 0 && r.value_numeric != null && (!r.sub_type || r.sub_type === 'value'))
+            .filter(r => r.month > 0 && r.value_numeric != null)
             .sort((a, b) => b.year - a.year || b.month - a.month);
         month = allMonths.length ? allMonths[0].month : 1;
     }
-    console.log(`renderMonthlyReport: year=${year}, month=${month}`);
 
-    const allYears = [...new Set(summaryIndicators.map(r => r.year))].sort();
+    const allYears = [...new Set(summaryIndicators.map(r => r.year).filter(y => y != null))].sort();
     const showYears = allYears.slice(-5);
-    // FIX #2: include ALL sub_types, not just 'value'
     const allData = summaryIndicators;
 
-    // Month selector
-    let monthSelectHtml = `<select id="monthlyMonthSelect" class="filter-select" style="width:auto;min-width:100px">
+    const monthSelectHtml = `<select id="monthlyMonthSelect" class="filter-select" style="width:auto;min-width:100px">
         ${MO.map((m, i) => `<option value="${i + 1}"${i + 1 === month ? ' selected' : ''}>${m}</option>`).join('')}
     </select>`;
 
@@ -269,24 +69,25 @@ export function renderMonthlyReport(container, year, month) {
         <div style="display:flex;gap:8px;align-items:center">${monthSelectHtml}</div>
     </div>`;
 
-    // Table 1: Main indicators
-    html += renderTable('Основні показники', TABLE_1_ROWS, SUB_INDICATORS, showYears, year, month, allData, 'monthly_t1');
+    // Table 1: Main indicators (M_FIN + M_REV + M_PROD + M_FOR)
+    const table1 = getIndicatorsByBlocks(MONTHLY_TABLE_1_BLOCKS);
+    html += renderIndicatorTable('Основні показники', table1, showYears, year, month, allData, 'monthly_t1');
 
-    // Table 1b: Animal limits
+    // Animals
     html += renderAnimalTable(showYears, year, allData);
 
-    // Table 2: Taxes
-    html += renderTable('Податки та збори', TABLE_2_ROWS, TABLE_2_SUB, showYears, year, month, allData, 'monthly_t2');
+    // Table 2: Taxes (M_TAX)
+    const table2 = getIndicatorsByBlocks(MONTHLY_TABLE_2_BLOCKS);
+    html += renderIndicatorTable('Податки та збори', table2, showYears, year, month, allData, 'monthly_t2');
 
-    // Table 3: Salaries by branch
+    // Salary per branch
     html += renderSalaryTable(showYears, year, month, allData);
 
-    // Reference info
+    // Reference block
     html += renderReferenceBlock(allData, year, month);
 
     container.innerHTML = html;
 
-    // Wire events
     wireMonthSelect(container, year);
     wireCollapse(container);
     wireRowClicks(container);
@@ -296,64 +97,17 @@ export function renderMonthlyReport(container, year, month) {
 }
 
 function getLatestMonth(year) {
-    // Find the latest month that has actual numeric data for the selected year
-    // Use only sub_type='value' to avoid false positives from volume/price records
     const months = summaryIndicators
-        .filter(r => r.year === year && r.month > 0 && r.value_numeric != null
-            && (!r.sub_type || r.sub_type === 'value'))
+        .filter(r => r.year === year && r.month > 0 && r.value_numeric != null && r.indicator_code)
         .map(r => r.month);
     return months.length ? Math.max(...months) : null;
 }
 
-// FIX #4: normalized matching for sub-indicators
-function isSub(name, subSet) {
-    const n = name.replace(/\s+/g, ' ').trim().toLowerCase();
-    return [...subSet].some(s => s.replace(/\s+/g, ' ').trim().toLowerCase() === n);
-}
+// ===== Generic indicator table (Table 1, Table 2) =====
 
-// Match indicator: collect ALL records with matching name, deduplicate by (year,month)
-function matchIndicator(name, allData) {
-    const lower = name.toLowerCase().replace(/\s+/g, ' ').trim();
-    const isVolPriceName = /м3.*цін|цін.*грн|сер\.\s*цін/.test(lower);
-    const exact = [];
-    const fuzzy = [];
+function renderIndicatorTable(title, indicators, showYears, year, month, allData, commentId) {
+    if (!indicators.length) return '';
 
-    for (const r of allData) {
-        const rk = r.indicator_name.toLowerCase().replace(/\s+/g, ' ').trim();
-        const rkIsVolPrice = /м3.*цін|цін.*грн|сер\.\s*цін/.test(rk);
-
-        // Don't mix vol/price indicators with regular ones
-        if (isVolPriceName !== rkIsVolPrice) continue;
-
-        if (rk === lower) {
-            exact.push(r);
-        } else if (lower.length <= 10) {
-            // Short names: also match "ПДФО" → "пдфо  млн. грн" (yearly sheet has units in name)
-            if (rk.startsWith(lower + ' ') || rk.startsWith(lower + '\u00A0')) {
-                fuzzy.push(r);
-            }
-        } else {
-            if (rk.includes(lower) || (lower.includes(rk) && rk.length > 10)) {
-                fuzzy.push(r);
-            }
-        }
-    }
-
-    // Deduplicate by (year,month): exact first, then fuzzy — only one record per (year,month)
-    const seen = new Set();
-    const result = [];
-    for (const r of exact) {
-        const key = `${r.year}|${r.month}`;
-        if (!seen.has(key)) { seen.add(key); result.push(r); }
-    }
-    for (const r of fuzzy) {
-        const key = `${r.year}|${r.month}`;
-        if (!seen.has(key)) { seen.add(key); result.push(r); }
-    }
-    return result;
-}
-
-function renderTable(title, rowNames, subSet, showYears, year, month, allData, commentId) {
     const comments = summaryBlockComments.filter(c => c.report_type === 'monthly' && c.block_id === commentId);
     const existingComment = comments[0];
 
@@ -372,94 +126,12 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
             </tr></thead>
             <tbody>`;
 
-    for (const name of rowNames) {
-        const sub = isSub(name, subSet);
-        const bold = BOLD_ROWS.has(name); // FIX #6
-        let displayName = sub ? `<span class="indent-sub">→ ${name}</span>` : name;
-        if (bold) displayName = `<b>${displayName}</b>`;
-
-        const rows = matchIndicator(name, allData);
-        const snapshot = isSnapshot(name);
-
-        let cells = `<td class="ind-name">${displayName}</td>`;
-        for (const y of showYears) {
-            if (y > year) { cells += '<td>—</td>'; continue; }
-
-            if (y === year) {
-                const ann = rows.find(r => r.year === y && r.month === 0);
-                if (ann?.value_text === '-' || ann?.value_text === '*' || ann?.value_text === 'Х') {
-                    cells += `<td><b>${ann.value_text}</b></td>`;
-                } else {
-                    const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
-                    if (monthlyRecords.length) {
-                        const firstVP = monthlyRecords.find(r => isVolPriceText(r.value_text));
-                        if (firstVP) {
-                            // Vol/price: sum volumes + weighted avg price
-                            const totalVol = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
-                            let num = 0, den = 0;
-                            for (const r of monthlyRecords) {
-                                const p = extractPrice(r.value_text);
-                                if (p != null && r.value_numeric) { num += r.value_numeric * p; den += r.value_numeric; }
-                            }
-                            const avgPrice = den > 0 ? Math.round(num / den) : null;
-                            cells += `<td><b>${fN(totalVol)}${avgPrice != null ? '/' + fN(avgPrice) : ''}</b></td>`;
-                        } else {
-                            const weightedYtd = getWeightedYtd(name, allData, y, month);
-                            const total = monthlyRecords.reduce((s, r) => s + r.value_numeric, 0);
-                            const ytd = weightedYtd != null ? weightedYtd : (snapshot ? total / monthlyRecords.length : total);
-                            cells += `<td><b>${fN(ytd)}</b></td>`;
-                        }
-                    } else {
-                        cells += `<td><b>${ann?.value_text ? toSlash(ann.value_text) : '—'}</b></td>`;
-                    }
-                }
-            } else {
-                // Past years
-                const ann = rows.find(r => r.year === y && r.month === 0);
-                if (ann?.value_text === '-' || ann?.value_text === '*' || ann?.value_text === 'Х') {
-                    cells += `<td>${ann.value_text}</td>`;
-                } else if (ann?.value_text && /[\/(]/.test(ann.value_text)) {
-                    cells += `<td>${toSlash(ann.value_text)}</td>`;
-                } else if (ann?.value_numeric != null) {
-                    cells += `<td>${fN(ann.value_numeric)}</td>`;
-                } else {
-                    const monthlyRecords = rows.filter(r => r.year === y && r.month > 0 && r.value_numeric != null);
-                    if (monthlyRecords.length) {
-                        const weightedYtd = getWeightedYtd(name, allData, y, 12);
-                        const val = weightedYtd != null ? weightedYtd : (snapshot
-                            ? monthlyRecords.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecords.length
-                            : monthlyRecords.reduce((s, r) => s + r.value_numeric, 0));
-                        cells += `<td>${fN(val)}</td>`;
-                    } else {
-                        cells += `<td>—</td>`;
-                    }
-                }
-            }
-        }
-
-        // FIX #3: delta — for January, compare with December of previous year
-        const monthRec = rows.find(r => r.year === year && r.month === month);
-        const prevMonthRec = month > 1
-            ? rows.find(r => r.year === year && r.month === month - 1)
-            : rows.find(r => r.year === year - 1 && r.month === 12);
-        const curVal = monthRec?.value_numeric;
-        const prevVal = prevMonthRec?.value_numeric;
-
-        // Show value_text for volume/price format (as slash), else numeric
-        const monthDisplay = (monthRec?.value_text && /[\/(]/.test(monthRec.value_text))
-            ? toSlash(monthRec.value_text)
-            : (curVal != null ? fN(curVal) : (monthRec?.value_text || '—'));
-        cells += `<td><b>${monthDisplay}</b></td>`;
-        cells += `<td class="${deltaCls(curVal, prevVal)}">${deltaBadge(curVal, prevVal) || '—'}</td>`;
-
-        cells = cells.replace(/^<td>/, `<td><span class="cell-text">`);
-        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name.replace(/"/g, '&quot;')}"></span></td>`);
-        html += `<tr class="clickable-row" data-indicator="${name.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
+    for (const ind of indicators) {
+        html += renderIndicatorRow(ind, showYears, year, month, allData);
     }
 
     html += `</tbody></table></div>`;
 
-    // FIX #9: comment full width
     const val = existingComment ? existingComment.content.replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
     html += `<div class="ws-block-comment monthly-comment-block">
         <textarea class="ws-comment-input monthly-comment" data-block="${commentId}" placeholder="Коментар..." rows="2">${val}</textarea>
@@ -470,12 +142,103 @@ function renderTable(title, rowNames, subSet, showYears, year, month, allData, c
     return html;
 }
 
-// Animal limits table
+function renderIndicatorRow(ind, showYears, year, month, allData) {
+    const displayName = ind.is_subitem
+        ? `<span class="indent-sub">→ ${ind.canonical_name}</span>`
+        : ind.canonical_name;
+    const finalName = ind.is_header
+        ? `<b>${displayName}</b>`
+        : displayName;
+
+    const isVolPrice = ind.value_kind === 'volprice';
+    const isText = ind.value_kind === 'text';
+
+    let cells = `<td class="ind-name">${finalName}</td>`;
+
+    // Year cells
+    for (const y of showYears) {
+        if (y > year) { cells += '<td>—</td>'; continue; }
+
+        const isCurrent = y === year;
+        const cellMonth = isCurrent ? month : 12;
+
+        let cellContent = '—';
+        let isBold = isCurrent;
+
+        if (isText) {
+            const last = findMonthlyRecords(ind.code, allData, y, cellMonth).pop();
+            cellContent = last?.value_text || '—';
+        } else if (isVolPrice) {
+            const { volume, avgPrice } = computeVolpriceYtd(ind, allData, y, cellMonth);
+            if (volume != null) {
+                cellContent = fN(volume) + (avgPrice != null ? '/' + fN(avgPrice) : '');
+            }
+        } else {
+            const ytd = computeYtd(ind, allData, y, cellMonth);
+            if (ytd != null) {
+                cellContent = typeof ytd === 'string' ? ytd : fN(ytd);
+            }
+        }
+
+        cells += isBold
+            ? `<td><b>${cellContent}</b></td>`
+            : `<td>${cellContent}</td>`;
+    }
+
+    // Current month cell + delta
+    let curDisplay = '—', curNum = null;
+    if (isText) {
+        const monthRec = findMonthRecord(ind.code, allData, year, month);
+        curDisplay = monthRec?.value_text || '—';
+    } else if (isVolPrice) {
+        const monthRec = findMonthRecord(ind.code, allData, year, month);
+        if (monthRec?.value_text) {
+            curDisplay = toSlash(monthRec.value_text);
+            curNum = monthRec.value_numeric; // volume
+        } else if (monthRec?.value_numeric != null) {
+            curDisplay = fN(monthRec.value_numeric);
+            curNum = monthRec.value_numeric;
+        }
+    } else if (ind.ytd_formula === 'derived') {
+        // Derived: compute for just-this-month using single-month range
+        const val = computeYtd(ind, allData, year, month);
+        if (val != null) { curDisplay = fN(val); curNum = val; }
+    } else {
+        const monthRec = findMonthRecord(ind.code, allData, year, month);
+        if (monthRec?.value_numeric != null) {
+            curDisplay = fN(monthRec.value_numeric);
+            curNum = monthRec.value_numeric;
+        } else if (monthRec?.value_text) {
+            curDisplay = monthRec.value_text;
+        }
+    }
+    cells += `<td><b>${curDisplay}</b></td>`;
+
+    // Delta vs previous month (Jan → Dec prev year)
+    let prevNum = null;
+    if (curNum != null && !isText) {
+        const prevMonth = month > 1 ? month - 1 : 12;
+        const prevYear  = month > 1 ? year : year - 1;
+        const prevRec = findMonthRecord(ind.code, allData, prevYear, prevMonth);
+        prevNum = prevRec?.value_numeric ?? null;
+    }
+    cells += `<td class="${deltaCls(curNum, prevNum)}">${deltaBadge(curNum, prevNum) || '—'}</td>`;
+
+    // Wrap for cell annotations
+    const indicatorKey = ind.code;
+    cells = cells.replace(/^<td class="ind-name">/, `<td class="ind-name"><span class="cell-text">`);
+    cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${indicatorKey}"></span></td>`);
+    return `<tr class="clickable-row" data-indicator="${indicatorKey}" data-display="${ind.canonical_name.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
+}
+
+// ===== Animals =====
+
 function renderAnimalTable(showYears, year, allData) {
+    const species = getAllSpecies();
+    if (!species.length) return '';
     const animalData = allData.filter(r => r.indicator_group === 'animals');
     if (!animalData.length) return '';
 
-    const animalNames = [...new Set(animalData.map(r => r.indicator_name))];
     const visibleYears = showYears.filter(y => y <= year);
 
     let html = `<div class="monthly-table-block">
@@ -488,14 +251,14 @@ function renderAnimalTable(showYears, year, allData) {
             <thead><tr><th>Вид</th>${visibleYears.map(y => `<th>${y} рік</th>`).join('')}</tr></thead>
             <tbody>`;
 
-    for (const name of animalNames) {
-        const rows = animalData.filter(r => r.indicator_name === name);
-        let cells = `<td class="ind-name"><span class="cell-text">${name}</span><span class="cell-anno-dot" data-indicator="${name.replace(/"/g, '&quot;')}"></span></td>`;
+    for (const sp of species) {
+        const rows = animalData.filter(r => r.indicator_code === sp.code);
+        let cells = `<td class="ind-name"><span class="cell-text">${sp.canonical_name}</span><span class="cell-anno-dot" data-indicator="${sp.code}"></span></td>`;
         for (const y of visibleYears) {
             const rec = rows.find(r => r.year === y);
             cells += `<td>${rec?.value_text || (rec?.value_numeric != null ? fN(rec.value_numeric) : '—')}</td>`;
         }
-        html += `<tr class="clickable-row" data-indicator="${name.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
+        html += `<tr class="clickable-row" data-indicator="${sp.code}" data-display="${sp.canonical_name.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
     }
 
     html += `</tbody></table></div>`;
@@ -512,36 +275,13 @@ function renderAnimalTable(showYears, year, allData) {
     return html;
 }
 
-function renderSalaryTable(showYears, year, month, allData) {
-    const EXCLUDE_SALARY = ['середня з/п по філіях', 'середня з/п по лісових', 'середня заробітна плата штатного'];
-    const salaryRows = allData.filter(r => {
-        const lower = r.indicator_name.toLowerCase();
-        if (EXCLUDE_SALARY.some(ex => lower.includes(ex))) return false;
-        if (lower.startsWith('*')) return false; // footnotes: *, **, ***
-        if (lower.startsWith('довідково')) return false;
-        if (lower.includes('прожитковий') || lower.includes('мінімальна заробітна') || lower.includes('середня заробітна плата в країні')) return false;
-        return r.indicator_group === 'salary_by_branch' ||
-            lower.includes('філія') || lower.includes('лісовий офіс') ||
-            lower.includes('навчальний центр') || lower.includes('репродуктивні') ||
-            lower.includes('пожежний') || lower.includes('карпатський') ||
-            lower.includes('південний') || lower.includes('північний') ||
-            lower.includes('подільський') || lower.includes('поліський') ||
-            lower.includes('слобожанський') || lower.includes('столичний') ||
-            lower.includes('східний') || lower.includes('центральний');
-    });
+// ===== Salary per branch =====
 
-    // Show branches in original Excel order (no alphabetical sort)
-    const seen = new Set();
-    let branchNames = salaryRows
-        .filter(r => r.year === year && r.value_numeric != null)
-        .map(r => r.indicator_name)
-        .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
-    if (!branchNames.length) {
-        seen.clear();
-        branchNames = salaryRows.map(r => r.indicator_name)
-            .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
-    }
-    if (!branchNames.length) return '';
+function renderSalaryTable(showYears, year, month, allData) {
+    const branches = getAllBranches();
+    if (!branches.length) return '';
+    const salaryRows = allData.filter(r => r.indicator_group === 'salary_by_branch');
+    if (!salaryRows.length) return '';
 
     const comments = summaryBlockComments.filter(c => c.report_type === 'monthly' && c.block_id === 'monthly_t3');
     const existingComment = comments[0];
@@ -562,42 +302,52 @@ function renderSalaryTable(showYears, year, month, allData) {
             </tr></thead>
             <tbody>`;
 
-    for (const name of branchNames) {
-        const rows = salaryRows.filter(r => r.indicator_name === name);
-        let cells = `<td class="ind-name">${name}</td>`;
+    // Ітерація по salary_branches (sort_order з БД) — 20 рядків
+    for (const br of branches) {
+        const rows = salaryRows.filter(r => r.indicator_code === br.code);
+        // Якщо для гілки нема жодного значення в жодному з видимих років — пропускаємо
+        const anyValue = rows.some(r => r.value_numeric != null && showYears.includes(r.year));
+        if (!anyValue) continue;
+
+        let cells = `<td class="ind-name">${br.canonical_name}</td>`;
         for (const y of showYears) {
-            if (y > year) { cells += '<td>—</td>'; continue; } // FIX #1
-            const ann = rows.find(r => r.year === y && r.month === 0);
-            if (ann?.value_numeric != null) {
-                const isCurrent = y === year;
-                cells += `<td${isCurrent ? '><b' : ''}>${fN(ann.value_numeric)}${isCurrent ? '</b>' : ''}</td>`;
-            } else if (y === year) {
-                const monthlyRecs = rows.filter(r => r.year === y && r.month > 0 && r.month <= month && r.value_numeric != null);
-                if (monthlyRecs.length) {
-                    const avg = monthlyRecs.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecs.length;
-                    cells += `<td><b>${fN(avg)}</b></td>`;
-                } else {
-                    cells += `<td>—</td>`;
-                }
+            if (y > year) { cells += '<td>—</td>'; continue; }
+            const monthlyRecs = rows.filter(r => r.year === y && r.month > 0 && r.month <= (y === year ? month : 12) && r.value_numeric != null);
+            const isCurrent = y === year;
+            let cellVal = null;
+            if (monthlyRecs.length) {
+                cellVal = monthlyRecs.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecs.length;
+            } else {
+                // Annual fallback (yearly file single snapshot)
+                const annual = rows.find(r => r.year === y && r.month === 0 && r.value_numeric != null);
+                if (annual) cellVal = annual.value_numeric;
+            }
+            if (cellVal != null) {
+                cells += isCurrent ? `<td><b>${fN(cellVal)}</b></td>` : `<td>${fN(cellVal)}</td>`;
             } else {
                 cells += `<td>—</td>`;
             }
         }
         const cur = rows.find(r => r.year === year && r.month === month);
-        // FIX #3: January → December prev year
         const prev = month > 1
             ? rows.find(r => r.year === year && r.month === month - 1)
             : rows.find(r => r.year === year - 1 && r.month === 12);
-        const curVal = cur?.value_numeric;
-        const prevVal = prev?.value_numeric;
+        const curVal = cur?.value_numeric ?? null;
+        const prevVal = prev?.value_numeric ?? null;
         cells += `<td><b>${curVal != null ? fN(curVal) : '—'}</b></td>`;
         cells += `<td class="${deltaCls(curVal, prevVal)}">${deltaBadge(curVal, prevVal) || '—'}</td>`;
-        // Region salary column
-        const regionRec = allData.find(r => r.indicator_group === 'region_salary' && r.indicator_name === name);
+
+        // Region salary column (матч по тому ж branch_code через region__<code>)
+        const regionRec = allData.find(r =>
+            r.indicator_group === 'region_salary' &&
+            r.indicator_code === 'region__' + br.code &&
+            r.year === year && r.month === month
+        );
         cells += `<td>${regionRec?.value_numeric != null ? fN(regionRec.value_numeric) : '—'}</td>`;
-        cells = cells.replace(/^<td>/, `<td><span class="cell-text">`);
-        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${name.replace(/"/g, '&quot;')}"></span></td>`);
-        html += `<tr class="clickable-row" data-indicator="${name.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
+
+        cells = cells.replace(/^<td class="ind-name">/, `<td class="ind-name"><span class="cell-text">`);
+        cells = cells.replace(/<\/td>/, `</span><span class="cell-anno-dot" data-indicator="${br.code}"></span></td>`);
+        html += `<tr class="clickable-row" data-indicator="${br.code}" data-display="${br.canonical_name.replace(/"/g, '&quot;')}" style="cursor:pointer">${cells}</tr>`;
     }
 
     html += `</tbody></table></div>`;
@@ -611,6 +361,8 @@ function renderSalaryTable(showYears, year, month, allData) {
     html += `</div></div>`;
     return html;
 }
+
+// ===== Reference =====
 
 const REFERENCE_CATEGORY_ORDER = [
     'subsistence_minimum', 'min_wage', 'country_avg_salary',
@@ -661,13 +413,10 @@ function renderReferenceBlock(allData, year, month) {
 
     let content = '';
     if (refText) {
-        // Format reference text from Excel — group by section headers
         const lines = refText.split('\n').filter(l => l.trim());
-        let currentSection = '';
         for (const line of lines) {
             const t = line.trim();
             if (/^[А-ЯЄЇҐA-Z]{3,}.*:$/.test(t) || /^ПММ:|^ГАЗ:|^ЕЛЕКТРОЕНЕРГІЯ:|^ПРОДУКТИ/i.test(t)) {
-                currentSection = t;
                 content += `<div class="ref-section"><div class="ref-title">${t}</div>`;
             } else if (/^прожитковий|^мінімальна|^середня заробітна/i.test(t)) {
                 content += `<div class="ref-section"><p>${t}</p></div>`;
@@ -723,7 +472,12 @@ function wireCollapse(container) {
 
 function wireRowClicks(container) {
     container.querySelectorAll('.clickable-row').forEach(row => {
-        row.onclick = () => openMonthlyIndicatorModal(row.dataset.indicator, '');
+        row.onclick = () => {
+            const code = row.dataset.indicator;
+            const display = row.dataset.display || code;
+            const ind = getIndicatorByCode(code);
+            openMonthlyIndicatorModal(ind?.canonical_name || display, '');
+        };
     });
 }
 

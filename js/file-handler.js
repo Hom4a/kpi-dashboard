@@ -36,13 +36,24 @@ export function setLoadWoodCallback(fn) { _loadWoodFn = fn; }
 const MARKET_COUNTRIES = ['україна', 'фінляндія', 'німеччина', 'польща', 'латвія', 'литва', 'швеція', 'норвегія', 'естонія', 'австрія'];
 
 export function detectFileType(wb, fileName) {
-    // Summary indicators: check FIRST — these files contain "залишок" which would misdetect as inventory
+    // Summary indicators: check FIRST — ці файли містять "залишок коштів" який би
+    // помилково матчився у inventory/forest.
     const sheetYears = wb.SheetNames.filter(n => /^20\d{2}$/.test(n.trim()));
-    if (sheetYears.length >= 2) return 'summary_indicators';
-    if ((fileName || '').toLowerCase().includes('основні показники')) return 'summary_indicators';
+    if (sheetYears.length >= 1) return 'summary_indicators';
+    const fnLower = (fileName || '').toLowerCase();
+    if (fnLower.includes('основні показники') || /\d{4}\s*рік/i.test(fnLower)) {
+        return 'summary_indicators';
+    }
 
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, raw: true });
+
+    // Content-based summary detection: yearly-file заголовки першого стовпчика
+    const firstCol = rows.slice(0, 80).map(r => ((r?.[0] || '') + '').toLowerCase());
+    const hasFop        = firstCol.some(c => c.includes('фонд оплати праці'));
+    const hasHeadcount  = firstCol.some(c => c.includes('чисельність штатних'));
+    const hasTaxes      = firstCol.some(c => c.includes('сплачено податків'));
+    if ((hasFop && hasHeadcount) || hasTaxes) return 'summary_indicators';
     let countryHits = 0;
     for (let i = 0; i < Math.min(15, rows.length); i++) {
         const row = (rows[i] || []).map(c => (c || '').toString().toLowerCase());

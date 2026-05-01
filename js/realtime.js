@@ -17,8 +17,13 @@ const MONITORED_TABLES = [
     'harvesting_plan_fact',
     'harvesting_zsu',
     'market_prices',
-    'summary_indicators',
-    'summary_weekly'
+    // On-prem нормалізовані таблиці summary (всі мапляться на один event)
+    'indicator_values',
+    'indicator_volprice_values',
+    'salary_values',
+    'animal_values',
+    'weekly_indicator_values',
+    'weekly_notes',
 ];
 
 const TABLE_EVENT_MAP = {
@@ -28,8 +33,12 @@ const TABLE_EVENT_MAP = {
     harvesting_plan_fact: 'data:harvesting-loaded',
     harvesting_zsu: 'data:harvesting-loaded',
     market_prices: 'data:market-loaded',
-    summary_indicators: 'data:summary-loaded',
-    summary_weekly: 'data:summary-loaded'
+    indicator_values: 'data:summary-loaded',
+    indicator_volprice_values: 'data:summary-loaded',
+    salary_values: 'data:summary-loaded',
+    animal_values: 'data:summary-loaded',
+    weekly_indicator_values: 'data:summary-loaded',
+    weekly_notes: 'data:summary-loaded',
 };
 
 export function startRealtime(reloadCallbacks) {
