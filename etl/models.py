@@ -114,6 +114,46 @@ class ReferenceText(BaseModel):
     source_priority: int
 
 
+class SalaryValue(BaseModel):
+    """Salary fact for one branch (forestry office, central office, center).
+
+    Each row is a single salary observation tied to a branch + period.
+    The branch is identified by its **verbatim Excel name** — repository
+    layer maps it to a stable ``salary_branches.code`` via the alias
+    table; the parser deliberately keeps source text intact so cell
+    quotes (``Філія "Карпатський лісовий офіс"``) and whitespace can
+    be inspected for ETL audit.
+
+    ``month`` follows ReferenceText semantics:
+
+      * ``0``       — annual average (yearly Excel C14; osnovni C2-C6 —
+                       each year column is itself a per-year average).
+      * ``1..12``   — monthly snapshot from the corresponding column.
+
+    YTD column (13) is not used: salary spreadsheets do not produce a
+    separate YTD figure — the average is the year-level value.
+
+    Two numeric columns are tracked side-by-side because the source
+    workbooks pair them in one row:
+
+      * ``salary_uah``      — paid average for the branch.
+      * ``region_avg_uah``  — comparator (state-published regional
+                              average for the same period); may be
+                              absent in older formats.
+    """
+
+    branch_name: str
+    year: int
+    month: int = Field(ge=0, le=12)
+    salary_uah: float | None = None
+    region_avg_uah: float | None = None
+    source_file: str
+    source_row: int
+    vintage_date: datetime
+    report_type: ReportType
+    source_priority: int
+
+
 class ParseResult(BaseModel):
     """Output of any parser: typed rows + diagnostics."""
 
@@ -122,5 +162,6 @@ class ParseResult(BaseModel):
     species_annual: list[SpeciesAnnual] = Field(default_factory=list)
     species_monthly: list[SpeciesMonthly] = Field(default_factory=list)
     reference: list[ReferenceText] = Field(default_factory=list)
+    salary: list[SalaryValue] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)

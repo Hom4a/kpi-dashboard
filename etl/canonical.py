@@ -12,6 +12,7 @@ from .models import (
     AnnualValue,
     MonthlyValue,
     ReferenceText,
+    SalaryValue,
     SpeciesAnnual,
     SpeciesMonthly,
 )
@@ -102,3 +103,39 @@ def canonical_reference(
         ):
             best[k] = f
     return sorted(best.values(), key=lambda r: (r.category, r.year, r.month))
+
+
+def canonical_salary(
+    facts: Iterable[SalaryValue],
+) -> list[SalaryValue]:
+    """One row per ``(branch_name, year, month)`` — highest priority,
+    newest vintage, smallest source_row, with deterministic ordering.
+
+    Resolution rule (lexicographic):
+
+        1. Highest ``source_priority`` wins.
+        2. Tie-break by latest ``vintage_date``.
+        3. Final tie-break by smallest ``source_row`` (first occurrence
+           in source). If everything ties, input order decides — the
+           earlier fact stays.
+
+    Inlines its own picker (mirroring ``canonical_reference``) rather than
+    reusing ``_pick_canonical`` so reruns over the same workbook produce
+    byte-identical output for diffing.
+
+    Output is sorted by ``(branch_name, year, month)``.
+    """
+    best: dict[tuple[str, int, int], SalaryValue] = {}
+    for f in facts:
+        k = (f.branch_name, f.year, f.month)
+        current = best.get(k)
+        if current is None:
+            best[k] = f
+            continue
+        if (f.source_priority, f.vintage_date, -f.source_row) > (
+            current.source_priority,
+            current.vintage_date,
+            -current.source_row,
+        ):
+            best[k] = f
+    return sorted(best.values(), key=lambda r: (r.branch_name, r.year, r.month))

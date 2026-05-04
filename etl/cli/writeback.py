@@ -28,6 +28,7 @@ from etl.canonical import (
     canonical_annual,
     canonical_monthly,
     canonical_reference,
+    canonical_salary,
     canonical_species_annual,
     canonical_species_monthly,
 )
@@ -37,6 +38,7 @@ from etl.models import (
     MonthlyValue,
     ParseResult,
     ReferenceText,
+    SalaryValue,
     SpeciesAnnual,
     SpeciesMonthly,
 )
@@ -160,6 +162,7 @@ class PipelineOutput:
     canonical_species_annual: list[SpeciesAnnual]
     canonical_species_monthly: list[SpeciesMonthly]
     canonical_reference: list[ReferenceText]
+    canonical_salary: list[SalaryValue]
     derived_annual: list[AnnualValue]
 
 
@@ -176,6 +179,7 @@ def run_full_pipeline(xlsx_path: Path) -> PipelineOutput:
     canon_sa = canonical_species_annual(raw.species_annual)
     canon_sm = canonical_species_monthly(raw.species_monthly)
     canon_ref = canonical_reference(raw.reference)
+    canon_sal = canonical_salary(raw.salary)
     derived = compute_derived_annual(canon_a)
 
     return PipelineOutput(
@@ -186,6 +190,7 @@ def run_full_pipeline(xlsx_path: Path) -> PipelineOutput:
         canonical_species_annual=canon_sa,
         canonical_species_monthly=canon_sm,
         canonical_reference=canon_ref,
+        canonical_salary=canon_sal,
         derived_annual=derived,
     )
 
