@@ -400,21 +400,12 @@ function renderReferenceBlock(allData, year, month) {
 
     // Stage 2: same-year annual snapshot (year, 0)
     // Archival reference (2023/2024/2025, 0) is an annual snapshot — month=0.
-    // Without this stage, archival year views fall through to Stage 3 and
-    // render the unrelated newest period (2026/3) — see sub-step 6.x.c.
+    // No Stage 3 (global newest) — better to show empty placeholder than
+    // to cross-pollinate archival views with current month reference.
     if (refRows.length === 0) {
         refRows = allData.filter(
             r => r.indicator_group === 'reference' && r.year === year && r.month === 0
         );
-    }
-
-    // Stage 3: global newest across years — final fallback
-    if (refRows.length === 0) {
-        const all = allData.filter(r => r.indicator_group === 'reference');
-        if (all.length > 0) {
-            const newest = all.sort((a, b) => b.year - a.year || b.month - a.month)[0];
-            refRows = all.filter(r => r.year === newest.year && r.month === newest.month);
-        }
     }
 
     refRows.sort((a, b) => {
@@ -444,7 +435,7 @@ function renderReferenceBlock(allData, year, month) {
             }
         }
     } else {
-        content = '<p style="color:var(--text3);font-size:12px">Довідкові дані відсутні. Завантажте Excel файл.</p>';
+        content = '<p class="reference-empty" style="color:var(--text3);font-size:12px">Немає даних</p>';
     }
 
     return `<div class="monthly-table-block">
