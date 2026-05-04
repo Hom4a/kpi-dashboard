@@ -82,6 +82,7 @@ def _fake_pipeline(
         canonical_species_monthly=[],
         canonical_reference=[],
         canonical_salary=[],
+        canonical_animal=[],
         derived_annual=[],
     )
 

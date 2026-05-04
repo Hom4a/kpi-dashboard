@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 from openpyxl import load_workbook
 
 from etl.canonical import (
+    canonical_animal,
     canonical_annual,
     canonical_monthly,
     canonical_reference,
@@ -34,6 +35,7 @@ from etl.canonical import (
 )
 from etl.derived import compute_derived_annual
 from etl.models import (
+    AnimalValue,
     AnnualValue,
     MonthlyValue,
     ParseResult,
@@ -163,6 +165,7 @@ class PipelineOutput:
     canonical_species_monthly: list[SpeciesMonthly]
     canonical_reference: list[ReferenceText]
     canonical_salary: list[SalaryValue]
+    canonical_animal: list[AnimalValue]
     derived_annual: list[AnnualValue]
 
 
@@ -180,6 +183,7 @@ def run_full_pipeline(xlsx_path: Path) -> PipelineOutput:
     canon_sm = canonical_species_monthly(raw.species_monthly)
     canon_ref = canonical_reference(raw.reference)
     canon_sal = canonical_salary(raw.salary)
+    canon_anim = canonical_animal(raw.animal)
     derived = compute_derived_annual(canon_a)
 
     return PipelineOutput(
@@ -191,6 +195,7 @@ def run_full_pipeline(xlsx_path: Path) -> PipelineOutput:
         canonical_species_monthly=canon_sm,
         canonical_reference=canon_ref,
         canonical_salary=canon_sal,
+        canonical_animal=canon_anim,
         derived_annual=derived,
     )
 

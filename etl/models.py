@@ -154,6 +154,44 @@ class SalaryValue(BaseModel):
     source_priority: int
 
 
+class AnimalValue(BaseModel):
+    """Animal census fact for one species + year.
+
+    Annual-only model (no period_month) — animal census is published
+    yearly by Ukrainian state forestry authorities.
+
+    ``species_name`` is captured **verbatim** from the Excel cell
+    (with abbreviations like ``"Олень благор."`` kept intact).
+    Repository layer maps it to a stable ``animal_species.id`` via
+    the alias table (``animal_species_aliases``) — the parser
+    deliberately keeps source text intact for audit.
+
+    ``population`` — integer head count (Excel always emits integers,
+    not decimals).
+
+    ``limit_qty`` — optional hunting limit count. Always ``None`` in
+    current production data because Excel uses ``"*"`` as a footnote
+    marker meaning "limit not yet defined". The schema accepts
+    integers for the future when limits become enforceable.
+
+    ``raw_text`` — full original cell content (e.g.,
+    ``"Олень благор. 3787/*"``) preserved for audit. Frontend may
+    use it to display footnote annotations alongside the parsed
+    population figure.
+    """
+
+    species_name: str
+    year: int
+    population: int
+    limit_qty: int | None = None
+    raw_text: str
+    source_file: str
+    source_row: int
+    vintage_date: datetime
+    report_type: ReportType
+    source_priority: int
+
+
 class ParseResult(BaseModel):
     """Output of any parser: typed rows + diagnostics."""
 
@@ -163,5 +201,6 @@ class ParseResult(BaseModel):
     species_monthly: list[SpeciesMonthly] = Field(default_factory=list)
     reference: list[ReferenceText] = Field(default_factory=list)
     salary: list[SalaryValue] = Field(default_factory=list)
+    animal: list[AnimalValue] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)

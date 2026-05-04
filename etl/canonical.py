@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from typing import TypeVar
 
 from .models import (
+    AnimalValue,
     AnnualValue,
     MonthlyValue,
     ReferenceText,
@@ -139,3 +140,30 @@ def canonical_salary(
         ):
             best[k] = f
     return sorted(best.values(), key=lambda r: (r.branch_name, r.year, r.month))
+
+
+def canonical_animal(facts: Iterable[AnimalValue]) -> list[AnimalValue]:
+    """One row per ``(species_name, year)`` — same 3-tier tie-break as
+    canonical_salary / canonical_reference: priority DESC, vintage DESC,
+    source_row ASC.
+
+    Inlines its own picker (mirroring ``canonical_reference`` and
+    ``canonical_salary``) rather than reusing ``_pick_canonical`` so
+    reruns over the same workbook produce byte-identical output.
+
+    Output is sorted by ``(species_name, year)``.
+    """
+    best: dict[tuple[str, int], AnimalValue] = {}
+    for f in facts:
+        k = (f.species_name, f.year)
+        current = best.get(k)
+        if current is None:
+            best[k] = f
+            continue
+        if (f.source_priority, f.vintage_date, -f.source_row) > (
+            current.source_priority,
+            current.vintage_date,
+            -current.source_row,
+        ):
+            best[k] = f
+    return sorted(best.values(), key=lambda r: (r.species_name, r.year))
