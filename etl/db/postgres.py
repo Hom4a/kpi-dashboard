@@ -19,6 +19,7 @@ from etl.models import (
     AnnualValue,
     MonthlyValue,
     ReferenceText,
+    SalaryValue,
     SpeciesAnnual,
     SpeciesMonthly,
 )
@@ -207,13 +208,28 @@ class PostgresRepository(Repository):
         # via FakeRepository in unit tests for now).
         return None
 
+    def get_canonical_salary(
+        self, branch_name: str, year: int, month: int
+    ) -> SalaryValue | None:
+        # Stub — real read-back lands in sub-step 5.4.4.c+ together with
+        # the salary write path. Existing get_canonical_* stubs share the
+        # same temporary shape (return None until queried by tests).
+        return None
+
     def get_revision_history(
         self,
         kind: str,
         entity: str,
         year: int,
         month: int | None = None,
-    ) -> list[AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText]:
+    ) -> list[
+        AnnualValue
+        | MonthlyValue
+        | SpeciesAnnual
+        | SpeciesMonthly
+        | ReferenceText
+        | SalaryValue
+    ]:
         # 5.3.4 will implement this against fact_revisions table.
         return []
 

@@ -19,6 +19,7 @@ from etl.models import (
     AnnualValue,
     MonthlyValue,
     ReferenceText,
+    SalaryValue,
     SpeciesAnnual,
     SpeciesMonthly,
 )
@@ -241,13 +242,27 @@ class FakeRepository(Repository):
     ) -> ReferenceText | None:
         return self._canon_reference.get((category, year, month))
 
+    def get_canonical_salary(
+        self, branch_name: str, year: int, month: int
+    ) -> SalaryValue | None:
+        # Stub — real lookup lands in sub-step 5.4.4.c (FakeRepository
+        # gains _canon_salary dict + write-path support).
+        return None
+
     def get_revision_history(
         self,
         kind: str,
         entity: str,
         year: int,
         month: int | None = None,
-    ) -> list[AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText]:
+    ) -> list[
+        AnnualValue
+        | MonthlyValue
+        | SpeciesAnnual
+        | SpeciesMonthly
+        | ReferenceText
+        | SalaryValue
+    ]:
         valid = (
             "annual", "monthly", "species_annual", "species_monthly", "reference",
         )

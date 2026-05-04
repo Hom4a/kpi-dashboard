@@ -8,6 +8,7 @@ from etl.models import (
     AnnualValue,
     MonthlyValue,
     ReferenceText,
+    SalaryValue,
     SpeciesAnnual,
     SpeciesMonthly,
 )
@@ -24,6 +25,7 @@ def build_batch_from_canonical(
     species_annual: list[SpeciesAnnual] | None = None,
     species_monthly: list[SpeciesMonthly] | None = None,
     reference: list[ReferenceText] | None = None,
+    salary: list[SalaryValue] | None = None,
 ) -> WriteBatch:
     """Pack canonical-resolution output into a single ``WriteBatch``.
 
@@ -40,4 +42,5 @@ def build_batch_from_canonical(
         species_annual=list(species_annual or []),
         species_monthly=list(species_monthly or []),
         reference=list(reference or []),
+        salary=list(salary or []),
     )

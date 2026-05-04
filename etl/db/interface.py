@@ -15,6 +15,7 @@ from etl.models import (
     AnnualValue,
     MonthlyValue,
     ReferenceText,
+    SalaryValue,
     SpeciesAnnual,
     SpeciesMonthly,
 )
@@ -36,6 +37,7 @@ class WriteBatch:
     species_annual: list[SpeciesAnnual] = field(default_factory=list)
     species_monthly: list[SpeciesMonthly] = field(default_factory=list)
     reference: list[ReferenceText] = field(default_factory=list)
+    salary: list[SalaryValue] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -107,17 +109,38 @@ class Repository(ABC):
         """Read back current canonical reference text for a category-period."""
 
     @abstractmethod
+    def get_canonical_salary(
+        self, branch_name: str, year: int, month: int
+    ) -> SalaryValue | None:
+        """Read back current canonical salary for a branch-period.
+
+        ``branch_name`` is the **verbatim** Excel string (with quotes,
+        trailing ``**`` etc.) — repository implementations resolve it
+        to a stable ``salary_branches.id`` via the alias table.
+        ``month`` follows ``SalaryValue`` semantics: ``0`` for the
+        annual average, ``1..12`` for monthly snapshots.
+        """
+
+    @abstractmethod
     def get_revision_history(
         self,
         kind: str,
         entity: str,
         year: int,
         month: int | None = None,
-    ) -> list[AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText]:
+    ) -> list[
+        AnnualValue
+        | MonthlyValue
+        | SpeciesAnnual
+        | SpeciesMonthly
+        | ReferenceText
+        | SalaryValue
+    ]:
         """All historical revisions for an ``(entity, period)``, oldest first.
 
         ``kind`` is one of: ``annual`` / ``monthly`` / ``species_annual`` /
-        ``species_monthly`` / ``reference``. ``entity`` is the
+        ``species_monthly`` / ``reference`` / ``salary``. ``entity`` is the
         ``metric_code`` for scalar kinds, the species code for species
-        kinds, or the category slug for reference.
+        kinds, the category slug for reference, or the branch name
+        (verbatim) for salary.
         """
