@@ -28,10 +28,12 @@ from .models import (
     MonthlyValue,
     ParseResult,
     ReferenceText,
+    SalaryValue,
     SpeciesAnnual,
     SpeciesMonthly,
 )
 from .parsers_reference import extract_reference_block
+from .parsers_salary import extract_salary_block
 from .report_metadata import ReportMetadata, infer_report_metadata
 from .utils import parse_composite_cell, safe_number
 
@@ -123,6 +125,8 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
     species_annual: list[SpeciesAnnual] = []
     species_monthly: list[SpeciesMonthly] = []
     reference: list[ReferenceText] = []
+    salary: list[SalaryValue] = []
+    salary_header_row: int | None = None
     warnings: list[str] = list(base_meta.warnings)
 
     sheet_year = next(iter(month_map.values()))[0]
@@ -136,6 +140,7 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
         a_norm = " ".join(a_name.split()).casefold()
 
         if _SALARY_SECTION_MARKER in a_norm:
+            salary_header_row = row_idx
             break
 
         if a_norm in _SECTION_HEADERS:
@@ -241,6 +246,20 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
         if warn and warn != "empty_marker":
             warnings.append(f"row {row_idx} col {YTD_COL} {metric_code}: {warn}")
 
+    # «Середня з/п по лісових офісах» — main loop captured the header row
+    # before breaking; extractor walks downward from there.
+    sal_rows, sal_warns = extract_salary_block(
+        ws,
+        month_map=month_map,
+        ytd_year=sheet_year,
+        source_file=path_str,
+        base_meta=base_meta,
+        ytd_meta=ytd_meta,
+        start_row=salary_header_row,
+    )
+    salary.extend(sal_rows)
+    warnings.extend(sal_warns)
+
     # «Довідково» — extracted independently of the main metric loop so the
     # SALARY_SECTION_MARKER break above can't mask it. The extractor scans
     # the sheet for its own header (single sheet only — no roaming).
@@ -262,6 +281,7 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
         species_annual=species_annual,
         species_monthly=species_monthly,
         reference=reference,
+        salary=salary,
         warnings=warnings,
     )
 
