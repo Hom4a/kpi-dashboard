@@ -22,10 +22,12 @@ from .models import (
     MonthlyValue,
     ParseResult,
     ReferenceText,
+    SalaryValue,
     SpeciesAnnual,
     SpeciesMonthly,
 )
 from .parsers_reference import extract_reference_block
+from .parsers_salary import extract_salary_block_osnovni
 from .report_metadata import infer_report_metadata
 from .utils import parse_composite_cell, safe_number
 
@@ -52,6 +54,11 @@ _SECTION_HEADERS: frozenset[str] = frozenset(
         "довідково:",
     }
 )
+
+# Mirrors parsers_salary._SALARY_HEADER_KEYWORD; kept duplicate (not imported)
+# because parser_osnovni decides whether to *capture* the row index or *skip*
+# the section, while parsers_salary decides whether to *find* the header.
+_SALARY_SECTION_MARKER = "середня з/п по"
 
 
 def _find_header_row(ws: object, max_scan: int = 10) -> int | None:
@@ -92,6 +99,8 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
     species_annual: list[SpeciesAnnual] = []
     species_monthly: list[SpeciesMonthly] = []
     reference: list[ReferenceText] = []
+    salary: list[SalaryValue] = []
+    salary_header_row: int | None = None
     warnings: list[str] = list(meta.warnings)
     errors: list[str] = []
 
@@ -115,6 +124,14 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
 
         a_name = str(a_raw).strip()
         a_norm = " ".join(a_name.split()).casefold()
+
+        # Salary section is parsed separately by extract_salary_block_osnovni;
+        # capturing the header row here lets us hand it off without rescanning.
+        # Must run before _SECTION_HEADERS check (the salary header isn't a
+        # section banner but is still distinct from metric rows).
+        if _SALARY_SECTION_MARKER in a_norm:
+            salary_header_row = row_idx
+            break
 
         if a_norm in _SECTION_HEADERS:
             continue
@@ -216,6 +233,23 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
             if warn and warn != "empty_marker":
                 warnings.append(f"row {row_idx} col 7 {metric_code}: {warn}")
 
+    # «Середня з/п по філіях» — main loop captured the header row before
+    # breaking; extractor walks downward from there. C2..C6 → month=0 per
+    # year, C7 → (current_year, current_month). C8 (Minfin region with
+    # 2-month lag) is intentionally not parsed — see Q1.D in 5.4.3.
+    sal_rows, sal_warns = extract_salary_block_osnovni(
+        ws,
+        annual_columns=ANNUAL_COLUMNS,
+        current_month_col=7,
+        current_year=current_year,
+        current_month=current_month,
+        source_file=path_str,
+        base_meta=meta,
+        start_row=salary_header_row,
+    )
+    salary.extend(sal_rows)
+    warnings.extend(sal_warns)
+
     # «Довідково» — extracted post-loop, independent of metric scanning.
     # ws here is worksheets[0] only (osnovni multi-sheet copies on
     # year-sheets are not iterated, satisfying edge-case E1).
@@ -237,6 +271,7 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
         species_annual=species_annual,
         species_monthly=species_monthly,
         reference=reference,
+        salary=salary,
         warnings=warnings,
         errors=errors,
     )

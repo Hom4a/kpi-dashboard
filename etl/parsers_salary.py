@@ -209,4 +209,110 @@ def extract_salary_block(
     return rows, warnings
 
 
-__all__ = ["extract_salary_block"]
+def extract_salary_block_osnovni(
+    ws: Any,
+    *,
+    annual_columns: tuple[tuple[int, int, bool], ...],
+    current_month_col: int,
+    current_year: int | None,
+    current_month: int | None,
+    source_file: str,
+    base_meta: ReportMetadata,
+    start_row: int | None = None,
+) -> tuple[list[SalaryValue], list[str]]:
+    """Walk the salary-by-branch section of an osnovni («Основні показники»)
+    workbook (format B — wide-by-year).
+
+    Geometry differs from yearly format:
+
+      * Columns C2..C6 each carry a per-year average (``2022 рік`` …
+        ``2026 рік``); the last (``is_ytd=True``) is a partial YTD when
+        the file's current month < 12, but we emit it with the same
+        shape — canonical resolution by ``priority``/``vintage_date``
+        will pick a fully-closed yearly file's value over an osnovni
+        partial when both exist.
+      * Column C7 carries the current-month snapshot
+        (e.g. ``"березень 2026"``); we emit only when the parser
+        successfully decoded both year and month from the header.
+      * Column C8 is a Minfin region salary with a 2-month lag
+        (``"за січень 2026"`` in a March file). Per design decision
+        Q1.D in 5.4.3 we do NOT parse it here — ``region_avg_uah``
+        is always ``None`` for osnovni emits. Frontend's region
+        comparator can read yearly files instead.
+
+    Per design decision Q2.B in 5.4.3, all C2..C6 emits use ``month=0``
+    (annual-snapshot semantics) regardless of ``is_ytd``. The
+    distinction is preserved in canonical revisions through
+    ``vintage_date``, not the month coordinate.
+
+    Per design decision Q1.D, ``base_meta`` is applied to all emits
+    (no ``ytd_meta`` split). Osnovni files have a single revision
+    profile (``operational``/priority=10 in production).
+    """
+    rows: list[SalaryValue] = []
+    warnings: list[str] = []
+
+    header_row = (
+        start_row if start_row is not None else _find_salary_header_row(ws)
+    )
+    if header_row is None:
+        warnings.append("no_salary_block_found")
+        return rows, warnings
+
+    empty_streak = 0
+
+    for row_idx in range(header_row + 1, ws.max_row + 1):
+        a = ws.cell(row_idx, 1).value
+        a_str = "" if a is None else str(a).strip()
+
+        action, empty_streak = _should_stop_at_row(a_str, empty_streak)
+        if action == "stop":
+            break
+        if action == "skip":
+            continue
+
+        branch_name = a_str  # verbatim — '**' suffix kept intact
+
+        for col_idx, year, _is_ytd in annual_columns:
+            val, _warn, _raw = safe_number(ws.cell(row_idx, col_idx).value)
+            if val is None:
+                continue   # closed/pending/empty — variant B skip
+            rows.append(
+                SalaryValue(
+                    branch_name=branch_name,
+                    year=year,
+                    month=0,
+                    salary_uah=val,
+                    region_avg_uah=None,
+                    source_file=source_file,
+                    source_row=row_idx,
+                    vintage_date=base_meta.vintage_date,
+                    report_type=base_meta.report_type,
+                    source_priority=base_meta.source_priority,
+                )
+            )
+
+        if current_year is not None and current_month is not None:
+            val, _warn, _raw = safe_number(
+                ws.cell(row_idx, current_month_col).value
+            )
+            if val is not None:
+                rows.append(
+                    SalaryValue(
+                        branch_name=branch_name,
+                        year=current_year,
+                        month=current_month,
+                        salary_uah=val,
+                        region_avg_uah=None,
+                        source_file=source_file,
+                        source_row=row_idx,
+                        vintage_date=base_meta.vintage_date,
+                        report_type=base_meta.report_type,
+                        source_priority=base_meta.source_priority,
+                    )
+                )
+
+    return rows, warnings
+
+
+__all__ = ["extract_salary_block", "extract_salary_block_osnovni"]
