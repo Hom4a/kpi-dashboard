@@ -1,0 +1,16 @@
+-- Rollback for migration 22.
+--
+-- This migration replaced the body of fn_upload_monthly_batch.
+-- CREATE OR REPLACE cannot be auto-undone; restore is manual from
+-- the pre-apply backup:
+--
+--   sql/backups/fn_upload_monthly_batch_pre_22.sql
+--
+-- That file is the verbatim output of pg_get_functiondef(oid) taken
+-- at apply time. To restore the previous behaviour:
+--
+--   cat sql/backups/fn_upload_monthly_batch_pre_22.sql | \
+--       ssh valeriy@10.0.18.16 "docker exec -i supabase-db psql -U postgres"
+--
+-- After restore, frontend reference uploads will silently drop again
+-- (Phase 1 behaviour: indicator_name='Довідково' caught by HEADER_NAMES).
