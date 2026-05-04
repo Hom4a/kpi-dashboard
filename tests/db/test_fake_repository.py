@@ -3,9 +3,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+
 from etl.db.batch import build_batch_from_canonical
 from etl.db.fake import FakeRepository
-from etl.models import AnnualValue, MonthlyValue, ReferenceText, SpeciesAnnual
+from etl.models import (
+    AnnualValue,
+    MonthlyValue,
+    ReferenceText,
+    SalaryValue,
+    SpeciesAnnual,
+)
 
 
 def _annual(
@@ -522,3 +530,187 @@ def test_get_revision_history_reference() -> None:
     )
     contents = [r.content for r in history]  # type: ignore[union-attr]
     assert contents == ["content v1", "content v2"]  # oldest first
+
+
+# ---------------------------------------------------------------------
+# Salary tests (sub-step 5.4.4.d) — mirror reference branch architecture
+# ---------------------------------------------------------------------
+
+def _salary(
+    *,
+    branch_name: str = "Карпатський лісовий офіс",
+    year: int = 2025,
+    month: int = 1,
+    salary_uah: float | None = 25000.0,
+    region_avg_uah: float | None = 22000.0,
+    priority: int = 10,
+    vintage: datetime | None = None,
+    source_row: int = 70,
+) -> SalaryValue:
+    return SalaryValue(
+        branch_name=branch_name,
+        year=year,
+        month=month,
+        salary_uah=salary_uah,
+        region_avg_uah=region_avg_uah,
+        source_file="2025_рік.xlsx",
+        source_row=source_row,
+        vintage_date=vintage or datetime(2026, 1, 31),
+        report_type="operational",
+        source_priority=priority,
+    )
+
+
+def test_salary_write_idempotent() -> None:
+    """Re-writing the same SalaryValue is a no-op."""
+    repo = FakeRepository()
+    fact = _salary(salary_uah=25000.0)
+    batch = build_batch_from_canonical(
+        source_file="2025_рік.xlsx",
+        vintage_date=fact.vintage_date,
+        salary=[fact],
+    )
+
+    r1 = repo.write_batch(batch)
+    r2 = repo.write_batch(batch)
+
+    assert r1.rows_to_revisions == 1
+    assert r2.rows_to_revisions == 0  # signature already in _seen
+    history = repo.get_revision_history(
+        "salary", "Карпатський лісовий офіс", 2025, month=1
+    )
+    assert len(history) == 1
+
+
+def test_salary_canonical_resolution_priority() -> None:
+    """Higher source_priority wins for the same (branch, year, month)."""
+    repo = FakeRepository()
+    op = _salary(salary_uah=25000.0, priority=10)
+    acct = _salary(
+        salary_uah=27500.0, priority=20,
+        vintage=datetime(2026, 1, 31),
+    )
+    repo.write_batch(build_batch_from_canonical(
+        source_file="src.xlsx",
+        vintage_date=op.vintage_date,
+        salary=[op, acct],
+    ))
+
+    canon = repo.get_canonical_salary("Карпатський лісовий офіс", 2025, 1)
+    assert canon is not None
+    assert canon.salary_uah == 27500.0
+    assert canon.source_priority == 20
+
+
+def test_salary_canonical_resolution_vintage_tiebreaker() -> None:
+    """Same priority — newer vintage_date wins."""
+    repo = FakeRepository()
+    older = _salary(
+        salary_uah=24000.0, priority=10,
+        vintage=datetime(2026, 1, 31),
+    )
+    newer = _salary(
+        salary_uah=26000.0, priority=10,
+        vintage=datetime(2026, 4, 25),
+    )
+    repo.write_batch(build_batch_from_canonical(
+        source_file="src.xlsx",
+        vintage_date=newer.vintage_date,
+        salary=[older, newer],
+    ))
+
+    canon = repo.get_canonical_salary("Карпатський лісовий офіс", 2025, 1)
+    assert canon is not None
+    assert canon.salary_uah == 26000.0
+
+
+def test_salary_canonical_resolution_source_row_tiebreaker() -> None:
+    """Same priority + same vintage — smaller source_row wins."""
+    repo = FakeRepository()
+    later_row = _salary(salary_uah=24000.0, source_row=85)
+    earlier_row = _salary(salary_uah=26000.0, source_row=70)
+    repo.write_batch(build_batch_from_canonical(
+        source_file="src.xlsx",
+        vintage_date=earlier_row.vintage_date,
+        salary=[later_row, earlier_row],
+    ))
+
+    canon = repo.get_canonical_salary("Карпатський лісовий офіс", 2025, 1)
+    assert canon is not None
+    assert canon.salary_uah == 26000.0  # source_row=70 wins over 85
+
+
+def test_salary_get_revision_history_oldest_first() -> None:
+    """Multiple SalaryValues for the same key with different vintages
+    return all rows ordered oldest-first."""
+    repo = FakeRepository()
+    facts = [
+        _salary(
+            salary_uah=v,
+            vintage=datetime(2026, m, 28),
+        )
+        for v, m in [(24000.0, 1), (25000.0, 2), (26000.0, 3)]
+    ]
+    for f in facts:
+        repo.write_batch(build_batch_from_canonical(
+            source_file="src.xlsx",
+            vintage_date=f.vintage_date,
+            salary=[f],
+        ))
+
+    history = repo.get_revision_history(
+        "salary", "Карпатський лісовий офіс", 2025, month=1
+    )
+    salaries = [s.salary_uah for s in history]  # type: ignore[union-attr]
+    assert salaries == [24000.0, 25000.0, 26000.0]  # oldest first
+
+
+def test_salary_revision_history_invalid_kind_still_raises() -> None:
+    """get_revision_history rejects unknown kind; 'salary' is now valid."""
+    repo = FakeRepository()
+    with pytest.raises(ValueError):
+        repo.get_revision_history("invalid", "X", 2025, month=1)
+    # Sanity: 'salary' does NOT raise, even on empty repo.
+    assert repo.get_revision_history("salary", "X", 2025, month=1) == []
+
+
+def test_salary_get_canonical_returns_none_when_absent() -> None:
+    """Empty repo yields None for any (branch, year, month) lookup."""
+    repo = FakeRepository()
+    assert repo.get_canonical_salary("Карпатський лісовий офіс", 2025, 1) is None
+
+
+def test_salary_distinct_branches_with_similar_names() -> None:
+    """Verbatim branch names are NOT collapsed — three distinct strings
+    produce three distinct canonical rows.
+
+    This is the architectural invariant from the 5.4.4 reconnaissance:
+    DB has separate UUIDs for ``Карпатський лісовий офіс`` (regional level)
+    vs ``Філія "Карпатський лісовий офіс"`` (subsidiary). Repository must
+    keep them separate; alias normalization happens later, in the resolver
+    layer (5.4.4.e).
+    """
+    repo = FakeRepository()
+    a = _salary(branch_name="Карпатський лісовий офіс", salary_uah=27796.0)
+    b = _salary(branch_name='Філія "Карпатський лісовий офіс"', salary_uah=28779.0)
+    c = _salary(branch_name='філія "Карпатський лісовий офіс"', salary_uah=29000.0)
+
+    repo.write_batch(build_batch_from_canonical(
+        source_file="src.xlsx",
+        vintage_date=a.vintage_date,
+        salary=[a, b, c],
+    ))
+
+    canon_a = repo.get_canonical_salary("Карпатський лісовий офіс", 2025, 1)
+    canon_b = repo.get_canonical_salary('Філія "Карпатський лісовий офіс"', 2025, 1)
+    canon_c = repo.get_canonical_salary('філія "Карпатський лісовий офіс"', 2025, 1)
+
+    assert canon_a is not None and canon_a.salary_uah == 27796.0
+    assert canon_b is not None and canon_b.salary_uah == 28779.0
+    assert canon_c is not None and canon_c.salary_uah == 29000.0
+    # All three coexist as separate rows in the canonical store.
+    assert {canon_a.branch_name, canon_b.branch_name, canon_c.branch_name} == {
+        "Карпатський лісовий офіс",
+        'Філія "Карпатський лісовий офіс"',
+        'філія "Карпатський лісовий офіс"',
+    }

@@ -28,6 +28,7 @@ from .interface import Repository, WriteBatch, WriteResult
 
 FactKind = Literal[
     "annual", "monthly", "species_annual", "species_monthly", "reference",
+    "salary",
 ]
 
 # Type aliases for revision keys per kind. Each key is enough to identify
@@ -37,7 +38,15 @@ MonthlyKey = tuple[Literal["monthly"], str, int, int]           # (kind, metric,
 SpAnnualKey = tuple[Literal["species_annual"], str, int]
 SpMonthlyKey = tuple[Literal["species_monthly"], str, int, int]
 ReferenceKey = tuple[Literal["reference"], str, int, int]       # (kind, category, year, month)
-RevisionKey = AnnualKey | MonthlyKey | SpAnnualKey | SpMonthlyKey | ReferenceKey
+SalaryKey = tuple[Literal["salary"], str, int, int]             # (kind, branch_name, year, month)
+RevisionKey = (
+    AnnualKey
+    | MonthlyKey
+    | SpAnnualKey
+    | SpMonthlyKey
+    | ReferenceKey
+    | SalaryKey
+)
 
 
 _FactType = TypeVar(
@@ -59,7 +68,14 @@ class _Revision:
 
     kind: FactKind
     key: RevisionKey
-    fact: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText
+    fact: (
+        AnnualValue
+        | MonthlyValue
+        | SpeciesAnnual
+        | SpeciesMonthly
+        | ReferenceText
+        | SalaryValue
+    )
     is_canonical: bool = False
     superseded_at: float | None = None  # monotonic timestamp; None = current
 
@@ -84,9 +100,27 @@ def _reference_key(f: ReferenceText) -> ReferenceKey:
     return ("reference", f.category, f.year, f.month)
 
 
+def _salary_key(f: SalaryValue) -> SalaryKey:
+    return ("salary", f.branch_name, f.year, f.month)
+
+
 def _is_higher(
-    candidate: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
-    current: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
+    candidate: (
+        AnnualValue
+        | MonthlyValue
+        | SpeciesAnnual
+        | SpeciesMonthly
+        | ReferenceText
+        | SalaryValue
+    ),
+    current: (
+        AnnualValue
+        | MonthlyValue
+        | SpeciesAnnual
+        | SpeciesMonthly
+        | ReferenceText
+        | SalaryValue
+    ),
 ) -> bool:
     """``candidate`` outranks ``current`` for canonical purposes.
 
@@ -108,18 +142,29 @@ def _is_higher(
 
 
 def _fact_signature(
-    f: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
+    f: (
+        AnnualValue
+        | MonthlyValue
+        | SpeciesAnnual
+        | SpeciesMonthly
+        | ReferenceText
+        | SalaryValue
+    ),
 ) -> tuple[object, ...]:
     """Business-identity tuple — used to dedupe identical re-inserts.
 
     Mirrors the partial unique indexes in
-    ``sql/17-fact-revisions-unique-key.sql`` and
-    ``sql/18-reference-revisions-unique.sql``:
+    ``sql/17-fact-revisions-unique-key.sql``,
+    ``sql/18-reference-revisions-unique.sql``, and
+    ``sql/19-fact-revisions-unique-key-salary.sql``:
     ``source_file`` / ``source_row`` are audit metadata only and NOT part
     of identity; re-uploading the same content from a different filename
     is a no-op. ``value_text`` participates for AnnualValue/MonthlyValue
     (KORREKCJIA 2: species do not carry text values). Reference rows use
     ``content`` as their dedupe payload (mirrors sql/18 unique key).
+    Salary rows include ``salary_uah`` and ``region_avg_uah`` (mirrors
+    sql/19 unique key) — a future revision changing only the region
+    figure is treated as distinct.
     """
     if isinstance(f, AnnualValue):
         return (
@@ -145,9 +190,15 @@ def _fact_signature(
             f.volume_km3, f.avg_price_grn,
             f.vintage_date, f.source_priority, f.report_type,
         )
+    if isinstance(f, ReferenceText):
+        return (
+            "reference", f.category, f.year, f.month,
+            f.content,
+            f.vintage_date, f.source_priority, f.report_type,
+        )
     return (
-        "reference", f.category, f.year, f.month,
-        f.content,
+        "salary", f.branch_name, f.year, f.month,
+        f.salary_uah, f.region_avg_uah,
         f.vintage_date, f.source_priority, f.report_type,
     )
 
@@ -168,6 +219,7 @@ class FakeRepository(Repository):
         self._canon_sp_annual: dict[tuple[str, int], SpeciesAnnual] = {}
         self._canon_sp_monthly: dict[tuple[str, int, int], SpeciesMonthly] = {}
         self._canon_reference: dict[tuple[str, int, int], ReferenceText] = {}
+        self._canon_salary: dict[tuple[str, int, int], SalaryValue] = {}
 
     # ---- Repository protocol -----------------------------------------
 
@@ -199,6 +251,10 @@ class FakeRepository(Repository):
             if self._append(_reference_key(fr), "reference", fr):
                 rows_to_revisions += 1
                 affected_keys.add(_reference_key(fr))
+        for fs in batch.salary:
+            if self._append(_salary_key(fs), "salary", fs):
+                rows_to_revisions += 1
+                affected_keys.add(_salary_key(fs))
 
         for key in affected_keys:
             applied, superseded = self._reapply_canonical(key)
@@ -245,9 +301,7 @@ class FakeRepository(Repository):
     def get_canonical_salary(
         self, branch_name: str, year: int, month: int
     ) -> SalaryValue | None:
-        # Stub — real lookup lands in sub-step 5.4.4.c (FakeRepository
-        # gains _canon_salary dict + write-path support).
-        return None
+        return self._canon_salary.get((branch_name, year, month))
 
     def get_revision_history(
         self,
@@ -264,7 +318,8 @@ class FakeRepository(Repository):
         | SalaryValue
     ]:
         valid = (
-            "annual", "monthly", "species_annual", "species_monthly", "reference",
+            "annual", "monthly", "species_annual", "species_monthly",
+            "reference", "salary",
         )
         if kind not in valid:
             raise ValueError(f"Unknown kind: {kind!r}")
@@ -275,6 +330,10 @@ class FakeRepository(Repository):
             f = rev.fact
             if isinstance(f, ReferenceText):
                 if f.category != entity or f.year != year:
+                    return False
+                return not (month is not None and f.month != month)
+            if isinstance(f, SalaryValue):
+                if f.branch_name != entity or f.year != year:
                     return False
                 return not (month is not None and f.month != month)
             if isinstance(f, (AnnualValue, MonthlyValue)):
@@ -300,7 +359,14 @@ class FakeRepository(Repository):
         self,
         key: RevisionKey,
         kind: FactKind,
-        fact: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
+        fact: (
+            AnnualValue
+            | MonthlyValue
+            | SpeciesAnnual
+            | SpeciesMonthly
+            | ReferenceText
+            | SalaryValue
+        ),
     ) -> bool:
         """Insert revision unless an identical signature already present."""
         sig = _fact_signature(fact)
@@ -347,7 +413,14 @@ class FakeRepository(Repository):
     def _set_canonical(
         self,
         key: RevisionKey,
-        fact: AnnualValue | MonthlyValue | SpeciesAnnual | SpeciesMonthly | ReferenceText,
+        fact: (
+            AnnualValue
+            | MonthlyValue
+            | SpeciesAnnual
+            | SpeciesMonthly
+            | ReferenceText
+            | SalaryValue
+        ),
     ) -> None:
         kind = key[0]
         if kind == "annual":
@@ -371,6 +444,11 @@ class FakeRepository(Repository):
             self._canon_reference[
                 (fact.category, fact.year, fact.month)
             ] = fact
+        elif kind == "salary":
+            assert isinstance(fact, SalaryValue)
+            self._canon_salary[
+                (fact.branch_name, fact.year, fact.month)
+            ] = fact
 
     # ---- Test helpers (not part of Repository ABC) -------------------
 
@@ -384,6 +462,7 @@ class FakeRepository(Repository):
             + len(self._canon_monthly)
             + len(self._canon_sp_annual)
             + len(self._canon_sp_monthly)
+            + len(self._canon_salary)
         )
 
     # Re-export ``replace`` so tests can build modified fact copies easily.
