@@ -24,6 +24,7 @@ from etl.models import (
     SpeciesMonthly,
 )
 
+from .branch_resolver import resolve_branch_id
 from .code_mapper import (
     UnknownMetricError,
     db_to_python,
@@ -63,6 +64,11 @@ class PostgresRepository(Repository):
         self._resolve_indicator_id_cached = lru_cache(maxsize=256)(
             self._resolve_indicator_id_uncached
         )
+        # Branch-id cache. Distinct from indicator-id cache because
+        # resolution semantics differ — branches return ``None`` (warn +
+        # skip) instead of raising on miss. ``None`` is also cached to
+        # avoid re-querying for known-unknown branches in the same batch.
+        self._branch_id_cache: dict[str, UUID | None] = {}
 
     # ----------------------------------------------------------------
     # Repository protocol
@@ -85,6 +91,11 @@ class PostgresRepository(Repository):
         # separate canonical dispatcher (variant B from the plan: keep
         # _reapply_canonical UUID-only, add _reapply_canonical_reference).
         affected_ref: list[tuple[str, int, int]] = []
+        # Salary rows are TEXT-keyed (branch_name) at the source level but
+        # UUID-keyed (branch_id) at storage. The set holds (branch_id_str,
+        # year, month) — set semantics dedupe revisions of the same key
+        # for canonical reapply.
+        affected_sal: set[tuple[str, int, int]] = set()
 
         # ``with conn`` commits on success / rolls back on exception.
         with self._conn, self._conn.cursor() as cur:
@@ -113,6 +124,18 @@ class PostgresRepository(Repository):
             for fr in batch.reference:
                 rev_rows.append(self._row_for_reference(fr, batch))
                 affected_ref.append((fr.category, fr.year, fr.month))
+            for fs in batch.salary:
+                branch_id = self._cached_resolve_branch_id(cur, fs.branch_name)
+                if branch_id is None:
+                    warnings.append(
+                        f"unknown_branch: {fs.branch_name!r} (skipped — "
+                        f"add to salary_branches + salary_branch_aliases manually)"
+                    )
+                    continue
+                rev_rows.append(
+                    self._row_for_salary(fs, batch.batch_id, branch_id)
+                )
+                affected_sal.add((str(branch_id), fs.year, fs.month))
 
             if rev_rows:
                 rows_to_revisions = self._bulk_insert_revisions(cur, rev_rows)
@@ -150,6 +173,12 @@ class PostgresRepository(Repository):
                         rows_superseded += 1
                 else:
                     rows_unchanged += 1
+
+            # --- 2c. Salary canonical (TEXT-source / UUID-storage) ----
+            for branch_id_str, year, month in affected_sal:
+                self._reapply_canonical_salary(
+                    cur, UUID(branch_id_str), year, month, batch.batch_id
+                )
 
         return WriteResult(
             batch_id=batch.batch_id,
@@ -332,6 +361,42 @@ class PostgresRepository(Repository):
             False,                                    # is_canonical (set later)
             None,                                     # superseded_at
             batch.batch_id,
+        )
+
+    @staticmethod
+    def _row_for_salary(
+        fact: SalaryValue, batch_id: UUID, branch_id: UUID
+    ) -> tuple[Any, ...]:
+        """Tuple matching ``_INSERT_REVISION_COLS`` for a salary revision.
+
+        Salary rows are polymorphic like reference, but keyed by
+        ``branch_id`` (UUID resolved by ``resolve_branch_id`` from the
+        verbatim Excel branch name) instead of ``category``. The
+        ck_fact_ref_exclusive CHECK requires only ``branch_id`` to be
+        non-NULL among the four entity slots when ``fact_kind='salary'``.
+
+        ``branch_id`` is passed in by the caller (write_batch resolves
+        it once per branch name and feeds it here) — keeps this
+        function pure (no DB calls, mirrors ``_row_for_reference``).
+
+        Salary slots: ``branch_id``, ``salary_uah``, ``region_avg_uah``.
+        All other fact-shape columns (indicator_id, species_id, category,
+        value_numeric, value_text, volume_km3, avg_price_grn, population,
+        limit_qty, raw_text) are NULL.
+        """
+        return (
+            "salary",
+            None, branch_id, None, None,             # indicator/species/category NULL; branch_id set
+            fact.year, fact.month,
+            None, None,                                # value_numeric / value_text NULL
+            None, None,                                # volume_km3 / avg_price_grn NULL
+            fact.salary_uah, fact.region_avg_uah,      # salary slots
+            None, None, None,                          # population / limit_qty / raw_text NULL
+            fact.vintage_date, fact.report_type, fact.source_priority,
+            fact.source_file, fact.source_row,
+            False,                                     # is_canonical (set later)
+            None,                                      # superseded_at
+            batch_id,
         )
 
     _INSERT_REVISION_COLS: tuple[str, ...] = (
@@ -601,6 +666,123 @@ class PostgresRepository(Repository):
             (year, month, category, content, str(upload_batch_id)),
         )
 
+    def _reapply_canonical_salary(
+        self,
+        cur: Any,
+        branch_id: UUID,
+        year: int,
+        month: int,
+        batch_id: UUID,
+    ) -> None:
+        """Reapply canonical winner for a single (branch, period) salary key.
+
+        TEXT-source-but-UUID-keyed dispatcher pattern (mirrors
+        ``_reapply_canonical_reference`` in shape, but selects by
+        ``branch_id`` instead of ``category``). Selects winner by
+        (priority DESC, vintage DESC, source_row ASC), demotes the
+        previous canonical if not the winner, promotes the winner,
+        and UPSERTs ``salary_values``.
+
+        Returns ``None`` (rather than ``(applied, superseded)`` like
+        the other dispatchers) — salary contributions to
+        ``rows_to_canonical`` / ``rows_superseded`` counters are
+        deferred. Idempotency and correctness are unaffected.
+
+        ``winner_row`` index map for **salary** SELECT:
+            [0] id              UUID of the winning revision row
+            [1] branch_id       echoed (sanity)
+            [2] salary_uah      payload
+            [3] region_avg_uah  payload (may be NULL)
+            [4] source_file
+            [5] source_row
+            [6] vintage_date
+            [7] source_priority
+            [8] is_canonical    (== prev_was_canonical for this winner)
+        """
+        cur.execute(
+            """
+            SELECT id, branch_id, salary_uah, region_avg_uah,
+                   source_file, source_row, vintage_date,
+                   source_priority, is_canonical
+              FROM fact_revisions
+             WHERE fact_kind = 'salary'
+               AND branch_id = %s
+               AND period_year = %s
+               AND period_month = %s
+             ORDER BY source_priority DESC, vintage_date DESC, source_row ASC
+             LIMIT 1
+            """,
+            (str(branch_id), year, month),
+        )
+        winner_row = cur.fetchone()
+        if winner_row is None:
+            return
+
+        winner_id = winner_row[0]
+
+        # Demote previously-canonical sibling (if any).
+        cur.execute(
+            """
+            UPDATE fact_revisions
+               SET is_canonical = FALSE,
+                   superseded_at = NOW()
+             WHERE fact_kind = 'salary'
+               AND branch_id = %s
+               AND period_year = %s
+               AND period_month = %s
+               AND is_canonical = TRUE
+               AND id <> %s
+            """,
+            (str(branch_id), year, month, winner_id),
+        )
+
+        # Promote the winner.
+        cur.execute(
+            "UPDATE fact_revisions SET is_canonical = TRUE, superseded_at = NULL "
+            "WHERE id = %s",
+            (winner_id,),
+        )
+
+        self._upsert_salary_value(
+            cur, branch_id, year, month, winner_row, batch_id
+        )
+
+    @staticmethod
+    def _upsert_salary_value(
+        cur: Any,
+        branch_id: UUID,
+        year: int,
+        month: int,
+        winner_row: tuple[Any, ...],
+        upload_batch_id: UUID,
+    ) -> None:
+        """UPSERT salary canonical into ``salary_values``.
+
+        winner_row layout: see ``_reapply_canonical_salary`` docstring.
+            [2]=salary_uah, [3]=region_avg_uah.
+        Relies on ``idx_sv_unique`` on (branch_id, period_year,
+        period_month) for ON CONFLICT.
+        """
+        salary_uah = winner_row[2]
+        region_avg_uah = winner_row[3]
+        cur.execute(
+            """
+            INSERT INTO salary_values
+                (branch_id, period_year, period_month,
+                 salary_uah, region_avg_uah, upload_batch_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (branch_id, period_year, period_month) DO UPDATE
+            SET salary_uah      = EXCLUDED.salary_uah,
+                region_avg_uah  = EXCLUDED.region_avg_uah,
+                upload_batch_id = EXCLUDED.upload_batch_id
+            """,
+            (
+                str(branch_id), year, month,
+                salary_uah, region_avg_uah,
+                str(upload_batch_id),
+            ),
+        )
+
     @staticmethod
     def _upsert_volprice_value(
         cur: Any,
@@ -664,6 +846,27 @@ class PostgresRepository(Repository):
                 f"Add it to the DB or check the code_mapper."
             )
         return UUID(str(row[0]))
+
+    def _cached_resolve_branch_id(
+        self, cur: Any, branch_name: str
+    ) -> UUID | None:
+        """Memoized branch_id lookup for the lifetime of this Repository.
+
+        Repository instances are short-lived (one per writeback file),
+        so the cache is naturally bounded. ``None`` is also cached so
+        repeated unknown-branch warnings don't re-query the DB inside
+        the same write_batch transaction.
+
+        Unlike ``_resolve_indicator_id`` (raises UnknownMetricError on
+        miss), this returns ``None`` to let the caller emit a warning
+        and skip the salary row — branch additions go through manual
+        SQL review per 5.4.4 design decision (variant 3).
+        """
+        if branch_name in self._branch_id_cache:
+            return self._branch_id_cache[branch_name]
+        branch_id = resolve_branch_id(cur, branch_name)
+        self._branch_id_cache[branch_name] = branch_id
+        return branch_id
 
 
 __all__ = ["PostgresRepository"]

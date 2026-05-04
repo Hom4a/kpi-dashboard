@@ -19,6 +19,8 @@ together — the table is the source of truth for parity.
 from __future__ import annotations
 
 import re
+from typing import Any
+from uuid import UUID
 
 # Pre-compiled patterns mirror the four ``regexp_replace`` calls in
 # fn_normalize_indicator_name. Order matters — see the SQL function
@@ -58,4 +60,28 @@ def _normalize_branch_name(name: str) -> str:
     return s.strip()
 
 
-__all__ = ["_normalize_branch_name"]
+def resolve_branch_id(cur: Any, branch_name: str) -> UUID | None:
+    """Look up ``salary_branches.id`` for a verbatim Excel branch name.
+
+    Normalizes via ``_normalize_branch_name`` (DB regex mirror) then
+    SELECTs from ``salary_branch_aliases`` where ``alias_normalized``
+    matches.
+
+    Returns ``None`` when no alias matches — callers must warn and
+    skip the salary row (sub-step 5.4.4 design decision: human-reviewed
+    addition of new branch spellings via SQL, not auto-INSERT).
+
+    ``cur`` is a psycopg2 cursor (typed as ``Any`` to avoid hard import
+    of psycopg2 from this module — keeps the resolver testable without
+    a live DB).
+    """
+    norm = _normalize_branch_name(branch_name)
+    cur.execute(
+        "SELECT branch_id FROM salary_branch_aliases WHERE alias_normalized = %s",
+        (norm,),
+    )
+    row = cur.fetchone()
+    return UUID(str(row[0])) if row else None
+
+
+__all__ = ["_normalize_branch_name", "resolve_branch_id"]
