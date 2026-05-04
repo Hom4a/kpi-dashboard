@@ -9,6 +9,7 @@ import { initCellAnnotations } from './cell-annotations.js';
 import {
     getIndicatorsByBlocks, getIndicatorByCode,
     getAllBranches, getAllSpecies,
+    getTaxBlockIndicators,
     MONTHLY_TABLE_1_BLOCKS, MONTHLY_TABLE_2_BLOCKS,
 } from './indicators-loader.js';
 import {
@@ -76,8 +77,9 @@ export function renderMonthlyReport(container, year, month) {
     // Animals
     html += renderAnimalTable(showYears, year, allData);
 
-    // Table 2: Taxes (M_TAX)
-    const table2 = getIndicatorsByBlocks(MONTHLY_TABLE_2_BLOCKS);
+    // Table 2: Taxes (M_TAX) + crossrendered M_FIN finance metrics
+    // (Excel rows 63-67) at the bottom — see getTaxBlockIndicators().
+    const table2 = getTaxBlockIndicators();
     html += renderIndicatorTable('Податки та збори', table2, showYears, year, month, allData, 'monthly_t2');
 
     // Salary per branch
