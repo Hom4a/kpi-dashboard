@@ -322,12 +322,14 @@ export function parseSummaryXlsx(wb) {
                 }
             }
 
-            // Parse region salary column if exists
+            // Parse region salary column if exists — bind to current monthCol
+            // (mirror of reference block above; pre-fix wrote sentinel year=0/month=0
+            // which is invisible to render-monthly.js but pollutes salary_values).
             if (regionSalaryCol && r[regionSalaryCol] != null && r[regionSalaryCol] !== '') {
                 const parsed = parseValue(r[regionSalaryCol]);
                 if (parsed.value_numeric != null) {
                     records.push({
-                        year: 0, month: 0, indicator_group: 'region_salary',
+                        year: refYear, month: refMonth, indicator_group: 'region_salary',
                         indicator_name: name, sub_type: 'value',
                         value_numeric: parsed.value_numeric, value_text: null, unit: 'грн'
                     });
