@@ -18,6 +18,7 @@ from openpyxl import load_workbook
 
 from .metrics import is_ignored, resolve_metric, resolve_species
 from .models import (
+    AnimalValue,
     AnnualValue,
     MonthlyValue,
     ParseResult,
@@ -25,6 +26,10 @@ from .models import (
     SalaryValue,
     SpeciesAnnual,
     SpeciesMonthly,
+)
+from .parsers_animals import (
+    _ANIMALS_HEADER_KEYWORD,
+    extract_animals_block_osnovni,
 )
 from .parsers_reference import extract_reference_block
 from .parsers_salary import extract_salary_block_osnovni
@@ -59,6 +64,11 @@ _SECTION_HEADERS: frozenset[str] = frozenset(
 # because parser_osnovni decides whether to *capture* the row index or *skip*
 # the section, while parsers_salary decides whether to *find* the header.
 _SALARY_SECTION_MARKER = "середня з/п по"
+
+# Same shape as the salary marker — animals section header is
+# 'Чисельність/кількість лімітів'. Re-exported from parsers_animals
+# under a parser-local name for readability.
+_ANIMALS_SECTION_MARKER = _ANIMALS_HEADER_KEYWORD
 
 
 def _find_header_row(ws: object, max_scan: int = 10) -> int | None:
@@ -101,6 +111,8 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
     reference: list[ReferenceText] = []
     salary: list[SalaryValue] = []
     salary_header_row: int | None = None
+    animal: list[AnimalValue] = []
+    animals_header_row: int | None = None
     warnings: list[str] = list(meta.warnings)
     errors: list[str] = []
 
@@ -135,7 +147,15 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
 
         if a_norm in _SECTION_HEADERS:
             continue
+        if a_norm.startswith(_ANIMALS_SECTION_MARKER):
+            # Capture for post-loop extract_animals_block_osnovni. Don't
+            # break — salary section still lies further down (row 69).
+            if animals_header_row is None:
+                animals_header_row = row_idx
+            continue
         if a_norm.startswith("чисельність/кількість"):
+            # Defensive fallback for any other 'чисельність/кількість*'
+            # header that may not include the 'лімітів' suffix.
             continue
         if a_norm.startswith("*"):
             continue
@@ -250,6 +270,20 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
     salary.extend(sal_rows)
     warnings.extend(sal_warns)
 
+    # «Чисельність/кількість лімітів» — animals census, captured by main
+    # loop. Years come from ANNUAL_COLUMNS; the is_ytd column (2026) is
+    # filtered inside the extractor — animals reflect closed years only.
+    if animals_header_row is not None:
+        anim_rows, anim_warns = extract_animals_block_osnovni(
+            ws,
+            annual_columns=ANNUAL_COLUMNS,
+            source_file=path_str,
+            base_meta=meta,
+            header_row=animals_header_row,
+        )
+        animal.extend(anim_rows)
+        warnings.extend(anim_warns)
+
     # «Довідково» — extracted post-loop, independent of metric scanning.
     # ws here is worksheets[0] only (osnovni multi-sheet copies on
     # year-sheets are not iterated, satisfying edge-case E1).
@@ -272,6 +306,7 @@ def parse_osnovni_annual(path: str | Path) -> ParseResult:
         species_monthly=species_monthly,
         reference=reference,
         salary=salary,
+        animal=animal,
         warnings=warnings,
         errors=errors,
     )

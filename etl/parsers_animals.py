@@ -221,9 +221,120 @@ def extract_animals_block(
     return animals, warnings
 
 
+def extract_animals_block_osnovni(
+    ws: Any,
+    *,
+    annual_columns: tuple[tuple[int, int, bool], ...],
+    source_file: str,
+    base_meta: ReportMetadata,
+    header_row: int | None = None,
+) -> tuple[list[AnimalValue], list[str]]:
+    """Walk the animals census section of an osnovni workbook.
+
+    Geometry differs from the yearly format: years live in fixed
+    columns (``ANNUAL_COLUMNS`` from ``parser_osnovni``) rather than
+    in dynamic ``"YYYY рік"`` labels above the section header.
+
+    ``annual_columns`` is the parser_osnovni ``ANNUAL_COLUMNS`` list of
+    ``(col_idx, year, is_ytd)`` triples. ``is_ytd=True`` columns are
+    skipped — animal census reflects closed years only, not partial YTD
+    figures (production data confirms: 2026 column is empty for
+    animal rows even when other metrics carry YTD values).
+
+    The current-month column (col 7 in osnovni) is intentionally
+    NOT a parameter — animals have no monthly snapshot.
+
+    Composite cell format identical to yearly:
+    ``"<species_alias> <pop>/<limit>"`` parsed by ``_ANIMALS_CELL_RE``.
+
+    ``base_meta`` is the osnovni-derived ``ReportMetadata`` (single
+    metadata for all emits — osnovni doesn't split into report_type
+    sub-bands the way yearly's ``ytd_meta`` does).
+
+    Returns ``(animals, warnings)``. Empty list when section header
+    not found, or when every column is marked YTD.
+    """
+    warnings: list[str] = []
+
+    if header_row is None:
+        header_row = _find_animals_header_row(ws)
+        if header_row is None:
+            return [], warnings
+
+    closed_year_cols: list[tuple[int, int]] = [
+        (col, year) for (col, year, is_ytd) in annual_columns if not is_ytd
+    ]
+    if not closed_year_cols:
+        warnings.append(
+            "animals_section: no closed-year columns in annual_columns "
+            "(all marked is_ytd)"
+        )
+        return [], warnings
+
+    animals: list[AnimalValue] = []
+
+    # Scan from header_row inclusive — production yearly files (and
+    # likely osnovni too) put first species data on the same row as the
+    # col-A section header. Synthetic test geometry tolerated via the
+    # offset==0 special case.
+    for offset in range(0, _MAX_SPECIES_ROWS + 1):
+        row_idx = header_row + offset
+        if row_idx > ws.max_row:
+            break
+
+        any_cell = any(
+            ws.cell(row_idx, col).value is not None
+            for col, _ in closed_year_cols
+        )
+        if not any_cell:
+            if offset == 0:
+                continue
+            break
+
+        if offset > 0:
+            a_val = ws.cell(row_idx, 1).value
+            if a_val is not None and str(a_val).strip():
+                break
+
+        for col_idx, year in closed_year_cols:
+            cell_value = ws.cell(row_idx, col_idx).value
+            if cell_value is None:
+                continue
+            cell_str = str(cell_value).strip()
+            if not cell_str:
+                continue
+
+            parsed = _parse_animal_cell(cell_str)
+            if parsed is None:
+                warnings.append(
+                    f"animals_cell_unparseable: row {row_idx} "
+                    f"col {col_idx}: {cell_str!r}"
+                )
+                continue
+
+            species_name, population, limit_qty = parsed
+            animals.append(
+                AnimalValue(
+                    species_name=species_name,
+                    year=year,
+                    population=population,
+                    limit_qty=limit_qty,
+                    raw_text=cell_str,
+                    source_file=source_file,
+                    source_row=row_idx,
+                    vintage_date=base_meta.vintage_date,
+                    report_type=base_meta.report_type,
+                    source_priority=base_meta.source_priority,
+                )
+            )
+
+    return animals, warnings
+
+
 __all__ = [
     "_ANIMALS_HEADER_KEYWORD",
     "_ANIMALS_CELL_RE",
     "_YEAR_LABEL_RE",
     "extract_animals_block",
+    "extract_animals_block_osnovni",
 ]
