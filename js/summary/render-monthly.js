@@ -393,10 +393,22 @@ const REFERENCE_CATEGORY_ORDER = [
  * newest available period — better than empty block.
  */
 function renderReferenceBlock(allData, year, month) {
+    // Stage 1: exact (year, month) — current monthly views (2026, 2/3)
     let refRows = allData.filter(
         r => r.indicator_group === 'reference' && r.year === year && r.month === month
     );
 
+    // Stage 2: same-year annual snapshot (year, 0)
+    // Archival reference (2023/2024/2025, 0) is an annual snapshot — month=0.
+    // Without this stage, archival year views fall through to Stage 3 and
+    // render the unrelated newest period (2026/3) — see sub-step 6.x.c.
+    if (refRows.length === 0) {
+        refRows = allData.filter(
+            r => r.indicator_group === 'reference' && r.year === year && r.month === 0
+        );
+    }
+
+    // Stage 3: global newest across years — final fallback
     if (refRows.length === 0) {
         const all = allData.filter(r => r.indicator_group === 'reference');
         if (all.length > 0) {
