@@ -24,6 +24,7 @@ from openpyxl.utils.datetime import from_excel
 
 from .metrics import is_ignored, resolve_metric, resolve_species
 from .models import (
+    AnimalValue,
     AnnualValue,
     MonthlyValue,
     ParseResult,
@@ -32,6 +33,7 @@ from .models import (
     SpeciesAnnual,
     SpeciesMonthly,
 )
+from .parsers_animals import _ANIMALS_HEADER_KEYWORD, extract_animals_block
 from .parsers_reference import extract_reference_block
 from .parsers_salary import extract_salary_block
 from .report_metadata import ReportMetadata, infer_report_metadata
@@ -127,6 +129,8 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
     reference: list[ReferenceText] = []
     salary: list[SalaryValue] = []
     salary_header_row: int | None = None
+    animal: list[AnimalValue] = []
+    animals_header_row: int | None = None
     warnings: list[str] = list(base_meta.warnings)
 
     sheet_year = next(iter(month_map.values()))[0]
@@ -145,7 +149,15 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
 
         if a_norm in _SECTION_HEADERS:
             continue
+        if a_norm.startswith(_ANIMALS_HEADER_KEYWORD):
+            # Capture for post-loop extract_animals_block. We don't break
+            # here because the salary section still lies further down.
+            if animals_header_row is None:
+                animals_header_row = row_idx
+            continue
         if a_norm.startswith("чисельність/кількість"):
+            # Defensive: any other "чисельність/кількість*" header (without
+            # the "лімітів" suffix) is still treated as a non-metric row.
             continue
         if a_norm.startswith("*"):
             continue
@@ -260,6 +272,19 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
     salary.extend(sal_rows)
     warnings.extend(sal_warns)
 
+    # «Чисельність/кількість лімітів» — animals census, captured by main
+    # loop. Year labels read from the row immediately above the header
+    # (e.g., row 42 in 2025_рік.xlsx with cols B='2022 рік', C='2023 рік').
+    if animals_header_row is not None:
+        anim_rows, anim_warns = extract_animals_block(
+            ws,
+            source_file=path_str,
+            base_meta=base_meta,
+            header_row=animals_header_row,
+        )
+        animal.extend(anim_rows)
+        warnings.extend(anim_warns)
+
     # «Довідково» — extracted independently of the main metric loop so the
     # SALARY_SECTION_MARKER break above can't mask it. The extractor scans
     # the sheet for its own header (single sheet only — no roaming).
@@ -282,6 +307,7 @@ def parse_annual_monthly(path: str | Path) -> ParseResult:
         species_monthly=species_monthly,
         reference=reference,
         salary=salary,
+        animal=animal,
         warnings=warnings,
     )
 
