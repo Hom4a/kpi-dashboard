@@ -270,6 +270,12 @@ def print_summary(xlsx_path: Path, pipeline: PipelineOutput) -> None:
         f"{len(sal_branches)} branches" if sal_branches else "(none)"
     )
 
+    anim_count = len(pipeline.canonical_animal)
+    anim_species = sorted({a.species_name for a in pipeline.canonical_animal})
+    anim_detail = (
+        f"{len(anim_species)} species" if anim_species else "(none)"
+    )
+
     lines.append("")
     lines.append("Counts (canonical, deduplicated):")
     lines.append(f"  Annual values:    {len(pipeline.canonical_annual)}")
@@ -279,6 +285,7 @@ def print_summary(xlsx_path: Path, pipeline: PipelineOutput) -> None:
     lines.append(f"  Derived metrics:  {derived_count}  ({derived_detail})")
     lines.append(f"  Reference texts:  {ref_count}  ({ref_detail})")
     lines.append(f"  Salary values:    {sal_count}  ({sal_detail})")
+    lines.append(f"  Animal census:    {anim_count}  ({anim_detail})")
     lines.append("")
     lines.append("Period coverage:")
     lines.append(f"  Annual:   {annual_str}")
@@ -341,6 +348,8 @@ def _build_batch(xlsx_path: Path, pipeline: PipelineOutput) -> WriteBatch:
         f.vintage_date for f in pipeline.canonical_reference
     ] + [
         f.vintage_date for f in pipeline.canonical_salary
+    ] + [
+        f.vintage_date for f in pipeline.canonical_animal
     ]
     vintage = max(all_vintages) if all_vintages else datetime.now().astimezone()
 
@@ -353,6 +362,7 @@ def _build_batch(xlsx_path: Path, pipeline: PipelineOutput) -> WriteBatch:
         species_monthly=pipeline.canonical_species_monthly,
         reference=pipeline.canonical_reference,
         salary=pipeline.canonical_salary,
+        animal=pipeline.canonical_animal,
     )
 
 
