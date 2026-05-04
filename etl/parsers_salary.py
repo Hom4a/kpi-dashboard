@@ -39,28 +39,31 @@ Edge-cases the production data exhibits (verified against
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from .models import SalaryValue
 from .report_metadata import ReportMetadata
 from .utils import safe_number
 
+# Substring shared by both formats:
+#   yearly:   "Середня з/п по лісових офісах одного штатного працівника, грн"
+#   osnovni:  "Середня з/п по філіях одного штатного працівника, грн"
+# Casefold A-cell substring match.
+_SALARY_HEADER_KEYWORD = "середня з/п по"
+
 # Geometry stable since the 2022 file format introduction. If a future
 # format moves columns, callers should hardcode-override here rather
 # than auto-detect (auto-detect adds opaque failure modes).
-_SALARY_HEADER_KEYWORD = "середня з/п по лісових офісах"  # casefold A-cell substring
-_REGION_COL = 15   # column O — header "Середня з/п в регіоні"
-_YTD_COL = 14      # column N — header "Середня за рік" (annual avg, NOT YTD-sum)
-
-_MONTH_COL_START = 2   # column B
-_MONTH_COL_END = 13    # column M
+_REGION_COL_YEARLY = 15   # yearly format: column O — "Середня з/п в регіоні"
+_REGION_COL_OSNOVNI = 8   # osnovni format: column H — "Середня з/п в регіоні (Мінфін)"
+_YTD_COL = 14             # yearly format: column N — "Середня за рік" (annual avg)
 
 
-def _find_salary_header(ws: Any) -> int | None:
+def _find_salary_header_row(ws: Any) -> int | None:
     """Return the 1-based row index of the salary block header, or None.
 
-    Linear scan from row 1; the keyword is unique enough that one match
-    is the answer (see geometry note in module docstring).
+    Linear scan from row 1; the keyword is unique enough across both
+    yearly and osnovni formats that one match is the answer.
     """
     for row_idx in range(1, ws.max_row + 1):
         a = ws.cell(row_idx, 1).value
@@ -69,6 +72,41 @@ def _find_salary_header(ws: Any) -> int | None:
         if _SALARY_HEADER_KEYWORD in str(a).strip().casefold():
             return row_idx
     return None
+
+
+def _should_stop_at_row(
+    a_str: str, empty_streak: int
+) -> tuple[Literal["stop", "skip", "process"], int]:
+    """Classify the current row's column-A string for the salary-block walker.
+
+    Returns ``(action, new_empty_streak)``:
+
+      * ``"stop"`` — caller breaks the loop (footnote, two consecutive
+        empty rows, or stray «Довідково:» header).
+      * ``"skip"`` — caller advances; current row carries no data
+        (a single empty row mid-section).
+      * ``"process"`` — caller treats ``a_str`` as a branch name and
+        emits SalaryValues from the row's numeric cells.
+
+    Stop reasons (matches reference parser):
+
+      E1. Two consecutive fully-empty rows.
+      E2. Footnote line — ``a_str`` starts with ``*``. Branch names that
+          end with ``**`` (e.g. ``'філія "Лісовий навчальний центр"**'``)
+          do NOT match — we check ``startswith``, not ``endswith``.
+      E3. Stray «Довідково:» header (defensive — reference is extracted
+          independently, but cheap safety check).
+    """
+    if a_str == "":
+        new_streak = empty_streak + 1
+        if new_streak >= 2:
+            return "stop", new_streak
+        return "skip", new_streak
+    if a_str.startswith("*"):
+        return "stop", 0
+    if a_str.casefold().startswith("довідково"):
+        return "stop", 0
+    return "process", 0
 
 
 def extract_salary_block(
@@ -102,7 +140,9 @@ def extract_salary_block(
     rows: list[SalaryValue] = []
     warnings: list[str] = []
 
-    header_row = start_row if start_row is not None else _find_salary_header(ws)
+    header_row = (
+        start_row if start_row is not None else _find_salary_header_row(ws)
+    )
     if header_row is None:
         warnings.append("no_salary_block_found")
         return rows, warnings
@@ -113,28 +153,19 @@ def extract_salary_block(
         a = ws.cell(row_idx, 1).value
         a_str = "" if a is None else str(a).strip()
 
-        # E3 — two consecutive empty rows terminate.
-        if a_str == "":
-            empty_streak += 1
-            if empty_streak >= 2:
-                break
+        action, empty_streak = _should_stop_at_row(a_str, empty_streak)
+        if action == "stop":
+            break
+        if action == "skip":
             continue
-        empty_streak = 0
-
-        # E4 — footnote line ends the section.
-        if a_str.startswith("*"):
-            break
-
-        # E5 — defensive: reference header should not appear here, but
-        # if it does we hand control back to the main parser.
-        if a_str.casefold().startswith("довідково"):
-            break
 
         branch_name = a_str  # E7 — verbatim, no normalise
 
         # Region is per-branch; propagated to all 13 emits. Empty in
         # 2025_рік.xlsx; older files / other formats may populate it.
-        region_val, _, _ = safe_number(ws.cell(row_idx, _REGION_COL).value)
+        region_val, _, _ = safe_number(
+            ws.cell(row_idx, _REGION_COL_YEARLY).value
+        )
 
         for col, (year, month) in month_map.items():
             val, _warn, _raw = safe_number(ws.cell(row_idx, col).value)
