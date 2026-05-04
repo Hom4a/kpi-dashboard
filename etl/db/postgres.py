@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from etl.models import (
+    AnimalValue,
     AnnualValue,
     MonthlyValue,
     ReferenceText,
@@ -245,6 +246,14 @@ class PostgresRepository(Repository):
         # same temporary shape (return None until queried by tests).
         return None
 
+    def get_canonical_animal(
+        self, species_name: str, year: int
+    ) -> AnimalValue | None:
+        # Stub — production write path is exercised through FakeRepository
+        # in unit tests. Real read-back can land alongside other
+        # get_canonical_* implementations when needed by the dashboard.
+        return None
+
     def get_revision_history(
         self,
         kind: str,
@@ -258,6 +267,7 @@ class PostgresRepository(Repository):
         | SpeciesMonthly
         | ReferenceText
         | SalaryValue
+        | AnimalValue
     ]:
         # 5.3.4 will implement this against fact_revisions table.
         return []

@@ -8,6 +8,7 @@ import pytest
 from etl.db.batch import build_batch_from_canonical
 from etl.db.fake import FakeRepository
 from etl.models import (
+    AnimalValue,
     AnnualValue,
     MonthlyValue,
     ReferenceText,
@@ -713,4 +714,178 @@ def test_salary_distinct_branches_with_similar_names() -> None:
         "Карпатський лісовий офіс",
         'Філія "Карпатський лісовий офіс"',
         'філія "Карпатський лісовий офіс"',
+    }
+
+
+# ---------------------------------------------------------------------
+# Animal tests (sub-step 5.5.5.a) — mirror salary architecture
+# ---------------------------------------------------------------------
+
+def _animal(
+    *,
+    species_name: str = "Олень благор.",
+    year: int = 2022,
+    population: int = 3787,
+    limit_qty: int | None = None,
+    priority: int = 10,
+    vintage: datetime | None = None,
+    source_row: int = 43,
+) -> AnimalValue:
+    return AnimalValue(
+        species_name=species_name,
+        year=year,
+        population=population,
+        limit_qty=limit_qty,
+        raw_text=f"{species_name} {population}/" + ("*" if limit_qty is None else str(limit_qty)),
+        source_file="2025_рік.xlsx",
+        source_row=source_row,
+        vintage_date=vintage or datetime(2026, 1, 31),
+        report_type="operational",
+        source_priority=priority,
+    )
+
+
+def test_animal_write_idempotent() -> None:
+    """Re-writing the same AnimalValue is a no-op."""
+    repo = FakeRepository()
+    fact = _animal(population=3787)
+    batch = build_batch_from_canonical(
+        source_file="2025_рік.xlsx",
+        vintage_date=fact.vintage_date,
+        animal=[fact],
+    )
+
+    r1 = repo.write_batch(batch)
+    r2 = repo.write_batch(batch)
+
+    assert r1.rows_to_revisions == 1
+    assert r2.rows_to_revisions == 0
+    history = repo.get_revision_history("animal", "Олень благор.", 2022)
+    assert len(history) == 1
+
+
+def test_animal_canonical_resolution_priority() -> None:
+    """Higher source_priority wins for the same (species, year)."""
+    repo = FakeRepository()
+    op = _animal(population=3700, priority=10)
+    acct = _animal(
+        population=3787, priority=20,
+        vintage=datetime(2026, 1, 31),
+    )
+    repo.write_batch(build_batch_from_canonical(
+        source_file="src.xlsx",
+        vintage_date=op.vintage_date,
+        animal=[op, acct],
+    ))
+
+    canon = repo.get_canonical_animal("Олень благор.", 2022)
+    assert canon is not None
+    assert canon.population == 3787
+    assert canon.source_priority == 20
+
+
+def test_animal_canonical_resolution_vintage_tiebreaker() -> None:
+    """Same priority — newer vintage_date wins."""
+    repo = FakeRepository()
+    older = _animal(
+        population=3700, priority=10,
+        vintage=datetime(2026, 1, 31),
+    )
+    newer = _animal(
+        population=3787, priority=10,
+        vintage=datetime(2026, 4, 25),
+    )
+    repo.write_batch(build_batch_from_canonical(
+        source_file="src.xlsx",
+        vintage_date=newer.vintage_date,
+        animal=[older, newer],
+    ))
+
+    canon = repo.get_canonical_animal("Олень благор.", 2022)
+    assert canon is not None
+    assert canon.population == 3787
+
+
+def test_animal_canonical_resolution_source_row_tiebreaker() -> None:
+    """Same priority + same vintage — smaller source_row wins."""
+    repo = FakeRepository()
+    later = _animal(population=3700, source_row=50)
+    earlier = _animal(population=3787, source_row=43)
+    repo.write_batch(build_batch_from_canonical(
+        source_file="src.xlsx",
+        vintage_date=earlier.vintage_date,
+        animal=[later, earlier],
+    ))
+
+    canon = repo.get_canonical_animal("Олень благор.", 2022)
+    assert canon is not None
+    assert canon.population == 3787  # source_row=43 wins over 50
+
+
+def test_animal_get_revision_history_oldest_first() -> None:
+    """Multiple AnimalValues for the same key with different vintages
+    return all rows ordered oldest-first."""
+    repo = FakeRepository()
+    facts = [
+        _animal(
+            population=p,
+            vintage=datetime(2026, m, 28),
+        )
+        for p, m in [(3700, 1), (3750, 2), (3787, 3)]
+    ]
+    for f in facts:
+        repo.write_batch(build_batch_from_canonical(
+            source_file="src.xlsx",
+            vintage_date=f.vintage_date,
+            animal=[f],
+        ))
+
+    history = repo.get_revision_history("animal", "Олень благор.", 2022)
+    populations = [a.population for a in history]  # type: ignore[union-attr]
+    assert populations == [3700, 3750, 3787]
+
+
+def test_animal_revision_history_invalid_kind_still_raises() -> None:
+    """get_revision_history rejects unknown kind; 'animal' is now valid."""
+    repo = FakeRepository()
+    with pytest.raises(ValueError):
+        repo.get_revision_history("invalid", "X", 2022)
+    # Sanity: 'animal' does NOT raise on empty repo.
+    assert repo.get_revision_history("animal", "X", 2022) == []
+
+
+def test_animal_get_canonical_returns_none_when_absent() -> None:
+    """Empty repo yields None for any (species, year) lookup."""
+    repo = FakeRepository()
+    assert repo.get_canonical_animal("Олень благор.", 2022) is None
+
+
+def test_animal_distinct_species_with_similar_names() -> None:
+    """Verbatim species names are NOT collapsed by the FakeRepository.
+
+    Three distinct strings produce three distinct canonical rows. The
+    abbreviated 'Олень благор.' and the full 'Олень благородний' map
+    to the same animal_species.id only at the postgres-resolver layer
+    (5.5.5.b+); the in-memory store keeps them separate.
+    """
+    repo = FakeRepository()
+    a = _animal(species_name="Олень благор.", population=3787)
+    b = _animal(species_name="Олень благородний", population=3787)
+    c = _animal(species_name="Олень плямистий", population=1025)
+
+    repo.write_batch(build_batch_from_canonical(
+        source_file="src.xlsx",
+        vintage_date=a.vintage_date,
+        animal=[a, b, c],
+    ))
+
+    canon_a = repo.get_canonical_animal("Олень благор.", 2022)
+    canon_b = repo.get_canonical_animal("Олень благородний", 2022)
+    canon_c = repo.get_canonical_animal("Олень плямистий", 2022)
+
+    assert canon_a is not None and canon_a.population == 3787
+    assert canon_b is not None and canon_b.population == 3787
+    assert canon_c is not None and canon_c.population == 1025
+    assert {canon_a.species_name, canon_b.species_name, canon_c.species_name} == {
+        "Олень благор.", "Олень благородний", "Олень плямистий",
     }

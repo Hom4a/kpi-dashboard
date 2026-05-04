@@ -12,6 +12,7 @@ from datetime import datetime
 from uuid import UUID
 
 from etl.models import (
+    AnimalValue,
     AnnualValue,
     MonthlyValue,
     ReferenceText,
@@ -38,6 +39,7 @@ class WriteBatch:
     species_monthly: list[SpeciesMonthly] = field(default_factory=list)
     reference: list[ReferenceText] = field(default_factory=list)
     salary: list[SalaryValue] = field(default_factory=list)
+    animal: list[AnimalValue] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -122,6 +124,19 @@ class Repository(ABC):
         """
 
     @abstractmethod
+    def get_canonical_animal(
+        self, species_name: str, year: int
+    ) -> AnimalValue | None:
+        """Read back current canonical animal census for a species-year.
+
+        ``species_name`` is the **verbatim** Excel string (with
+        abbreviations like ``"Олень благор."`` kept) — repository
+        implementations resolve it to a stable ``animal_species.id``
+        via the alias table. Animals are annual-only — no
+        ``period_month``.
+        """
+
+    @abstractmethod
     def get_revision_history(
         self,
         kind: str,
@@ -135,12 +150,14 @@ class Repository(ABC):
         | SpeciesMonthly
         | ReferenceText
         | SalaryValue
+        | AnimalValue
     ]:
         """All historical revisions for an ``(entity, period)``, oldest first.
 
         ``kind`` is one of: ``annual`` / ``monthly`` / ``species_annual`` /
-        ``species_monthly`` / ``reference`` / ``salary``. ``entity`` is the
-        ``metric_code`` for scalar kinds, the species code for species
-        kinds, the category slug for reference, or the branch name
-        (verbatim) for salary.
+        ``species_monthly`` / ``reference`` / ``salary`` / ``animal``.
+        ``entity`` is the ``metric_code`` for scalar kinds, the species
+        code for timber-species kinds, the category slug for reference,
+        the branch name (verbatim) for salary, or the species name
+        (verbatim) for animal.
         """

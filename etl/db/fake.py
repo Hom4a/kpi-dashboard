@@ -16,6 +16,7 @@ from dataclasses import dataclass, replace
 from typing import Literal, TypeVar
 
 from etl.models import (
+    AnimalValue,
     AnnualValue,
     MonthlyValue,
     ReferenceText,
@@ -28,7 +29,7 @@ from .interface import Repository, WriteBatch, WriteResult
 
 FactKind = Literal[
     "annual", "monthly", "species_annual", "species_monthly", "reference",
-    "salary",
+    "salary", "animal",
 ]
 
 # Type aliases for revision keys per kind. Each key is enough to identify
@@ -39,6 +40,7 @@ SpAnnualKey = tuple[Literal["species_annual"], str, int]
 SpMonthlyKey = tuple[Literal["species_monthly"], str, int, int]
 ReferenceKey = tuple[Literal["reference"], str, int, int]       # (kind, category, year, month)
 SalaryKey = tuple[Literal["salary"], str, int, int]             # (kind, branch_name, year, month)
+AnimalKey = tuple[Literal["animal"], str, int]                  # (kind, species_name, year)
 RevisionKey = (
     AnnualKey
     | MonthlyKey
@@ -46,6 +48,7 @@ RevisionKey = (
     | SpMonthlyKey
     | ReferenceKey
     | SalaryKey
+    | AnimalKey
 )
 
 
@@ -75,6 +78,7 @@ class _Revision:
         | SpeciesMonthly
         | ReferenceText
         | SalaryValue
+        | AnimalValue
     )
     is_canonical: bool = False
     superseded_at: float | None = None  # monotonic timestamp; None = current
@@ -104,6 +108,10 @@ def _salary_key(f: SalaryValue) -> SalaryKey:
     return ("salary", f.branch_name, f.year, f.month)
 
 
+def _animal_key(f: AnimalValue) -> AnimalKey:
+    return ("animal", f.species_name, f.year)
+
+
 def _is_higher(
     candidate: (
         AnnualValue
@@ -112,6 +120,7 @@ def _is_higher(
         | SpeciesMonthly
         | ReferenceText
         | SalaryValue
+        | AnimalValue
     ),
     current: (
         AnnualValue
@@ -120,6 +129,7 @@ def _is_higher(
         | SpeciesMonthly
         | ReferenceText
         | SalaryValue
+        | AnimalValue
     ),
 ) -> bool:
     """``candidate`` outranks ``current`` for canonical purposes.
@@ -149,6 +159,7 @@ def _fact_signature(
         | SpeciesMonthly
         | ReferenceText
         | SalaryValue
+        | AnimalValue
     ),
 ) -> tuple[object, ...]:
     """Business-identity tuple — used to dedupe identical re-inserts.
@@ -196,9 +207,15 @@ def _fact_signature(
             f.content,
             f.vintage_date, f.source_priority, f.report_type,
         )
+    if isinstance(f, SalaryValue):
+        return (
+            "salary", f.branch_name, f.year, f.month,
+            f.salary_uah, f.region_avg_uah,
+            f.vintage_date, f.source_priority, f.report_type,
+        )
     return (
-        "salary", f.branch_name, f.year, f.month,
-        f.salary_uah, f.region_avg_uah,
+        "animal", f.species_name, f.year,
+        f.population, f.limit_qty,
         f.vintage_date, f.source_priority, f.report_type,
     )
 
@@ -220,6 +237,7 @@ class FakeRepository(Repository):
         self._canon_sp_monthly: dict[tuple[str, int, int], SpeciesMonthly] = {}
         self._canon_reference: dict[tuple[str, int, int], ReferenceText] = {}
         self._canon_salary: dict[tuple[str, int, int], SalaryValue] = {}
+        self._canon_animal: dict[tuple[str, int], AnimalValue] = {}
 
     # ---- Repository protocol -----------------------------------------
 
@@ -255,6 +273,10 @@ class FakeRepository(Repository):
             if self._append(_salary_key(fs), "salary", fs):
                 rows_to_revisions += 1
                 affected_keys.add(_salary_key(fs))
+        for fan in batch.animal:
+            if self._append(_animal_key(fan), "animal", fan):
+                rows_to_revisions += 1
+                affected_keys.add(_animal_key(fan))
 
         for key in affected_keys:
             applied, superseded = self._reapply_canonical(key)
@@ -303,6 +325,11 @@ class FakeRepository(Repository):
     ) -> SalaryValue | None:
         return self._canon_salary.get((branch_name, year, month))
 
+    def get_canonical_animal(
+        self, species_name: str, year: int
+    ) -> AnimalValue | None:
+        return self._canon_animal.get((species_name, year))
+
     def get_revision_history(
         self,
         kind: str,
@@ -316,10 +343,11 @@ class FakeRepository(Repository):
         | SpeciesMonthly
         | ReferenceText
         | SalaryValue
+        | AnimalValue
     ]:
         valid = (
             "annual", "monthly", "species_annual", "species_monthly",
-            "reference", "salary",
+            "reference", "salary", "animal",
         )
         if kind not in valid:
             raise ValueError(f"Unknown kind: {kind!r}")
@@ -336,6 +364,9 @@ class FakeRepository(Repository):
                 if f.branch_name != entity or f.year != year:
                     return False
                 return not (month is not None and f.month != month)
+            if isinstance(f, AnimalValue):
+                # Animals are annual-only — month is ignored.
+                return f.species_name == entity and f.year == year
             if isinstance(f, (AnnualValue, MonthlyValue)):
                 if f.metric_code != entity or f.year != year:
                     return False
@@ -366,6 +397,7 @@ class FakeRepository(Repository):
             | SpeciesMonthly
             | ReferenceText
             | SalaryValue
+            | AnimalValue
         ),
     ) -> bool:
         """Insert revision unless an identical signature already present."""
@@ -420,6 +452,7 @@ class FakeRepository(Repository):
             | SpeciesMonthly
             | ReferenceText
             | SalaryValue
+            | AnimalValue
         ),
     ) -> None:
         kind = key[0]
@@ -449,6 +482,9 @@ class FakeRepository(Repository):
             self._canon_salary[
                 (fact.branch_name, fact.year, fact.month)
             ] = fact
+        elif kind == "animal":
+            assert isinstance(fact, AnimalValue)
+            self._canon_animal[(fact.species_name, fact.year)] = fact
 
     # ---- Test helpers (not part of Repository ABC) -------------------
 
@@ -463,6 +499,7 @@ class FakeRepository(Repository):
             + len(self._canon_sp_annual)
             + len(self._canon_sp_monthly)
             + len(self._canon_salary)
+            + len(self._canon_animal)
         )
 
     # Re-export ``replace`` so tests can build modified fact copies easily.
