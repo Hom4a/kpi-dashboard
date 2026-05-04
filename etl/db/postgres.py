@@ -34,6 +34,7 @@ from .code_mapper import (
     species_python_to_db,
 )
 from .interface import Repository, WriteBatch, WriteResult
+from .species_resolver import resolve_species_id
 
 if TYPE_CHECKING:
     from psycopg2.extensions import (  # type: ignore[import-untyped]  # noqa: N812
@@ -70,6 +71,10 @@ class PostgresRepository(Repository):
         # skip) instead of raising on miss. ``None`` is also cached to
         # avoid re-querying for known-unknown branches in the same batch.
         self._branch_id_cache: dict[str, UUID | None] = {}
+        # Species-id cache — same warn-and-skip semantics as branch.
+        # Closed 6-species set in production (Олень благор., Олень
+        # плямистий, Козуля, Кабан, Лань, Муфлон); cache stays small.
+        self._species_id_cache: dict[str, UUID | None] = {}
 
     # ----------------------------------------------------------------
     # Repository protocol
@@ -97,6 +102,10 @@ class PostgresRepository(Repository):
         # year, month) — set semantics dedupe revisions of the same key
         # for canonical reapply.
         affected_sal: set[tuple[str, int, int]] = set()
+        # Animal rows are TEXT-keyed (species_name) at source, UUID-keyed
+        # (species_id) at storage. Annual-only — set holds
+        # (species_id_str, year), no period_month component.
+        affected_anim: set[tuple[str, int]] = set()
 
         # ``with conn`` commits on success / rolls back on exception.
         with self._conn, self._conn.cursor() as cur:
@@ -137,6 +146,18 @@ class PostgresRepository(Repository):
                     self._row_for_salary(fs, batch.batch_id, branch_id)
                 )
                 affected_sal.add((str(branch_id), fs.year, fs.month))
+            for fan in batch.animal:
+                species_id = self._cached_resolve_species_id(cur, fan.species_name)
+                if species_id is None:
+                    warnings.append(
+                        f"unknown_species: {fan.species_name!r} (skipped — "
+                        f"add to animal_species + animal_species_aliases manually)"
+                    )
+                    continue
+                rev_rows.append(
+                    self._row_for_animal(fan, batch.batch_id, species_id)
+                )
+                affected_anim.add((str(species_id), fan.year))
 
             if rev_rows:
                 rows_to_revisions = self._bulk_insert_revisions(cur, rev_rows)
@@ -179,6 +200,12 @@ class PostgresRepository(Repository):
             for branch_id_str, year, month in affected_sal:
                 self._reapply_canonical_salary(
                     cur, UUID(branch_id_str), year, month, batch.batch_id
+                )
+
+            # --- 2d. Animal canonical (TEXT-source / UUID-storage, annual-only) ----
+            for species_id_str, year in affected_anim:
+                self._reapply_canonical_animal(
+                    cur, UUID(species_id_str), year, batch.batch_id
                 )
 
         return WriteResult(
@@ -371,6 +398,43 @@ class PostgresRepository(Repository):
             False,                                    # is_canonical (set later)
             None,                                     # superseded_at
             batch.batch_id,
+        )
+
+    @staticmethod
+    def _row_for_animal(
+        fact: AnimalValue, batch_id: UUID, species_id: UUID
+    ) -> tuple[Any, ...]:
+        """Tuple matching ``_INSERT_REVISION_COLS`` for an animal census revision.
+
+        Animals are annual-only (no period_month). ``period_month`` is
+        hardcoded to ``0`` because ``fact_revisions.period_month`` is
+        NOT NULL — the underlying CHECK constraint allows ``0..13``.
+        ``idx_fact_revisions_unique_animal`` (sql/20) does not include
+        ``period_month`` in its key shape because period_month is always
+        0 for animal rows.
+
+        ``species_id`` is resolved by the caller via ``resolve_species_id``
+        and passed in as a parameter — keeps this function pure (mirrors
+        ``_row_for_salary``, ``_row_for_reference``).
+
+        Animal slots: ``species_id``, ``population``, ``limit_qty``,
+        ``raw_text``. All other fact-shape columns (indicator_id,
+        branch_id, category, value_numeric, value_text, volume_km3,
+        avg_price_grn, salary_uah, region_avg_uah) are NULL.
+        """
+        return (
+            "animal",
+            None, None, species_id, None,             # indicator/branch=NULL; species_id set; category=NULL
+            fact.year, 0,                              # period_year, period_month=0 (annual)
+            None, None,                                # value_numeric / value_text NULL
+            None, None,                                # volume_km3 / avg_price_grn NULL
+            None, None,                                # salary_uah / region_avg_uah NULL
+            fact.population, fact.limit_qty, fact.raw_text,  # animal slots
+            fact.vintage_date, fact.report_type, fact.source_priority,
+            fact.source_file, fact.source_row,
+            False,                                     # is_canonical (set later)
+            None,                                      # superseded_at
+            batch_id,
         )
 
     @staticmethod
@@ -793,6 +857,121 @@ class PostgresRepository(Repository):
             ),
         )
 
+    def _reapply_canonical_animal(
+        self,
+        cur: Any,
+        species_id: UUID,
+        year: int,
+        batch_id: UUID,
+    ) -> None:
+        """Reapply canonical winner for a single (species, year) animal key.
+
+        Mirror of ``_reapply_canonical_salary`` but without the
+        ``period_month`` filter — animals are annual-only. Selects winner
+        ORDER BY (priority DESC, vintage_date DESC, source_row ASC),
+        demotes previous canonical if not the winner, promotes the
+        winner, UPSERTs ``animal_values``.
+
+        Returns ``None`` (same accounting trade-off as
+        ``_reapply_canonical_salary``) — animal contributions to
+        ``rows_to_canonical`` / ``rows_superseded`` counters are
+        deferred. Idempotency and correctness unaffected.
+
+        ``winner_row`` index map for **animal** SELECT:
+            [0] id              UUID of the winning revision row
+            [1] species_id      echoed (sanity)
+            [2] population      payload
+            [3] limit_qty       payload (NULL when '*' footnote in source)
+            [4] raw_text        original cell text for audit
+            [5] source_file
+            [6] source_row
+            [7] vintage_date
+            [8] source_priority
+            [9] is_canonical    (== prev_was_canonical for this winner)
+        """
+        cur.execute(
+            """
+            SELECT id, species_id, population, limit_qty, raw_text,
+                   source_file, source_row, vintage_date,
+                   source_priority, is_canonical
+              FROM fact_revisions
+             WHERE fact_kind = 'animal'
+               AND species_id = %s
+               AND period_year = %s
+             ORDER BY source_priority DESC, vintage_date DESC, source_row ASC
+             LIMIT 1
+            """,
+            (str(species_id), year),
+        )
+        winner_row = cur.fetchone()
+        if winner_row is None:
+            return
+
+        winner_id = winner_row[0]
+
+        # Demote previously-canonical sibling (if any).
+        cur.execute(
+            """
+            UPDATE fact_revisions
+               SET is_canonical = FALSE,
+                   superseded_at = NOW()
+             WHERE fact_kind = 'animal'
+               AND species_id = %s
+               AND period_year = %s
+               AND is_canonical = TRUE
+               AND id <> %s
+            """,
+            (str(species_id), year, winner_id),
+        )
+
+        # Promote the winner.
+        cur.execute(
+            "UPDATE fact_revisions SET is_canonical = TRUE, superseded_at = NULL "
+            "WHERE id = %s",
+            (winner_id,),
+        )
+
+        self._upsert_animal_value(cur, species_id, year, winner_row, batch_id)
+
+    @staticmethod
+    def _upsert_animal_value(
+        cur: Any,
+        species_id: UUID,
+        year: int,
+        winner_row: tuple[Any, ...],
+        upload_batch_id: UUID,
+    ) -> None:
+        """UPSERT animal canonical into ``animal_values``.
+
+        winner_row layout: see ``_reapply_canonical_animal`` docstring.
+            [2]=population, [3]=limit_qty, [4]=raw_text.
+        Relies on ``idx_av_unique`` on (species_id, period_year) for
+        ON CONFLICT. Note: 2-column key (no period_month) because
+        animals are annual-only.
+        """
+        population = winner_row[2]
+        limit_qty = winner_row[3]
+        raw_text = winner_row[4]
+        cur.execute(
+            """
+            INSERT INTO animal_values
+                (species_id, period_year,
+                 population, limit_qty, raw_text,
+                 upload_batch_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (species_id, period_year) DO UPDATE
+            SET population      = EXCLUDED.population,
+                limit_qty       = EXCLUDED.limit_qty,
+                raw_text        = EXCLUDED.raw_text,
+                upload_batch_id = EXCLUDED.upload_batch_id
+            """,
+            (
+                str(species_id), year,
+                population, limit_qty, raw_text,
+                str(upload_batch_id),
+            ),
+        )
+
     @staticmethod
     def _upsert_volprice_value(
         cur: Any,
@@ -877,6 +1056,22 @@ class PostgresRepository(Repository):
         branch_id = resolve_branch_id(cur, branch_name)
         self._branch_id_cache[branch_name] = branch_id
         return branch_id
+
+    def _cached_resolve_species_id(
+        self, cur: Any, species_name: str
+    ) -> UUID | None:
+        """Memoized species_id lookup. Mirror of ``_cached_resolve_branch_id``.
+
+        Same warn-and-skip semantics as the branch resolver: returns
+        ``None`` for unknown species names so the caller can surface a
+        warning and continue (animal_species set is closed and
+        manually curated; auto-INSERT is intentionally avoided).
+        """
+        if species_name in self._species_id_cache:
+            return self._species_id_cache[species_name]
+        species_id = resolve_species_id(cur, species_name)
+        self._species_id_cache[species_name] = species_id
+        return species_id
 
 
 __all__ = ["PostgresRepository"]
