@@ -259,6 +259,12 @@ def print_summary(xlsx_path: Path, pipeline: PipelineOutput) -> None:
     ref_categories = sorted({r.category for r in pipeline.canonical_reference})
     ref_detail = ", ".join(ref_categories) if ref_categories else "(none)"
 
+    sal_count = len(pipeline.canonical_salary)
+    sal_branches = sorted({s.branch_name for s in pipeline.canonical_salary})
+    sal_detail = (
+        f"{len(sal_branches)} branches" if sal_branches else "(none)"
+    )
+
     lines.append("")
     lines.append("Counts (canonical, deduplicated):")
     lines.append(f"  Annual values:    {len(pipeline.canonical_annual)}")
@@ -267,6 +273,7 @@ def print_summary(xlsx_path: Path, pipeline: PipelineOutput) -> None:
     lines.append(f"  Species monthly:  {len(pipeline.canonical_species_monthly)}")
     lines.append(f"  Derived metrics:  {derived_count}  ({derived_detail})")
     lines.append(f"  Reference texts:  {ref_count}  ({ref_detail})")
+    lines.append(f"  Salary values:    {sal_count}  ({sal_detail})")
     lines.append("")
     lines.append("Period coverage:")
     lines.append(f"  Annual:   {annual_str}")
@@ -327,6 +334,8 @@ def _build_batch(xlsx_path: Path, pipeline: PipelineOutput) -> WriteBatch:
         f.vintage_date for f in pipeline.canonical_species_monthly
     ] + [
         f.vintage_date for f in pipeline.canonical_reference
+    ] + [
+        f.vintage_date for f in pipeline.canonical_salary
     ]
     vintage = max(all_vintages) if all_vintages else datetime.now().astimezone()
 
@@ -338,6 +347,7 @@ def _build_batch(xlsx_path: Path, pipeline: PipelineOutput) -> WriteBatch:
         species_annual=pipeline.canonical_species_annual,
         species_monthly=pipeline.canonical_species_monthly,
         reference=pipeline.canonical_reference,
+        salary=pipeline.canonical_salary,
     )
 
 
