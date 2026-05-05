@@ -100,7 +100,9 @@
 | created_at | timestamptz | NO | now() |
 | updated_at | timestamptz | NO | now() |
 
-**Currently in use:** admin (1), editor (2), viewer (3). Не використовується **manager** — Phase 1 додає у CHECK для готовності.
+**Schema baseline CHECK (5 roles permitted):** admin, director, analyst, editor, viewer. Director і analyst defined у CHECK without assigned users — likely vestigial з раніших plans (frontend `js/app.js:91` references analyst для Dashboards button visibility).
+
+**Currently in use:** admin (1), editor (2), viewer (3). Phase 1 додає **manager** до CHECK (6 ролей total: baseline 5 + manager) для готовності, preserving analyst/director для backward compat (Option A decision 2026-05-05).
 
 **handle_new_user trigger:** ON INSERT to auth.users → INSERT INTO profiles (id, email, full_name, role) з role з raw_user_meta_data або 'viewer' default. ON CONFLICT DO NOTHING. SECURITY DEFINER.
 
@@ -151,6 +153,7 @@
 | manager | ✓ | ✗ | ✗ | ✗ | ✓ read | (admin sets, optional) |
 | viewer | ✓ | ✗ | ✗ | ✗ | ✗ | false |
 
+> Note: Schema CHECK constraint also permits `analyst` and `director` values (preserved baseline для backward compat з `js/app.js:91` — Option A decision 2026-05-05). Admin UI dropdown у Phase 2 буде exposing тільки 4 ролі цієї моделі. Schema rationalization (potential drop of analyst/director) — Phase 7+ scope.
 > Note: `manager` додається у CHECK для готовності. Поточно no user.
 > Note: `profiles.allowed_pages text[]` — окремий механізм page-level access. Не зачіпається у цьому епіку.
 
@@ -194,7 +197,7 @@
 - `sql/23-profiles-enhance-and-rls-fix.sql`:
   1. ALTER TABLE profiles ADD COLUMN mfa_required boolean NOT NULL DEFAULT false
   2. ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check
-  3. ALTER TABLE profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('admin','editor','manager','viewer'))
+  3. ALTER TABLE profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('admin','director','analyst','editor','viewer','manager')) — Option A (chat 2026-05-05): baseline 5 + manager = 6 ролей
   4. CREATE FUNCTION public.fn_is_admin() SECURITY DEFINER STABLE
   5. CREATE FUNCTION public.fn_has_role(text) SECURITY DEFINER STABLE
   6. DROP 4 admin policies on profiles
@@ -202,6 +205,7 @@
   8. REVOKE EXECUTE ON FUNCTION handle_new_user() FROM anon, authenticated, public
   9. REVOKE EXECUTE ON FUNCTION trg_alias_normalize() FROM anon, authenticated, public
   10. GRANT EXECUTE ON FUNCTION fn_is_admin(), fn_has_role(text) TO authenticated
+  11. REVOKE EXECUTE ON FUNCTION fn_is_admin() / fn_has_role(text) FROM PUBLIC — Option C (chat 2026-05-05): explicit cleanup of Postgres default PUBLIC grant. anon retains explicit Supabase pattern grant (functional impact = 0; Phase 2 may revisit)
 
 - `sql/23-rollback.sql`: reverse 10→1.
 
@@ -236,6 +240,7 @@
 - js/admin/users-page.js + UI у Settings → "Адмін → Користувачі"
 - Forms: Create user → GoTrue admin API → handle_new_user → UPDATE profile.role
 - List view: emails, roles, last_signin, mfa_required, MFA factor active
+- Frontend: `js/app.js:91` додати 'manager' до Dashboards button visibility list (currently `['admin', 'analyst', 'editor']`; new: `['admin', 'analyst', 'editor', 'manager']`) — manager має read+audit access, повинен бачити Dashboards button
 
 **Smoke:** valeriy створює test user → user appears у auth.users + profiles → log in test → /admin denied → log back valeriy → delete test.
 
