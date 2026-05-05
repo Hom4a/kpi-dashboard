@@ -2,9 +2,11 @@
 ## ETL Pipeline + Frontend Dashboard for ДП Ліси України
 
 **Last updated:** 2026-05-05
-**Working branch:** feature/migration-15-revisions
+**Working branch:** feature/admin-panel ahead of master +3 commits (Phase 1 complete)
+**Active epic:** ADMIN_EPIC.md — Phase 1 CLOSED 2026-05-05; Phase 1.5 manual pending; Phase 2 ready
 **Production state:** Reference resolver live end-to-end + 5-period
-archival reference + safety guards on destructive actions
+archival reference + safety guards on destructive actions + profiles
+RLS hardened (circular subquery tech debt closed)
 
 ## Recently completed cycles
 
@@ -145,6 +147,51 @@ button. window.prompt requires exact 'УДАЛИТИ' input to proceed.
 ESC, empty, wrong text, or lowercase — all cancel with 'Скасовано'
 alert. Prevents click-through inertia and accidental hover-clicks.
 
+### Phase 1 — profiles enhance + RLS hardening + tech debt fix (CLOSED 2026-05-05)
+
+Goal: extend existing profiles infrastructure для admin epic without
+new user_roles table; fix circular RLS tech debt as bonus.
+
+Sub-step B.1 — sql/23 draft (no apply):
+- Re-verified baseline through 5 read-only queries; caught Option A/B/C
+  decision point on existing CHECK (baseline 5 roles, not 3 as initial
+  draft assumed) — chose Option A (preserve baseline + add manager = 6)
+- Drafted sql/23-profiles-enhance-and-rls-fix.sql (114 lines, 9 steps)
+- Drafted sql/23-rollback.sql (91 lines, exact baseline restoration)
+
+Sub-step B.2 — apply + smoke (commit bf6be0b):
+- Fresh backup pre-sql23-20260505-141053.sql (6.98 MB)
+- Apply through cat | psql: 25 statements clean BEGIN/COMMIT
+- 8-step smoke ALL PASS: schema (column + CHECK з 6 ролями), functions
+  (fn_is_admin/fn_has_role з SECURITY DEFINER STABLE), policies (4
+  admin replaced без recursion), grants (leak closed на handle_new_user
+  + trg_alias_normalize), trigger attached, functional auth simulation
+  (valeriy admin sees 6 profiles, nikita editor sees 1)
+
+Sub-step B.2.1 — REVOKE PUBLIC follow-up (Option C):
+- Discovered fn_is_admin/fn_has_role inherited PUBLIC EXECUTE через
+  Postgres default. Revoked PUBLIC ad-hoc; updated sql/23 file для
+  consistency.
+- Discovered anon retains explicit Supabase pattern grant (functional
+  impact = 0; documented as Phase 2 revisit).
+
+Sub-step B.3 — Phase 1 closure (commits bf6be0b + 0b75990):
+- Committed sql/23-* (forward + rollback)
+- Aligned ADMIN_EPIC.md з sql/23 actuals (4 sections updated)
+- Pushed both commits to origin/feature/admin-panel
+
+Tech debt closed: 4 admin policies на profiles мали circular subquery
+(SELECT FROM profiles within policy ON profiles). Replaced з USING
+(public.fn_is_admin()) SECURITY DEFINER pattern — no recursion.
+
+Phase 1.5 ready (manual): створити kaiassistantopenclaw@gmail.com
+service backup admin через Studio → UPDATE profiles SET role='admin'.
+≥2 admins precondition для Phase 2.6 RLS aal2 lock-down.
+
+Phase 2 ready: User management UI з RPCs + /admin/users page.
+TODO documented: js/app.js:91 додати 'manager' до Dashboards button
+visibility list (currently `['admin', 'analyst', 'editor']`).
+
 ## Pending — fresh-mind required
 
 ### Frontend audit (next session)
@@ -187,22 +234,38 @@ alert. Prevents click-through inertia and accidental hover-clicks.
    would add fact_revisions audit trail and canonical resolution.
 
 ### GH Pages mirror
-9. Merge feature/migration-15-revisions → master + GH Pages PR.
+9. ~~Merge feature/migration-15-revisions → master + GH Pages PR~~ (DONE
+   2026-05-05; current working branch feature/admin-panel from master).
+
+### Admin epic next steps
+10. Phase 1.5 manual: створити kaiassistantopenclaw@gmail.com через
+    Studio → UPDATE profiles SET role='admin' (≥2 admins precondition
+    для Phase 2.6 RLS aal2 lock-down).
+11. Phase 2 frontend: js/app.js:91 додати 'manager' до Dashboards
+    button visibility list (мінорна правка, deploy with Phase 2 UI).
+12. Phase 2 RPCs: fn_admin_create_user, fn_admin_set_user_role, etc.
+    (SECURITY DEFINER + fn_is_admin guard + ≥2 admins rule).
 
 ## Tech debt (deferred)
 
-- ⚠ ROTATE valeriy418@gmail.com password (leaked in chat 5x during
-  early sessions). Still pending.
 - ⚠ ALTER PUBLICATION supabase_realtime ADD TABLE for 6 normalized
   tables (degraded realtime).
-- ⚠ RLS infinite recursion on public.profiles (4 of 6 policies
-  self-reference, pre-existing).
 - ⚠ Untracked sql/01-13 — legacy seed/migration files never
   committed to this branch. Tech debt.
 - pre-existing test_fake_repository.py:217+ union-attr bug.
 - canonical_*_salary / canonical_*_animal don't contribute to
   rows_to_canonical / rows_superseded counters.
 - psycopg2 execute_values cur.rowcount quirk.
+
+### Tech debt CLOSED 2026-05-05
+- ✅ RLS infinite recursion on public.profiles — fixed у Phase 1
+  (sql/23, commit bf6be0b). 4 admin policies replaced inline EXISTS
+  subquery з USING(fn_is_admin()) SECURITY DEFINER pattern.
+
+### Tech debt deprioritized
+- ROTATE valeriy418@gmail.com password (leaked in chat early sessions)
+  — Phase 2.5 додасть mfa_required=true для admin role default; MFA
+  mitigates compromise. Не блокує current work.
 
 ## Lessons learned (this session)
 
