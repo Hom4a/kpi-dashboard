@@ -531,7 +531,20 @@ window.undoLastMarketUpload = async () => {
 };
 
 window.clearSummaryIndicators = async () => {
-    if (!confirm('Очистити дані зведених показників?')) return;
+    const REQUIRED_CONFIRM = 'УДАЛИТИ';
+    const userInput = window.prompt(
+        'Це видалить ВСІ зведені дані з усіх років (2023, 2024, 2025, ' +
+        '2026 etc.), включно з історичними значеннями reference, ' +
+        'salary, animal, indicators, volprice. Архівні дані Python ETL ' +
+        'залишаться у fact_revisions, але їх потрібно буде відновити ' +
+        'через CLI.\n\n' +
+        'Введіть слово "' + REQUIRED_CONFIRM + '" (без лапок) ' +
+        'щоб підтвердити:'
+    );
+    if (userInput !== REQUIRED_CONFIRM) {
+        alert('Скасовано. Дані не видалено.');
+        return;
+    }
     showLoader(true);
     try {
         await clearSummaryIndicators();
