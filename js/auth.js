@@ -16,22 +16,22 @@ export function setHideButtonsCallback(fn) { _hideButtonsFn = fn; }
 
 // ===== Role-based page access matrix =====
 const PAGE_ACCESS = {
-    volumes:     ['admin', 'director', 'analyst', 'editor', 'forester'],
-    finance:     ['admin', 'director', 'analyst', 'editor', 'accountant'],
-    forest:      ['admin', 'director', 'analyst', 'editor', 'accountant', 'forester', 'operator'],
-    harvesting:  ['admin', 'director', 'analyst', 'editor', 'forester'],
-    market:      ['admin', 'director', 'analyst', 'editor', 'forester'],
-    executive:   ['admin', 'director', 'analyst'],
-    summary:     ['admin', 'director', 'analyst', 'editor', 'viewer', 'accountant', 'hr', 'forester', 'operator'],
-    'data-entry':['admin', 'editor', 'accountant', 'hr', 'forester', 'operator'],
-    builder:     ['admin', 'analyst', 'editor'],
-    'api-system':['admin', 'analyst'],
-    gis:         ['admin', 'director', 'analyst', 'editor', 'forester'],
-    'wood-accounting': ['admin', 'director', 'analyst', 'editor', 'forester', 'operator'],
+    volumes:     ['admin', 'director', 'analyst', 'editor', 'manager'],
+    finance:     ['admin', 'director', 'analyst', 'editor', 'manager'],
+    forest:      ['admin', 'director', 'analyst', 'editor', 'manager'],
+    harvesting:  ['admin', 'director', 'analyst', 'editor', 'manager'],
+    market:      ['admin', 'director', 'analyst', 'editor', 'manager'],
+    executive:   ['admin', 'director', 'analyst', 'manager'],
+    summary:     ['admin', 'director', 'analyst', 'editor', 'viewer', 'manager'],
+    'data-entry':['admin', 'editor'],
+    builder:     ['admin', 'analyst', 'editor', 'manager'],
+    'api-system':['admin', 'analyst', 'manager'],
+    gis:         ['admin', 'director', 'analyst', 'editor', 'manager'],
+    'wood-accounting': ['admin', 'director', 'analyst', 'editor', 'manager'],
 };
 
 // Roles that can upload files
-const UPLOAD_ROLES = ['admin', 'director', 'analyst', 'editor', 'accountant', 'hr', 'forester', 'operator'];
+const UPLOAD_ROLES = ['admin', 'editor'];
 
 // Roles that see data management (clear/undo)
 const DATA_MANAGE_ROLES = ['admin', 'editor'];
@@ -41,9 +41,8 @@ const TARGET_ROLES = ['admin', 'editor'];
 
 // Role display names (Ukrainian)
 const ROLE_LABELS = {
-    admin: 'адмін', director: 'керівник', analyst: 'аналітик',
-    editor: 'редактор', accountant: 'бухгалтер', hr: 'HR',
-    forester: 'лісничий', operator: 'оператор', viewer: 'глядач'
+    admin: 'адмін', director: 'директор', analyst: 'аналітик',
+    editor: 'редактор', manager: 'керівник', viewer: 'глядач'
 };
 
 /** Get pages visible for a given role + profile */
