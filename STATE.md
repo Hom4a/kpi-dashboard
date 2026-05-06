@@ -3,7 +3,7 @@
 
 **Last updated:** 2026-05-06
 **Working branch:** feature/admin-panel ahead of master +14 commits (Phase 2 complete + Phase 2.5 G.1 self-service password change)
-**Active epic:** ADMIN_EPIC.md — Phase 2 CLOSED 2026-05-06; Phase 2.5 G.1 done; Phase 2.5 G.2-G.4 pending; Phase 1.5 manual still required для Phase 2.6
+**Active epic:** ADMIN_EPIC.md — Phase 2 CLOSED 2026-05-06; Phase 2.5 G.1 + G.2 done; Phase 2.5 G.3 (TOTP) + G.4 pending; Phase 1.5 manual still required для Phase 2.6
 **Production state:** Reference resolver live end-to-end + 5-period
 archival reference + safety guards on destructive actions + profiles
 RLS hardened (circular subquery tech debt closed) + 5 admin Edge
@@ -286,6 +286,37 @@ Implementation (G.1c, commit 7cee19f):
 Smoke verified end-to-end: invalid pwd rejection, validation messages,
 successful change, logout + re-login з новим pwd.
 
+### Phase 2.5 G.2 — SMTP delivery test (CLOSED 2026-05-06)
+
+Goal: verify SMTP infrastructure functional перш ніж drafting MFA
+recovery design.
+
+Test mechanism: trigger /recover endpoint для valeriy418@gmail.com
+через GoTrue public API. Read-only, no code changes.
+
+Findings:
+- /opt/kpi-dashboard/supabase/.env має placeholder SMTP values
+  (SMTP_HOST=supabase-mail, SMTP_USER=fake_mail_user, etc.) —
+  defaults з Supabase docker template, ніколи не configured.
+- supabase-mail container не існує → DNS resolution fails
+  (127.0.0.11 docker DNS returns 'server misbehaving').
+- /recover returns HTTP 500 'Error sending recovery email'
+  з error_code unexpected_failure.
+- Recovery flow itself works: GoTrue logs confirm
+  user_recovery_requested audit event. Failure точково на SMTP
+  delivery layer.
+- Latency 88ms (DNS-level fail, no actual SMTP attempt).
+
+Decision LOCKED: Option 3a — status quo. ADMIN_EPIC Section V already
+locks admin-only MFA reset (no email codes). G.1 password change
+працює без SMTP (signInWithPassword verify). Reset-password Edge
+Function returns plaintext (Option γ — admin copies out-of-band).
+TOTP enrollment generates secret locally + QR, no email needed.
+
+Verdict per Phase 2.5 G.3 design: TOTP recovery = admin reset only.
+NO email-based recovery codes. Email-dependent flows (invite emails,
+magic links, /recover) залишаються broken — поза scope ADMIN_EPIC.
+
 ## Pending — fresh-mind required
 
 ### Frontend audit (next session)
@@ -339,15 +370,23 @@ successful change, logout + re-login з новим pwd.
     для Phase 2.6 RLS aal2 lock-down). Все ще required.
 12. **Phase 2.5 — remaining coverage:**
     - ~~G.1 self-service password change~~ (DONE 2026-05-06, commit 7cee19f)
-    - G.2: SMTP delivery test (deferred з E.0 — Option γ не залежить, але
-      потрібен для future password recovery flow)
-    - G.3: TOTP MFA enrollment flow (auth.mfa native already verified у Phase 0)
+    - ~~G.2 SMTP delivery test~~ (DONE 2026-05-06; Option 3a status quo —
+      .env placeholders, supabase-mail container missing, /recover fails 500;
+      ADMIN_EPIC V locks admin-only reset → no email codes у G.3 design)
+    - **G.3 NEXT: TOTP MFA enrollment flow** (auth.mfa native already verified
+      у Phase 0; admin-only reset locked, no email recovery)
     - G.4: /profile/security page consolidation (single hub для password
       + MFA + sessions)
     - G.x future hardening: 'logout-all-sessions' button (admin.signOut
       по user_id) для terminating інших active devices після pwd change
     - createUser min 6→8 chars alignment (defer — separate consistency task)
     - Phase 2.6 aal2 RLS lock-down (gated на ≥2 admins precondition)
+    - Phase 7 polish: clean up '/forgot password' UI affordance якщо
+      existing — currently misleading бо /recover endpoint fails 500
+    - Production SMTP setup: окремий operational task поза admin epic.
+      Edit .env з real credentials + force-recreate supabase-auth container.
+      Required only якщо майбутньому додавати invite emails / magic links /
+      self-recover.
 13. js/app.js:91 додати 'manager' до Dashboards button visibility list
     `['admin', 'analyst', 'editor']` → `['admin', 'analyst', 'editor', 'manager']`
     (минулий пропуск, можна окремим micro-commit).
