@@ -2,8 +2,8 @@
 ## ETL Pipeline + Frontend Dashboard for ДП Ліси України
 
 **Last updated:** 2026-05-06
-**Working branch:** feature/admin-panel ahead of master +14 commits (Phase 2 complete + Phase 2.5 G.1 self-service password change)
-**Active epic:** ADMIN_EPIC.md — Phase 2 CLOSED 2026-05-06; Phase 2.5 G.1 + G.2 done; Phase 2.5 G.3 (TOTP) + G.4 pending; Phase 1.5 manual still required для Phase 2.6
+**Working branch:** feature/admin-panel ahead of master +17 commits (Phase 1.5 manual done + G.3a recon complete)
+**Active epic:** ADMIN_EPIC.md — Phase 2.5 G.1 + G.2 + G.3a (recon) done; G.3b decision lock + implementation pending; Phase 2.6 unblocked (≥2 admins precondition met)
 **Production state:** Reference resolver live end-to-end + 5-period
 archival reference + safety guards on destructive actions + profiles
 RLS hardened (circular subquery tech debt closed) + 5 admin Edge
@@ -317,6 +317,43 @@ Verdict per Phase 2.5 G.3 design: TOTP recovery = admin reset only.
 NO email-based recovery codes. Email-dependent flows (invite emails,
 magic links, /recover) залишаються broken — поза scope ADMIN_EPIC.
 
+### Phase 1.5 manual + Phase 2 production validation (CLOSED 2026-05-06)
+
+User created kaiassistantopenclaw@gmail.com → admin via Studio.
+≥2 admins precondition met для Phase 2.6 future.
+
+Smoke validation у production browser (admin's session):
+- Demote kaiassistantopenclaw → editor: ✅ guard allows (≥2 admins)
+- Demote valeriy (now last admin) → editor: ✅ guard BLOCKS з
+  'Cannot demote last admin' error
+- Promote kaiassistantopenclaw back → admin
+- Create test user → delete via 'УДАЛИТИ' prompt: ✅ removed cleanly
+
+Confirms ≥2 admins guard, set-role Edge Function, delete-user
+Edge Function, frontend confirmation patterns all production-functional.
+
+### Phase 2.5 G.3a — TOTP enrollment recon (CLOSED 2026-05-06)
+
+Read-only audit MFA infrastructure. Findings:
+- Supabase JS@2 SDK greenfield: 6 mfa.* methods available, 0 existing
+- auth.mfa_factors / mfa_challenges / mfa_amr_claims tables ready
+- profiles.mfa_required column (sql/23) available
+- Currently 0 enrolled factors (clean slate)
+- QR rendering: GoTrue returns SVG string inline — no CDN libs needed
+- GOTRUE_MFA_ENABLED defaults to true у v2.x (no explicit env required,
+  але recommended to lock behavior)
+- 5 login flow integration points у js/auth.js identified
+- Reset MFA factor mechanism: direct SQL DELETE recommended over GoTrue
+  admin API (CASCADE handles mfa_challenges automatically)
+
+7 design questions для G.3b decision lock у наступній сесії.
+Implementation estimate: ~485 LOC across 5 files + 1 new Edge Function.
+
+Bootstrap order locked: enrollment FIRST (voluntary через UI), THEN
+admin manually UPDATE profiles SET mfa_required=true для admin role
+ONLY ПІСЛЯ verifying both admins enrolled. Phase 2.6 RLS aal2 lock-down
+з тільки після цього.
+
 ## Pending — fresh-mind required
 
 ### Frontend audit (next session)
@@ -365,22 +402,30 @@ magic links, /recover) залишаються broken — поза scope ADMIN_EP
 ### Admin epic next steps
 10. ~~F.0 frontend: extend viewerAccessModal з 5 action buttons~~ (DONE
     2026-05-06, commit b95df38; F.0c-fix included ROLE_DESCRIPTIONS sync).
-11. Phase 1.5 manual: створити kaiassistantopenclaw@gmail.com через
-    Studio → UPDATE profiles SET role='admin' (≥2 admins precondition
-    для Phase 2.6 RLS aal2 lock-down). Все ще required.
+11. ~~Phase 1.5 manual: створити kaiassistantopenclaw@gmail.com через
+    Studio → UPDATE profiles SET role='admin'~~ (DONE 2026-05-06; ≥2
+    admins precondition для Phase 2.6 met).
+11a. ~~Phase 2 production validation~~ (DONE 2026-05-06; ≥2 admins guard
+    + delete-user smoked end-to-end у browser admin session).
 12. **Phase 2.5 — remaining coverage:**
     - ~~G.1 self-service password change~~ (DONE 2026-05-06, commit 7cee19f)
     - ~~G.2 SMTP delivery test~~ (DONE 2026-05-06; Option 3a status quo —
       .env placeholders, supabase-mail container missing, /recover fails 500;
       ADMIN_EPIC V locks admin-only reset → no email codes у G.3 design)
-    - **G.3 NEXT: TOTP MFA enrollment flow** (auth.mfa native already verified
-      у Phase 0; admin-only reset locked, no email recovery)
-    - G.4: /profile/security page consolidation (single hub для password
-      + MFA + sessions)
+    - ~~G.3a TOTP enrollment recon~~ (DONE 2026-05-06; SDK greenfield, tables
+      ready, 5 login flow integration points у js/auth.js identified;
+      ~485 LOC implementation estimate)
+    - **G.3 implementation pending: see G.3a synthesis для 7 design
+      questions** (UI placement, forced enrollment UX, admin reset
+      mechanism, GOTRUE_MFA_* env timing, MAX_ENROLLED_FACTORS,
+      pre-condition, recovery codes) — G.3b decision lock у наступній сесії
+    - G.4: /profile/security page consolidation (post-G.3, single hub
+      для password + MFA + sessions)
     - G.x future hardening: 'logout-all-sessions' button (admin.signOut
       по user_id) для terminating інших active devices після pwd change
     - createUser min 6→8 chars alignment (defer — separate consistency task)
-    - Phase 2.6 aal2 RLS lock-down (gated на ≥2 admins precondition)
+    - Phase 2.6 aal2 RLS lock-down — unblocked (≥2 admins precondition
+      met), gated на all G.3 + G.4 completion
     - Phase 7 polish: clean up '/forgot password' UI affordance якщо
       existing — currently misleading бо /recover endpoint fails 500
     - Production SMTP setup: окремий operational task поза admin epic.
