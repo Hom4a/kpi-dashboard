@@ -2,13 +2,14 @@
 ## ETL Pipeline + Frontend Dashboard for ДП Ліси України
 
 **Last updated:** 2026-05-06
-**Working branch:** feature/admin-panel ahead of master +11 commits (Phase 2 backend complete)
-**Active epic:** ADMIN_EPIC.md — Phase 2 backend CLOSED 2026-05-06; F.0 frontend integration pending; Phase 1.5 manual Studio bootstrap pending
+**Working branch:** feature/admin-panel ahead of master +13 commits (Phase 2 backend + frontend complete)
+**Active epic:** ADMIN_EPIC.md — Phase 2 CLOSED 2026-05-06; Phase 1.5 manual Studio bootstrap + Phase 2.5 MFA pending
 **Production state:** Reference resolver live end-to-end + 5-period
 archival reference + safety guards on destructive actions + profiles
 RLS hardened (circular subquery tech debt closed) + 5 admin Edge
 Functions deployed (set-role, disable-user, delete-user, reset-password,
-set-mfa-required) + create-user canary deployed
+set-mfa-required) + create-user canary deployed + frontend admin UI
+з 6 inline buttons per user row у viewerAccessModal
 
 ## Recently completed cycles
 
@@ -229,6 +230,32 @@ testing deferred to F.0 (real admin JWT через frontend modal).
 Server volume now has 8 functions: hello, main, create-user, set-role,
 disable-user, delete-user, reset-password, set-mfa-required.
 
+### Phase 2 frontend — admin user management UI (CLOSED 2026-05-06)
+
+Goal: extend viewerAccessModal з 5 admin action buttons wiring до
+Phase 2 backend Edge Functions.
+
+F.0a recon: existing modal handler structure, createUser fetch
+pattern, destructive confirm pattern (window.prompt 'УДАЛИТИ' from
+d09fe9f). Discovered ALL_ROLES + ROLE_LABELS local duplicates у
+modals.js (D.0 missed these — 9 stale roles + Title Case labels).
+
+F.0c implementation (commit b95df38):
+- Cleanup: import ROLE_LABELS from auth.js, delete modals.js dups
+- callAdminEdgeFunction shared helper
+- 6 inline buttons per user card (Save, Reset password, Disable,
+  Enable, MFA toggle, Delete)
+- 5 handler functions з consistent UX
+- Removed saveViewerAccess (mass save → per-row)
+- Build (PowerShell) + tar pipe deploy без MSYS2 mangling
+
+F.0c-fix: ROLE_DESCRIPTIONS object had 9 stale keys — manager missing
+caused undefined.caps TypeError при відкритті roles reference panel.
+Fix: ROLE_DESCRIPTIONS synced до 6 keys + defensive guard.
+
+Smoke verified у production browser: modal opens, reset-password
+generates+displays temp pw, per-row buttons functional.
+
 ## Pending — fresh-mind required
 
 ### Frontend audit (next session)
@@ -275,30 +302,29 @@ disable-user, delete-user, reset-password, set-mfa-required.
    2026-05-05; current working branch feature/admin-panel from master).
 
 ### Admin epic next steps
-10. F.0 frontend: extend `viewerAccessModal` (js/modals.js:175-329)
-    з 5 action buttons + handlers + confirmations (potential rename
-    → userManagementModal). Wire fetch до 5 Edge Functions
-    (set-role, disable-user, delete-user, reset-password,
-    set-mfa-required).
-11. F.1 end-to-end smoke з real admin JWT (positive tests deferred
-    від E.1-E.4 negative-only smokes).
-12. Build/deploy frontend після F.0/F.1 (VITE_BASE=/ via PowerShell;
-    tar pipe atomic swap до /var/www/dashboards.e-forest.gov.ua/).
-13. Phase 1.5 manual: створити kaiassistantopenclaw@gmail.com через
+10. ~~F.0 frontend: extend viewerAccessModal з 5 action buttons~~ (DONE
+    2026-05-06, commit b95df38; F.0c-fix included ROLE_DESCRIPTIONS sync).
+11. Phase 1.5 manual: створити kaiassistantopenclaw@gmail.com через
     Studio → UPDATE profiles SET role='admin' (≥2 admins precondition
-    для Phase 2.6 RLS aal2 lock-down).
-14. js/app.js:91 додати 'manager' до Dashboards button visibility list
+    для Phase 2.6 RLS aal2 lock-down). Все ще required.
+12. **Phase 2.5 — coverage:**
+    - SMTP delivery test (deferred з E.0 — Option γ не залежить, але
+      потрібен для future password recovery flow)
+    - Self-service password change: admin-generated temps need user
+      replacement after first login → /profile/security page
+    - TOTP enrollment flow (auth.mfa native already verified у Phase 0)
+    - aal2 RLS lock-down (Phase 2.6 bundled)
+13. js/app.js:91 додати 'manager' до Dashboards button visibility list
     `['admin', 'analyst', 'editor']` → `['admin', 'analyst', 'editor', 'manager']`
-    (рекомендується робити одночасно з F.0).
-15. Known limitation: delete-user fails з FK violation якщо target
-    uploaded data (non-CASCADE FKs у upload_history). Currently safe
-    (existing 6 users haven't uploaded). F.0 frontend може detect
-    і suggest 'Disable instead'.
-16. Phase 2.5: SMTP delivery test before forced MFA enrollment
-    (deferred because Option γ password reset не залежить від SMTP).
-17. 3 orphaned Edge Functions у repo (fetch-eur-rate, notify-telegram,
+    (минулий пропуск, можна окремим micro-commit).
+14. Known limitation: delete-user FK conflict для users з upload
+    history (frontend hint shown; future structural fix via CASCADE
+    additions or pre-delete cleanup).
+15. 3 orphaned Edge Functions у repo (fetch-eur-rate, notify-telegram,
     upload-wood-data) — local-only, server volume їх не має. Окрема
     "deploy or remove" task поза Phase 2 scope.
+16. viewerAccessModal id rename → userManagementModal — Phase 6 polish
+    (cosmetic, заголовок 'Управління користувачами' вже коректний).
 
 ## Tech debt (deferred)
 
