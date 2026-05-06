@@ -5,6 +5,7 @@ import { allData, filtered, charts, currentProfile, setAllData, setFiltered, set
 import { setupChartDefaults } from './charts-common.js';
 import { startAutoRefresh, stopAutoRefresh } from './auto-refresh.js';
 import { stopRealtime } from './realtime.js';
+import { openMFAChallenge, openForcedEnrollment } from './security.js';
 
 let _authInProgress = false;
 let _authCompleted = false;
@@ -160,6 +161,45 @@ export async function showAppForUser(user) {
                 console.warn('Profile: no fresh, no cache, no metadata');
             }
         }).catch(() => {});
+
+        // --- MFA gate (Phase 2.5 G.3c-3) ---
+        // Block app UI render until: aal2 verified OR no MFA needed OR sign out.
+        // Awaits fresh profile якщо cached/metadata-synthetic lacks mfa_required.
+        try {
+            let mfaProfile = currentProfile;
+            if (!mfaProfile || mfaProfile.mfa_required === undefined) {
+                const fresh = await withTimeout(getCurrentProfile(user.id), 5000, null);
+                if (fresh) {
+                    setCurrentProfile(fresh);
+                    mfaProfile = fresh;
+                }
+            }
+            const { data: aalData } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+            const { data: factorsData } = await sb.auth.mfa.listFactors();
+            const totpFactors = (factorsData?.totp || []).filter(f => f.status === 'verified');
+            const currentLevel = aalData?.currentLevel;
+            const nextLevel = aalData?.nextLevel;
+
+            let cancelled = false;
+            // Case A: has factor + currently aal1 → must verify
+            if (totpFactors.length > 0 && currentLevel === 'aal1' && nextLevel === 'aal2') {
+                const verified = await openMFAChallenge(totpFactors[0].id);
+                if (!verified) cancelled = true;
+            }
+            // Case B: no factor + mfa_required=true → forced enrollment
+            else if (totpFactors.length === 0 && mfaProfile?.mfa_required === true) {
+                const enrolled = await openForcedEnrollment();
+                if (!enrolled) cancelled = true;
+            }
+
+            if (cancelled) {
+                await sb.auth.signOut();
+                return;
+            }
+        } catch (mfaErr) {
+            console.error('MFA gate error (non-fatal, continuing):', mfaErr);
+        }
+        // --- end MFA gate ---
 
         const p = currentProfile;
         const role = p ? p.role : 'viewer';

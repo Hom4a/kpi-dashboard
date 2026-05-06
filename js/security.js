@@ -183,3 +183,103 @@ async function handleDisableMFA(factorId) {
     toast('MFA вимкнено');
     await renderIdleState();
 }
+
+// ===== Phase 2.5 G.3c-3: Login flow forced gate =====
+// openMFAChallenge(factorId): has factor, verify aal1→aal2
+// openForcedEnrollment(): no factor + mfa_required → enroll+verify
+// Resolve true on success, false on user "Вийти" (caller signs out).
+// Close X hidden during forced flows.
+
+function _wireVerify(factorId, finish, onExit) {
+    const codeEl = $sm('mfaGateCode');
+    const statusEl = $sm('mfaGateStatus');
+    const btn = $sm('btnGateVerify');
+    const exitBtn = $sm('btnGateExit');
+    const tryVerify = async () => {
+        const code = (codeEl?.value || '').trim();
+        if (!/^\d{6}$/.test(code)) {
+            statusEl.innerHTML = '<span style="color:var(--rose)">Введіть рівно 6 цифр</span>';
+            return;
+        }
+        btn.disabled = true; btn.textContent = 'Перевірка...'; statusEl.innerHTML = '';
+        try {
+            const { data: ch, error: chErr } = await sb.auth.mfa.challenge({ factorId });
+            if (chErr) throw chErr;
+            const { error: vErr } = await sb.auth.mfa.verify({ factorId, challengeId: ch.id, code });
+            if (vErr) throw vErr;
+            finish(true);
+        } catch (e) {
+            btn.disabled = false; btn.textContent = 'Підтвердити';
+            statusEl.innerHTML = '<span style="color:var(--rose)">Невірний код. Спробуйте ще раз.</span>';
+            if (codeEl) { codeEl.value = ''; codeEl.focus(); }
+        }
+    };
+    btn.onclick = tryVerify;
+    exitBtn.onclick = onExit || (() => finish(false));
+    codeEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); tryVerify(); }
+    });
+    setTimeout(() => codeEl?.focus(), 100);
+}
+
+const VERIFY_INPUT_HTML = `
+    <input type="text" id="mfaGateCode" class="de-input"
+           maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code"
+           placeholder="123456"
+           style="width:100%;font-family:monospace;font-size:16px;letter-spacing:4px;text-align:center">
+    <div id="mfaGateStatus" style="margin-top:6px;font-size:11px;min-height:14px"></div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+        <button id="btnGateVerify" class="btn" style="flex:1">Підтвердити</button>
+        <button id="btnGateExit" class="btn btn-sm">Вийти</button>
+    </div>`;
+
+export function openMFAChallenge(factorId) {
+    return new Promise((resolve) => {
+        const m = modalEl();
+        if (!m) { resolve(false); return; }
+        m.classList.add('on');
+        const xBtn = m.querySelector('.modal-close');
+        if (xBtn) xBtn.style.display = 'none';
+        bodyEl().innerHTML = `
+            <p style="font-size:13px;color:var(--text2);margin:0 0 8px">Двофакторна автентифікація увімкнена для вашого облікового запису.</p>
+            <p style="font-size:12px;color:var(--text2);margin:0 0 6px">Введіть 6-значний код з вашого додатку автентифікації:</p>
+            ${VERIFY_INPUT_HTML}`;
+        const finish = (r) => { m.classList.remove('on'); if (xBtn) xBtn.style.display = ''; resolve(r); };
+        _wireVerify(factorId, finish);
+    });
+}
+
+export function openForcedEnrollment() {
+    return new Promise(async (resolve) => {
+        const m = modalEl();
+        if (!m) { resolve(false); return; }
+        m.classList.add('on');
+        const xBtn = m.querySelector('.modal-close');
+        if (xBtn) xBtn.style.display = 'none';
+        const finishBase = (r) => { m.classList.remove('on'); if (xBtn) xBtn.style.display = ''; resolve(r); };
+
+        bodyEl().innerHTML = '<p style="color:var(--text2);font-size:12px">Створення QR-коду...</p>';
+        const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp' });
+        if (error || !data) {
+            bodyEl().innerHTML = `
+                <p style="color:var(--rose)">Помилка: ${esc(error?.message || 'unknown')}</p>
+                <button id="btnGateExit" class="btn btn-sm">Вийти</button>`;
+            $sm('btnGateExit').onclick = () => finishBase(false);
+            return;
+        }
+        const factorId = data.id;
+        bodyEl().innerHTML = `
+            <p style="font-size:12px;color:var(--rose);margin:0 0 8px;font-weight:600">Адміністратор вимагає налаштувати двофакторну автентифікацію.</p>
+            <p style="font-size:12px;color:var(--text2);margin:0 0 6px">1. Відскануйте QR-код у застосунку (Google Authenticator, Authy, 1Password):</p>
+            <div style="background:#fff;padding:12px;border-radius:6px;text-align:center;margin-bottom:6px">${data.totp.qr_code}</div>
+            <p style="font-size:11px;color:var(--text3);margin:0 0 12px">Або введіть ключ вручну:
+                <code style="user-select:all;background:var(--surface2);padding:2px 6px;border-radius:3px">${esc(data.totp.secret)}</code></p>
+            <p style="font-size:12px;color:var(--text2);margin:0 0 6px">2. Введіть 6-значний код з застосунку:</p>
+            ${VERIFY_INPUT_HTML}`;
+        const onExit = async () => {
+            try { await sb.auth.mfa.unenroll({ factorId }); } catch (e) { /* best-effort */ }
+            finishBase(false);
+        };
+        _wireVerify(factorId, finishBase, onExit);
+    });
+}
