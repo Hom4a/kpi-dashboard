@@ -9,7 +9,7 @@ import { getPlanFactCount, getZsuCount } from './harvesting/db-harvesting.js';
 import { getMarketPricesCount } from './market/db-market.js';
 import { getSummaryIndicatorCount, getSummaryWeeklyCount, deleteWeeklyByDate, deleteMonthlyByMonth, loadSummaryWeekly } from './summary/db-summary.js';
 import { summaryIndicators, summaryWeekly, setSelectedWeeklyDate } from './summary/state-summary.js';
-import { PAGE_ACCESS } from './auth.js';
+import { PAGE_ACCESS, ROLE_LABELS } from './auth.js';
 
 let _renderAllFn = null;
 export function setRenderAllCallback(fn) { _renderAllFn = fn; }
@@ -79,12 +79,9 @@ const ALL_PAGES = [
     { id: 'builder', label: 'Дашборди' }
 ];
 
-const ALL_ROLES = ['admin', 'director', 'analyst', 'editor', 'accountant', 'hr', 'forester', 'operator', 'viewer'];
-const ROLE_LABELS = {
-    admin: 'Адмін', director: 'Керівник', analyst: 'Аналітик',
-    editor: 'Редактор', accountant: 'Бухгалтер', hr: 'HR',
-    forester: 'Лісничий', operator: 'Оператор', viewer: 'Глядач'
-};
+// ALL_ROLES + ROLE_LABELS — single source of truth у auth.js (post-D.0 cleanup
+// matches sql/23 CHECK 6 roles). ALL_ROLES derived from imported ROLE_LABELS keys.
+const ALL_ROLES = Object.keys(ROLE_LABELS);
 const ORG_LEVELS = [
     { value: 'central', label: 'Центральний' },
     { value: 'regional', label: 'Обласний' },
@@ -93,15 +90,12 @@ const ORG_LEVELS = [
 ];
 
 const ROLE_DESCRIPTIONS = {
-    admin:      { desc: 'Повний доступ до системи', pages: 'Усі сторінки', caps: ['завантаження', 'керування даними', 'цілі', 'користувачі'] },
-    director:   { desc: 'Перегляд усіх аналітичних дашбордів', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Керівний, Карта', caps: ['перегляд'] },
-    analyst:    { desc: 'Аналітика + конструктор дашбордів', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Керівний, Карта, Дашборди', caps: ['перегляд', 'конструктор'] },
-    editor:     { desc: 'Введення та керування даними', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Карта, Введення, Дашборди', caps: ['завантаження', 'керування даними', 'цілі', 'конструктор'] },
-    accountant: { desc: 'Фінанси та продукція', pages: 'Фінанси, Продукція, Введення', caps: ['завантаження'] },
-    hr:         { desc: 'Кадрові дані', pages: 'Введення', caps: ['завантаження'] },
-    forester:   { desc: 'Лісогосподарські дані', pages: 'Обсяги, Продукція, Заготівля, Ринок, Карта, Введення', caps: ['завантаження'] },
-    operator:   { desc: 'Складські операції', pages: 'Продукція, Введення', caps: ['завантаження'] },
-    viewer:     { desc: 'Індивідуальний набір сторінок', pages: 'Налаштовується адміном (чекбокси)', caps: ['перегляд'] }
+    admin:    { desc: 'Повні права', pages: 'Усі сторінки', caps: ['усі дії', 'управління користувачами'] },
+    director: { desc: 'Перегляд керівних звітів', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Керівний, Карта, Зведення', caps: ['перегляд', 'PDF звіти'] },
+    analyst:  { desc: 'Аналіз даних усіх розділів', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Керівний, Карта, Зведення, Конструктор, API, Дашборди', caps: ['перегляд', 'дашборди', 'конструктор'] },
+    editor:   { desc: 'Введення та керування даними', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Карта, Введення, Дашборди', caps: ['завантаження', 'керування даними', 'цілі', 'конструктор'] },
+    manager:  { desc: 'Перегляд усіх дашбордів + журнал дій', pages: 'Обсяги, Фінанси, Продукція, Заготівля, Ринок, Керівний, Карта, Зведення, Дашборди', caps: ['перегляд'] },
+    viewer:   { desc: 'Лише обмежений перегляд', pages: 'Обмежений набір (allowed_pages)', caps: ['перегляд'] },
 };
 
 const PAGE_DESCRIPTIONS = {
@@ -172,13 +166,35 @@ function mapSignUpError(msg) {
     return 'Помилка реєстрації: ' + msg;
 }
 
+// ===== Phase 2 admin actions: shared Edge Function caller =====
+async function callAdminEdgeFunction(name, body) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+        throw new Error('Сесія прострочена. Увійдіть знову.');
+    }
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify(body),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || result.error) {
+        throw new Error(result.detail || result.error || `HTTP ${res.status}`);
+    }
+    return result;
+}
+
 export async function openViewerAccess() {
     $('viewerAccessModal').classList.add('on');
     const list = $('viewerAccessList');
     list.innerHTML = '<p style="color:var(--text3);font-size:12px">Завантаження...</p>';
     try {
         const { data: users, error } = await sb.from('profiles')
-            .select('id, full_name, role, allowed_pages, org_level, org_unit')
+            .select('id, email, full_name, role, allowed_pages, org_level, org_unit, mfa_required')
             .order('role').order('full_name');
         if (error) { toast('Помилка: ' + error.message, true); return; }
         if (!users || !users.length) {
@@ -202,6 +218,7 @@ export async function openViewerAccess() {
                     <div style="font-weight:600;color:var(--text2);border-bottom:1px solid var(--border);padding-bottom:4px">Можливості</div>
                     ${ALL_ROLES.map(r => {
                         const rd = ROLE_DESCRIPTIONS[r];
+                        if (!rd) return '';
                         const icons = rd.caps.map(c => CAP_ICONS[c] || '').join(' ');
                         return `<div style="color:var(--text);font-weight:500">${ROLE_LABELS[r]}</div>
                             <div style="color:var(--text3)">${rd.pages}</div>
@@ -328,6 +345,14 @@ export async function openViewerAccess() {
                             })()}
                         </div>
                     </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+                        <button class="btn btn-sm" data-action="save-${u.id}" onclick="saveUserRow('${u.id}')">💾 Зберегти</button>
+                        <button class="btn btn-sm" data-action="reset-${u.id}" onclick="resetUserPassword('${u.id}','${esc(u.email||'')}')">🔄 Новий пароль</button>
+                        <button class="btn btn-sm" data-action="ban-${u.id}" onclick="toggleUserDisabled('${u.id}','${esc(u.email||'')}',false)">🚫 Заблок.</button>
+                        <button class="btn btn-sm" data-action="unban-${u.id}" onclick="toggleUserDisabled('${u.id}','${esc(u.email||'')}',true)">✓ Розблок.</button>
+                        <button class="btn btn-sm" data-action="mfa-${u.id}" onclick="toggleUserMfaRequired('${u.id}','${esc(u.email||'')}',${!u.mfa_required})">${u.mfa_required ? '⚪ MFA off' : '🛡 MFA on'}</button>
+                        <button class="btn btn-sm btn-danger" data-action="delete-${u.id}" onclick="deleteUserRow('${u.id}','${esc(u.email||'')}')">🗑 Видалити</button>
+                    </div>
                 </div>`;
             }).join('');
 
@@ -363,27 +388,131 @@ export async function openViewerAccess() {
 
 export function closeViewerAccess() { $('viewerAccessModal').classList.remove('on'); }
 
-export async function saveViewerAccess() {
-    const items = document.querySelectorAll('#viewerAccessList [data-user-id]');
-    let saved = 0;
-    for (const item of items) {
-        const id = item.dataset.userId;
-        const role = item.querySelector('.ua-role-select')?.value;
-        const orgLevel = item.querySelector('.ua-org-level')?.value || 'central';
-        const orgUnit = item.querySelector('.ua-org-unit')?.value || '';
+// ===== Phase 2 admin actions: per-user-row handlers =====
+// Replace previous mass-save (saveViewerAccess) — use per-row Save button +
+// dedicated buttons for password reset / disable-enable / MFA toggle / delete.
+// Each handler delegates до Edge Function (set-role / disable-user / etc.)
+// for service_role-mediated mutation з ≥2 admins guard.
 
-        const update = { role, org_level: orgLevel, org_unit: orgUnit };
+export async function saveUserRow(userId) {
+    const card = document.querySelector(`#viewerAccessList [data-user-id="${userId}"]`);
+    if (!card) return;
 
-        // Save allowed_pages for all roles
-        const checked = [...item.querySelectorAll('.ua-pages-wrap input[type=checkbox]:checked')].map(c => c.dataset.page);
-        update.allowed_pages = checked;
+    const newRole = card.querySelector('.ua-role-select')?.value;
+    const newOrgLevel = card.querySelector('.ua-org-level')?.value || 'central';
+    const newOrgUnit = card.querySelector('.ua-org-unit')?.value || '';
+    const allowedPages = [...card.querySelectorAll('.ua-pages-wrap input[type=checkbox]:checked')].map(c => c.dataset.page);
 
-        const { error } = await sb.from('profiles').update(update).eq('id', id);
-        if (error) { toast('Помилка: ' + error.message, true); return; }
-        saved++;
+    const btn = card.querySelector(`[data-action="save-${userId}"]`);
+    if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Зачекайте...'; }
+
+    try {
+        // Step 1: role change via Edge Function (≥2 admins guard)
+        await callAdminEdgeFunction('set-role', { target_id: userId, new_role: newRole });
+        // Step 2: org/pages direct UPDATE via RLS ('Admins update all' policy)
+        const { error } = await sb.from('profiles')
+            .update({ org_level: newOrgLevel, org_unit: newOrgUnit, allowed_pages: allowedPages })
+            .eq('id', userId);
+        if (error) throw new Error(error.message);
+        toast('Зміни збережено', false);
+        setTimeout(() => openViewerAccess(), 500);
+    } catch (e) {
+        toast('Помилка: ' + e.message, true);
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || '💾 Зберегти'; }
     }
-    closeViewerAccess();
-    toast(`Збережено ${saved} користувачів`);
+}
+
+export async function resetUserPassword(userId, email) {
+    if (!confirm(`Згенерувати новий тимчасовий пароль для ${email}?`)) return;
+
+    const btn = document.querySelector(`[data-action="reset-${userId}"]`);
+    if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Зачекайте...'; }
+
+    try {
+        const result = await callAdminEdgeFunction('reset-password', { target_id: userId });
+        // Display temp password у dedicated UI block (matches createUser pattern)
+        const card = document.querySelector(`#viewerAccessList [data-user-id="${userId}"]`);
+        if (card) {
+            const block = document.createElement('div');
+            block.className = 'glass';
+            block.style.cssText = 'padding:10px;background:var(--bg2);border-left:3px solid var(--green);margin-top:8px';
+            block.innerHTML = `
+                <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px">Новий пароль згенеровано!</div>
+                <div style="font-size:12px;color:var(--text)">Email: <b>${esc(email)}</b></div>
+                <div style="font-size:12px;color:var(--text)">Пароль: <b>${esc(result.temp_password)}</b></div>
+                <div style="font-size:10px;color:var(--text3);margin-top:4px">Передайте ці дані користувачу. Список оновиться через 30с.</div>
+            `;
+            card.appendChild(block);
+        }
+        toast(`Пароль скинуто для ${email}`, false);
+        setTimeout(() => openViewerAccess(), 30000);  // 30s — admin копіює temp pwd
+    } catch (e) {
+        toast('Помилка: ' + e.message, true);
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || '🔄 Новий пароль'; }
+    }
+}
+
+export async function toggleUserDisabled(userId, email, enable) {
+    const action = enable ? 'розблокувати' : 'заблокувати';
+    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${email}?`)) return;
+
+    const actionKey = enable ? 'unban' : 'ban';
+    const btn = document.querySelector(`[data-action="${actionKey}-${userId}"]`);
+    if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Зачекайте...'; }
+
+    try {
+        await callAdminEdgeFunction('disable-user', { target_id: userId, enable });
+        toast(`Користувача ${enable ? 'розблоковано' : 'заблоковано'}: ${email}`, false);
+        setTimeout(() => openViewerAccess(), 500);
+    } catch (e) {
+        toast('Помилка: ' + e.message, true);
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || (enable ? '✓ Розблок.' : '🚫 Заблок.'); }
+    }
+}
+
+export async function toggleUserMfaRequired(userId, email, required) {
+    const verb = required ? 'Зробити MFA обовʼязковим' : 'Скасувати обовʼязковість MFA';
+    if (!confirm(`${verb} для ${email}?`)) return;
+
+    const btn = document.querySelector(`[data-action="mfa-${userId}"]`);
+    if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Зачекайте...'; }
+
+    try {
+        await callAdminEdgeFunction('set-mfa-required', { target_id: userId, required });
+        toast(`MFA ${required ? 'увімкнено' : 'вимкнено'} для ${email}`, false);
+        setTimeout(() => openViewerAccess(), 500);
+    } catch (e) {
+        toast('Помилка: ' + e.message, true);
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || '🛡 MFA on'; }
+    }
+}
+
+export async function deleteUserRow(userId, email) {
+    const REQUIRED_CONFIRM = 'УДАЛИТИ';
+    const userInput = window.prompt(
+        `Це видалить користувача ${email} БЕЗ можливості відновлення.\n\n` +
+        `Введіть слово "${REQUIRED_CONFIRM}" (без лапок) щоб підтвердити:`
+    );
+    if (userInput !== REQUIRED_CONFIRM) {
+        toast('Скасовано. Користувача не видалено.', false);
+        return;
+    }
+
+    const btn = document.querySelector(`[data-action="delete-${userId}"]`);
+    if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Зачекайте...'; }
+
+    try {
+        await callAdminEdgeFunction('delete-user', { target_id: userId });
+        toast(`Користувача ${email} видалено`, false);
+        setTimeout(() => openViewerAccess(), 500);
+    } catch (e) {
+        const isFkConflict = e.message && /foreign key|violates|reference/i.test(e.message);
+        const msg = isFkConflict
+            ? 'Не можна видалити: користувач має історичні дані. Заблокуйте замість видалення.'
+            : 'Помилка: ' + e.message;
+        toast(msg, true);
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || '🗑 Видалити'; }
+    }
 }
 
 // ===== User Creation =====
