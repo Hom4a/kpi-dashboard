@@ -6,7 +6,7 @@ import { initTheme, toggleTheme, setRenderAllCallback as setThemeRenderAll } fro
 import { handleLogin, handleLogout, showAuthScreen, hideButtons, showAppForUser, initAuthListener, setLoadAndRenderCallback as setAuthLoadAndRender, setHideButtonsCallback, UPLOAD_ROLES, DATA_MANAGE_ROLES, TARGET_ROLES } from './auth.js';
 import { switchPage, openMobileUpload, initSwipeGestures } from './navigation.js';
 import { populateFilters, applyFilter, resetFilters, initFilterEvents, setRenderAllCallback as setFilterRenderAll } from './filters.js';
-import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, openDataManage, closeDataManage, setRenderAllCallback as setModalsRenderAll, createUser, toggleAddUserForm, generateNewUserPassword, saveUserRow, resetUserPassword, toggleUserDisabled, toggleUserMfaRequired, deleteUserRow, openChangePassword, closeChangePassword, generateMyPassword, submitChangePassword } from './modals.js';
+import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, openDataManage, closeDataManage, setRenderAllCallback as setModalsRenderAll, createUser, toggleAddUserForm, generateNewUserPassword, saveUserRow, resetUserPassword, toggleUserDisabled, toggleUserMfaRequired, resetUserMfaFactor, deleteUserRow, openChangePassword, closeChangePassword, generateMyPassword, submitChangePassword } from './modals.js';
 import { openSecurityModal, closeSecurityModal } from './security.js';
 import { renderAll } from './render-all.js';
 import { setMainMode, renderTable } from './render-volumes.js';
@@ -394,6 +394,7 @@ window.saveUserRow = saveUserRow;
 window.resetUserPassword = resetUserPassword;
 window.toggleUserDisabled = toggleUserDisabled;
 window.toggleUserMfaRequired = toggleUserMfaRequired;
+window.resetUserMfaFactor = resetUserMfaFactor;
 window.deleteUserRow = deleteUserRow;
 window.openChangePassword = openChangePassword;
 window.closeChangePassword = closeChangePassword;

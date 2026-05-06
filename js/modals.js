@@ -351,6 +351,7 @@ export async function openViewerAccess() {
                         <button class="btn btn-sm" data-action="ban-${u.id}" onclick="toggleUserDisabled('${u.id}','${esc(u.email||'')}',false)">🚫 Заблок.</button>
                         <button class="btn btn-sm" data-action="unban-${u.id}" onclick="toggleUserDisabled('${u.id}','${esc(u.email||'')}',true)">✓ Розблок.</button>
                         <button class="btn btn-sm" data-action="mfa-${u.id}" onclick="toggleUserMfaRequired('${u.id}','${esc(u.email||'')}',${!u.mfa_required})">${u.mfa_required ? '⚪ MFA off' : '🛡 MFA on'}</button>
+                        <button class="btn btn-sm" data-action="resetmfa-${u.id}" onclick="resetUserMfaFactor('${u.id}','${esc(u.email||'')}')">🔓 Скинути MFA</button>
                         <button class="btn btn-sm btn-danger" data-action="delete-${u.id}" onclick="deleteUserRow('${u.id}','${esc(u.email||'')}')">🗑 Видалити</button>
                     </div>
                 </div>`;
@@ -484,6 +485,23 @@ export async function toggleUserMfaRequired(userId, email, required) {
     } catch (e) {
         toast('Помилка: ' + e.message, true);
         if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || '🛡 MFA on'; }
+    }
+}
+
+export async function resetUserMfaFactor(userId, email) {
+    if (!confirm(`Скинути MFA для ${email}?\n\nКористувач буде змушений наново налаштувати двофакторну автентифікацію при наступному вході (якщо MFA обовʼязковий).`)) return;
+
+    const btn = document.querySelector(`[data-action="resetmfa-${userId}"]`);
+    if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Зачекайте...'; }
+
+    try {
+        const res = await callAdminEdgeFunction('reset-mfa-factor', { target_id: userId });
+        const n = res?.factors_deleted ?? 0;
+        toast(n > 0 ? `MFA скинуто для ${email} (видалено ${n} factor${n === 1 ? '' : 'ів'})` : `${email}: жодного MFA factor не було`, false);
+        setTimeout(() => openViewerAccess(), 500);
+    } catch (e) {
+        toast('Помилка: ' + e.message, true);
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || '🔓 Скинути MFA'; }
     }
 }
 

@@ -162,9 +162,9 @@ export async function showAppForUser(user) {
             }
         }).catch(() => {});
 
-        // --- MFA gate (Phase 2.5 G.3c-3) ---
-        // Block app UI render until: aal2 verified OR no MFA needed OR sign out.
-        // Awaits fresh profile якщо cached/metadata-synthetic lacks mfa_required.
+        // --- MFA gate (Phase 2.5 G.3c-3, hotfix: timeout-protected) ---
+        // Block app UI render до aal2 OR no MFA needed OR sign out.
+        // 3s timeout wrapper — skip gate якщо SDK hangs (production fallback).
         try {
             let mfaProfile = currentProfile;
             if (!mfaProfile || mfaProfile.mfa_required === undefined) {
@@ -174,30 +174,28 @@ export async function showAppForUser(user) {
                     mfaProfile = fresh;
                 }
             }
-            const { data: aalData } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
-            const { data: factorsData } = await sb.auth.mfa.listFactors();
-            const totpFactors = (factorsData?.totp || []).filter(f => f.status === 'verified');
-            const currentLevel = aalData?.currentLevel;
-            const nextLevel = aalData?.nextLevel;
-
-            let cancelled = false;
-            // Case A: has factor + currently aal1 → must verify
-            if (totpFactors.length > 0 && currentLevel === 'aal1' && nextLevel === 'aal2') {
-                const verified = await openMFAChallenge(totpFactors[0].id);
-                if (!verified) cancelled = true;
-            }
-            // Case B: no factor + mfa_required=true → forced enrollment
-            else if (totpFactors.length === 0 && mfaProfile?.mfa_required === true) {
-                const enrolled = await openForcedEnrollment();
-                if (!enrolled) cancelled = true;
-            }
-
-            if (cancelled) {
-                await sb.auth.signOut();
-                return;
-            }
+            await Promise.race([
+                (async () => {
+                    const { data: aalData } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+                    if (!aalData) return;
+                    const { currentLevel, nextLevel } = aalData;
+                    const { data: factorsData } = await sb.auth.mfa.listFactors();
+                    const totpFactors = (factorsData?.totp || []).filter(f => f.status === 'verified');
+                    // Case A: has factor + aal1 → must verify
+                    if (totpFactors.length > 0 && currentLevel === 'aal1' && nextLevel === 'aal2') {
+                        const verified = await openMFAChallenge(totpFactors[0].id);
+                        if (!verified) { await sb.auth.signOut(); return; }
+                    }
+                    // Case B: no factor + mfa_required=true → forced enrollment
+                    else if (totpFactors.length === 0 && mfaProfile?.mfa_required === true) {
+                        const enrolled = await openForcedEnrollment();
+                        if (!enrolled) { await sb.auth.signOut(); return; }
+                    }
+                })(),
+                new Promise(resolve => setTimeout(resolve, 3000)),  // 3s timeout — skip gate
+            ]);
         } catch (mfaErr) {
-            console.error('MFA gate error (non-fatal, continuing):', mfaErr);
+            console.warn('[MFA gate] skipped:', mfaErr?.message ?? mfaErr);
         }
         // --- end MFA gate ---
 
