@@ -130,6 +130,7 @@
             <span class="user-name" id="userName"></span>
             <span class="role-badge" id="roleBadge"></span>
             <button class="btn-logout" onclick="openChangePassword()" title="Змінити пароль" style="margin-right:6px">🔑 Пароль</button>
+            <button class="btn-logout" onclick="openSecurityModal()" title="Двофакторна автентифікація" style="margin-right:6px">🛡 Безпека</button>
             <button class="btn-logout" onclick="handleLogout()">Вийти</button>
         </div>
         <div id="liveInfo" style="display:none"><span class="live-dot"></span><span style="font-size:11px;color:var(--text2)" id="liveLbl">Live</span></div>
@@ -977,6 +978,15 @@
         <p style="margin-top:12px;font-size:10px;color:var(--text3);line-height:1.4">
             Сесії на інших пристроях залишаться активними до закінчення JWT (приблизно 1 год).
         </p>
+    </div>
+</div>
+
+<!-- TOTP MFA enrollment / disable (Phase 2.5 G.3c-2) -->
+<div class="modal-overlay" id="securityModal">
+    <div class="modal" style="max-width:420px">
+        <button class="modal-close" onclick="closeSecurityModal()">&times;</button>
+        <h3>Безпека облікового запису</h3>
+        <div id="securityModalBody"></div>
     </div>
 </div>
 
