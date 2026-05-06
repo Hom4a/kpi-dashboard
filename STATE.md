@@ -1,12 +1,14 @@
 # Project State
 ## ETL Pipeline + Frontend Dashboard for ДП Ліси України
 
-**Last updated:** 2026-05-05
-**Working branch:** feature/admin-panel ahead of master +3 commits (Phase 1 complete)
-**Active epic:** ADMIN_EPIC.md — Phase 1 CLOSED 2026-05-05; Phase 1.5 manual pending; Phase 2 ready
+**Last updated:** 2026-05-06
+**Working branch:** feature/admin-panel ahead of master +11 commits (Phase 2 backend complete)
+**Active epic:** ADMIN_EPIC.md — Phase 2 backend CLOSED 2026-05-06; F.0 frontend integration pending; Phase 1.5 manual Studio bootstrap pending
 **Production state:** Reference resolver live end-to-end + 5-period
 archival reference + safety guards on destructive actions + profiles
-RLS hardened (circular subquery tech debt closed)
+RLS hardened (circular subquery tech debt closed) + 5 admin Edge
+Functions deployed (set-role, disable-user, delete-user, reset-password,
+set-mfa-required) + create-user canary deployed
 
 ## Recently completed cycles
 
@@ -192,6 +194,41 @@ Phase 2 ready: User management UI з RPCs + /admin/users page.
 TODO documented: js/app.js:91 додати 'manager' до Dashboards button
 visibility list (currently `['admin', 'analyst', 'editor']`).
 
+### Phase 2 backend — 5 admin Edge Functions (CLOSED 2026-05-06)
+
+Goal: 5 new Edge Functions for admin actions (matches existing
+create-user pattern from C.0 recon — locked Edge Functions over pg_net).
+
+D.0 mini-tasks (commits 97076d6 + 1dc7d98):
+- PAGE_ACCESS / UPLOAD_ROLES / ROLE_LABELS aligned з sql/23 schema
+  (6 roles: drop forester/accountant/hr/operator, add manager).
+- ROLE_LABELS Option D: director label 'керівник' → 'директор';
+  manager label = 'керівник'.
+- ADMIN_EPIC.md Section II.6 addendum locking Edge Function pattern.
+
+E.0 recon: revealed local create-user/index.ts NEVER deployed
+(server volume only had hello/main/). Deploy mechanism via tar pipe
+locked. Hot-reload confirmed — no container restart needed.
+
+E.0.5 canary deploy: existing create-user as first real Edge Function
+on server. 5 smokes pass (OPTIONS, no/bad auth, etc.).
+
+E.1 — E.4 sequence (5 commits — 6a3aa85, 1e15821, 12f6eec, a4d7830,
+b267e7c):
+- set-role: UPDATE profiles SET role з ≥2 admins guard
+- disable-user: toggle ban_duration via auth.admin.updateUserById
+- delete-user: hard delete via auth.admin.deleteUser, FK CASCADE
+  to profiles confirmed
+- reset-password: Option γ — generate temp 16-char strong password,
+  return plain-text у response
+- set-mfa-required: toggle profiles.mfa_required (Phase 2.5 enforce)
+
+Total 5 functions × 4 smokes = 20 negative tests pass. Positive
+testing deferred to F.0 (real admin JWT через frontend modal).
+
+Server volume now has 8 functions: hello, main, create-user, set-role,
+disable-user, delete-user, reset-password, set-mfa-required.
+
 ## Pending — fresh-mind required
 
 ### Frontend audit (next session)
@@ -238,13 +275,30 @@ visibility list (currently `['admin', 'analyst', 'editor']`).
    2026-05-05; current working branch feature/admin-panel from master).
 
 ### Admin epic next steps
-10. Phase 1.5 manual: створити kaiassistantopenclaw@gmail.com через
+10. F.0 frontend: extend `viewerAccessModal` (js/modals.js:175-329)
+    з 5 action buttons + handlers + confirmations (potential rename
+    → userManagementModal). Wire fetch до 5 Edge Functions
+    (set-role, disable-user, delete-user, reset-password,
+    set-mfa-required).
+11. F.1 end-to-end smoke з real admin JWT (positive tests deferred
+    від E.1-E.4 negative-only smokes).
+12. Build/deploy frontend після F.0/F.1 (VITE_BASE=/ via PowerShell;
+    tar pipe atomic swap до /var/www/dashboards.e-forest.gov.ua/).
+13. Phase 1.5 manual: створити kaiassistantopenclaw@gmail.com через
     Studio → UPDATE profiles SET role='admin' (≥2 admins precondition
     для Phase 2.6 RLS aal2 lock-down).
-11. Phase 2 frontend: js/app.js:91 додати 'manager' до Dashboards
-    button visibility list (мінорна правка, deploy with Phase 2 UI).
-12. Phase 2 RPCs: fn_admin_create_user, fn_admin_set_user_role, etc.
-    (SECURITY DEFINER + fn_is_admin guard + ≥2 admins rule).
+14. js/app.js:91 додати 'manager' до Dashboards button visibility list
+    `['admin', 'analyst', 'editor']` → `['admin', 'analyst', 'editor', 'manager']`
+    (рекомендується робити одночасно з F.0).
+15. Known limitation: delete-user fails з FK violation якщо target
+    uploaded data (non-CASCADE FKs у upload_history). Currently safe
+    (existing 6 users haven't uploaded). F.0 frontend може detect
+    і suggest 'Disable instead'.
+16. Phase 2.5: SMTP delivery test before forced MFA enrollment
+    (deferred because Option γ password reset не залежить від SMTP).
+17. 3 orphaned Edge Functions у repo (fetch-eur-rate, notify-telegram,
+    upload-wood-data) — local-only, server volume їх не має. Окрема
+    "deploy or remove" task поза Phase 2 scope.
 
 ## Tech debt (deferred)
 
