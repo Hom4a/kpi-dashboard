@@ -77,7 +77,19 @@
 - **Edge Functions:** ✓ container running, hello/main folders boilerplate
 - **SMTP:** ✓ 6 env vars set; delivery не верифіковано (Phase 2 smoke)
 
-**Verdict для fn_admin_reset_user_password:** pg_net + GoTrue admin API. Edge Function — fallback.
+**Verdict для admin actions mechanism (revised 2026-05-05 after C.0 recon):**
+
+**Edge Functions = primary mechanism** для всіх Phase 2 admin actions. Existing `supabase/functions/create-user/index.ts` already deployed і working — extending з 5 нових functions matches established pattern:
+1. caller JWT verified через `auth.getUser()` всередині Edge Function
+2. caller `profiles.role === 'admin'` check (mirrors fn_is_admin())
+3. service_role_key з Edge Function env vars (НЕ у DB як ALTER DATABASE SET) → cleaner security boundary
+4. Use `auth.admin.*` SDK methods (high-level wrappers), not raw HTTP
+
+**fn_admin_reset_user_password mechanism (Option γ from chat):** Edge Function `reset-password` викликає `auth.admin.updateUser({ password: <generated temp> })` → returns temp password → frontend displays у UI → admin копіює і передає user'у out-of-band (matches existing createUser flow). НЕ залежить від SMTP.
+
+**pg_net + GoTrue admin API:** Available infrastructure (verified C.1-C.4), але не використовується у Phase 2-2.6 admin actions. Reserved для future use cases якщо знадобиться (наприклад server-to-server async webhooks).
+
+**fn_is_admin() / fn_has_role(text) у БД:** залишаються — для RLS USING expressions у Phase 2.6 lock-down. Окрема задача від admin actions mechanism.
 
 ### 2.7. Frontend
 - vanilla ESM JS + Vite 7.3.1, no router lib
