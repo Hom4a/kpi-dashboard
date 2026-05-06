@@ -2,14 +2,15 @@
 ## ETL Pipeline + Frontend Dashboard for ДП Ліси України
 
 **Last updated:** 2026-05-06
-**Working branch:** feature/admin-panel ahead of master +13 commits (Phase 2 backend + frontend complete)
-**Active epic:** ADMIN_EPIC.md — Phase 2 CLOSED 2026-05-06; Phase 1.5 manual Studio bootstrap + Phase 2.5 MFA pending
+**Working branch:** feature/admin-panel ahead of master +14 commits (Phase 2 complete + Phase 2.5 G.1 self-service password change)
+**Active epic:** ADMIN_EPIC.md — Phase 2 CLOSED 2026-05-06; Phase 2.5 G.1 done; Phase 2.5 G.2-G.4 pending; Phase 1.5 manual still required для Phase 2.6
 **Production state:** Reference resolver live end-to-end + 5-period
 archival reference + safety guards on destructive actions + profiles
 RLS hardened (circular subquery tech debt closed) + 5 admin Edge
 Functions deployed (set-role, disable-user, delete-user, reset-password,
 set-mfa-required) + create-user canary deployed + frontend admin UI
-з 6 inline buttons per user row у viewerAccessModal
+з 6 inline buttons per user row у viewerAccessModal + self-service
+password change modal (header '🔑 Пароль' button)
 
 ## Recently completed cycles
 
@@ -256,6 +257,35 @@ Fix: ROLE_DESCRIPTIONS synced до 6 keys + defensive guard.
 Smoke verified у production browser: modal opens, reset-password
 generates+displays temp pw, per-row buttons functional.
 
+### Phase 2.5 G.1 — Self-service password change (CLOSED 2026-05-06)
+
+Goal: дати users можливість змінювати власні паролі без admin
+involvement (admin-generated temps з reset-password Edge Function
+були інакше permanent).
+
+Recon (G.1a):
+- Header structure: flat (no dropdown), .user-info has logout button
+- 0 existing auth.updateUser usage у repo (greenfield)
+- Supabase auth.updateUser() не enforce'ить current pw — manual via
+  signInWithPassword
+- createUser uses 6-char min; tighten до 8 для self-service
+
+Decisions locked (G.1b):
+- UI placement: button '🔑 Пароль' поряд 'Вийти' у header (no dropdown)
+- 3 fields: current/new/confirm + generate button (per user explicit ask)
+- Validation: 8 chars min, match, differ from current
+- Manual current-pw verification via signInWithPassword
+- No auto-logout після зміни
+
+Implementation (G.1c, commit 7cee19f):
+- index.html: header button + #changePasswordModal (35 LOC)
+- modals.js: 4 handlers (open/close/generate/submit) (+103 LOC)
+- app.js: 4 window exposures
+- generatePassword reused для 🎲 generation з 5s temporary reveal
+
+Smoke verified end-to-end: invalid pwd rejection, validation messages,
+successful change, logout + re-login з новим pwd.
+
 ## Pending — fresh-mind required
 
 ### Frontend audit (next session)
@@ -307,13 +337,17 @@ generates+displays temp pw, per-row buttons functional.
 11. Phase 1.5 manual: створити kaiassistantopenclaw@gmail.com через
     Studio → UPDATE profiles SET role='admin' (≥2 admins precondition
     для Phase 2.6 RLS aal2 lock-down). Все ще required.
-12. **Phase 2.5 — coverage:**
-    - SMTP delivery test (deferred з E.0 — Option γ не залежить, але
+12. **Phase 2.5 — remaining coverage:**
+    - ~~G.1 self-service password change~~ (DONE 2026-05-06, commit 7cee19f)
+    - G.2: SMTP delivery test (deferred з E.0 — Option γ не залежить, але
       потрібен для future password recovery flow)
-    - Self-service password change: admin-generated temps need user
-      replacement after first login → /profile/security page
-    - TOTP enrollment flow (auth.mfa native already verified у Phase 0)
-    - aal2 RLS lock-down (Phase 2.6 bundled)
+    - G.3: TOTP MFA enrollment flow (auth.mfa native already verified у Phase 0)
+    - G.4: /profile/security page consolidation (single hub для password
+      + MFA + sessions)
+    - G.x future hardening: 'logout-all-sessions' button (admin.signOut
+      по user_id) для terminating інших active devices після pwd change
+    - createUser min 6→8 chars alignment (defer — separate consistency task)
+    - Phase 2.6 aal2 RLS lock-down (gated на ≥2 admins precondition)
 13. js/app.js:91 додати 'manager' до Dashboards button visibility list
     `['admin', 'analyst', 'editor']` → `['admin', 'analyst', 'editor', 'manager']`
     (минулий пропуск, можна окремим micro-commit).
