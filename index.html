@@ -129,6 +129,7 @@
         <div class="user-info" id="userInfo">
             <span class="user-name" id="userName"></span>
             <span class="role-badge" id="roleBadge"></span>
+            <button class="btn-logout" onclick="openChangePassword()" title="Змінити пароль" style="margin-right:6px">🔑 Пароль</button>
             <button class="btn-logout" onclick="handleLogout()">Вийти</button>
         </div>
         <div id="liveInfo" style="display:none"><span class="live-dot"></span><span style="font-size:11px;color:var(--text2)" id="liveLbl">Live</span></div>
@@ -942,6 +943,40 @@
         <div id="viewerAccessList" style="display:flex;flex-direction:column;gap:2px"></div>
         <!-- F.0c: per-row Save buttons replace mass save (saveViewerAccess removed) -->
         <p style="margin-top:14px;font-size:11px;color:var(--text3)">Кожна карточка має власні кнопки дій. Зміни ролі/орг/сторінок зберігаються кнопкою «💾 Зберегти» поряд з користувачем.</p>
+    </div>
+</div>
+
+<!-- Self-service password change (Phase 2.5 G.1) -->
+<div class="modal-overlay" id="changePasswordModal">
+    <div class="modal" style="max-width:420px">
+        <button class="modal-close" onclick="closeChangePassword()">&times;</button>
+        <h3>Змінити пароль</h3>
+
+        <div style="margin-top:12px">
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Поточний пароль</label>
+            <input type="password" id="cpwCurrent" class="de-input" style="width:100%" autocomplete="current-password">
+        </div>
+
+        <div style="margin-top:8px">
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Новий пароль</label>
+            <div style="display:flex;gap:6px">
+                <input type="password" id="cpwNew" class="de-input" style="flex:1" placeholder="Мін. 8 символів" autocomplete="new-password">
+                <button class="btn btn-sm" onclick="generateMyPassword()" title="Згенерувати випадковий" style="padding:4px 10px">🎲</button>
+            </div>
+        </div>
+
+        <div style="margin-top:8px">
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Повторіть новий пароль</label>
+            <input type="password" id="cpwConfirm" class="de-input" style="width:100%" autocomplete="new-password">
+        </div>
+
+        <div id="cpwStatus" style="margin-top:10px;font-size:11px;min-height:14px"></div>
+
+        <button id="cpwSubmit" class="btn" style="margin-top:6px;width:100%" onclick="submitChangePassword()">Змінити пароль</button>
+
+        <p style="margin-top:12px;font-size:10px;color:var(--text3);line-height:1.4">
+            Сесії на інших пристроях залишаться активними до закінчення JWT (приблизно 1 год).
+        </p>
     </div>
 </div>
 

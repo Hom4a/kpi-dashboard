@@ -515,6 +515,109 @@ export async function deleteUserRow(userId, email) {
     }
 }
 
+// ===== Self-service password change (Phase 2.5 G.1) =====
+// Modal #changePasswordModal у index.html. Verifies current password
+// via re-signin (signInWithPassword) перш ніж auth.updateUser({ password }).
+
+export function openChangePassword() {
+    const m = document.getElementById('changePasswordModal');
+    if (!m) return;
+    document.getElementById('cpwCurrent').value = '';
+    document.getElementById('cpwNew').value = '';
+    document.getElementById('cpwConfirm').value = '';
+    document.getElementById('cpwStatus').innerHTML = '';
+    const btn = document.getElementById('cpwSubmit');
+    if (btn) { btn.disabled = false; btn.textContent = 'Змінити пароль'; }
+    m.classList.add('on');
+    setTimeout(() => document.getElementById('cpwCurrent')?.focus(), 100);
+}
+
+export function closeChangePassword() {
+    const m = document.getElementById('changePasswordModal');
+    if (m) m.classList.remove('on');
+}
+
+export function generateMyPassword() {
+    const pwd = generatePassword();   // 14-char crypto-safe (existing helper)
+    const newInput = document.getElementById('cpwNew');
+    const confirmInput = document.getElementById('cpwConfirm');
+    if (!newInput || !confirmInput) return;
+    newInput.value = pwd;
+    confirmInput.value = pwd;
+    // Briefly reveal so user can copy/note before saving
+    newInput.type = 'text';
+    confirmInput.type = 'text';
+    setTimeout(() => {
+        newInput.type = 'password';
+        confirmInput.type = 'password';
+    }, 5000);
+    document.getElementById('cpwStatus').innerHTML =
+        '<span style="color:var(--green)">Згенеровано. Збережіть у менеджер паролів — поля приховаються через 5с.</span>';
+}
+
+export async function submitChangePassword() {
+    const currentPwd = document.getElementById('cpwCurrent').value;
+    const newPwd = document.getElementById('cpwNew').value;
+    const confirmPwd = document.getElementById('cpwConfirm').value;
+    const statusEl = document.getElementById('cpwStatus');
+    const btn = document.getElementById('cpwSubmit');
+
+    // Client-side validation
+    if (!currentPwd || !newPwd || !confirmPwd) {
+        statusEl.innerHTML = '<span style="color:var(--rose)">Заповніть усі поля</span>';
+        return;
+    }
+    if (newPwd.length < 8) {
+        statusEl.innerHTML = '<span style="color:var(--rose)">Новий пароль має бути мін. 8 символів</span>';
+        return;
+    }
+    if (newPwd !== confirmPwd) {
+        statusEl.innerHTML = '<span style="color:var(--rose)">Новий пароль і підтвердження не співпадають</span>';
+        return;
+    }
+    if (newPwd === currentPwd) {
+        statusEl.innerHTML = '<span style="color:var(--rose)">Новий пароль має відрізнятися від поточного</span>';
+        return;
+    }
+
+    btn.disabled = true;
+    const origText = btn.textContent;
+    btn.textContent = 'Зачекайте...';
+    statusEl.innerHTML = '';
+
+    try {
+        // Step 1: get current session user (для email)
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user || !user.email) {
+            throw new Error('Сесія недійсна. Перезайдіть і спробуйте знову.');
+        }
+
+        // Step 2: verify current password via re-signin
+        // (Supabase auth.updateUser does NOT verify current password natively;
+        // re-signin is the manual check.)
+        const { error: signInError } = await sb.auth.signInWithPassword({
+            email: user.email,
+            password: currentPwd,
+        });
+        if (signInError) {
+            throw new Error('Поточний пароль невірний');
+        }
+
+        // Step 3: update to new password
+        const { error: updateError } = await sb.auth.updateUser({ password: newPwd });
+        if (updateError) {
+            throw new Error(updateError.message || 'Не вдалося оновити пароль');
+        }
+
+        toast('Пароль змінено');
+        closeChangePassword();
+    } catch (e) {
+        statusEl.innerHTML = `<span style="color:var(--rose)">${esc(e.message)}</span>`;
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+
 // ===== User Creation =====
 
 export function toggleAddUserForm() {
