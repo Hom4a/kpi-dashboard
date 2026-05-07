@@ -338,10 +338,12 @@ export function parseSummaryXlsx(wb) {
         }
     }
 
-    // Deduplicate: if same (year, month, indicator_name, sub_type) appears multiple times, keep last
+    // Deduplicate: if same (year, month, indicator_name, indicator_group, sub_type) appears multiple times, keep last.
+    // indicator_group critical: salary + region_salary records share (year, month, name) post-425bdc1 —
+    // without group у key, region overwrites salary у dedup → salary_uah lost для branches з filled regional cell.
     const seen = new Map();
     for (const r of records) {
-        const key = `${r.year}|${r.month}|${r.indicator_name}|${r.sub_type}`;
+        const key = `${r.year}|${r.month}|${r.indicator_name}|${r.indicator_group}|${r.sub_type}`;
         seen.set(key, r);
     }
 
