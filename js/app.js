@@ -4,7 +4,7 @@ import { $, show, hide, showLoader, toast, fmtDate } from './utils.js';
 import { allData, filtered, charts, tblTab, currentProfile, setAllData, setFiltered, setCharts, setTblTab } from './state.js';
 import { initTheme, toggleTheme, setRenderAllCallback as setThemeRenderAll } from './theme.js';
 import { handleLogin, handleLogout, showAuthScreen, hideButtons, showAppForUser, initAuthListener, setLoadAndRenderCallback as setAuthLoadAndRender, setHideButtonsCallback, UPLOAD_ROLES, DATA_MANAGE_ROLES, TARGET_ROLES } from './auth.js';
-import { switchPage, openMobileUpload, initSwipeGestures } from './navigation.js';
+import { switchPage, openMobileUpload, initSwipeGestures, toggleMobileMenu } from './navigation.js';
 import { populateFilters, applyFilter, resetFilters, initFilterEvents, setRenderAllCallback as setFilterRenderAll } from './filters.js';
 import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, openDataManage, closeDataManage, setRenderAllCallback as setModalsRenderAll, createUser, toggleAddUserForm, generateNewUserPassword, saveUserRow, resetUserPassword, toggleUserDisabled, toggleUserMfaRequired, resetUserMfaFactor, deleteUserRow, openChangePassword, closeChangePassword, generateMyPassword, submitChangePassword } from './modals.js';
 import { openSecurityModal, closeSecurityModal } from './security.js';
@@ -379,6 +379,7 @@ window.handleLogin = handleLogin;
 window.handleLogout = handleLogout;
 window.switchPage = switchPage;
 window.openMobileUpload = openMobileUpload;
+window.toggleMobileMenu = toggleMobileMenu;
 window.toggleTheme = toggleTheme;
 window.toggleFullscreen = toggleFullscreen;
 window.openTargetModal = openTargetModal;
@@ -702,7 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else header.classList.remove('compact');
     }, { passive: true });
 
-    // Mobile swipe
+    // Mobile swipe — disabled (replaced by hamburger drawer); call kept for compat
     initSwipeGestures();
 
     // PWA

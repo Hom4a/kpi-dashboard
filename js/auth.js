@@ -153,10 +153,14 @@ export async function showAppForUser(user) {
             setCurrentProfile({ id: user.id, role: metaRole, full_name: user.user_metadata?.full_name || '' });
         }
 
-        // Fetch fresh profile in BACKGROUND (non-blocking)
-        withTimeout(getCurrentProfile(user.id), 5000, null).then(freshProfile => {
-            if (freshProfile) {
-                setCurrentProfile(freshProfile);
+        // Fetch fresh profile in BACKGROUND (non-blocking).
+        // freshProfile declared at outer scope so diagnostic log at line ~223
+        // can read it (was pre-existing ReferenceError exposed by G.3c-3 gate).
+        let freshProfile = null;
+        withTimeout(getCurrentProfile(user.id), 5000, null).then(fp => {
+            freshProfile = fp;
+            if (fp) {
+                setCurrentProfile(fp);
             } else if (!cached && !metaRole) {
                 console.warn('Profile: no fresh, no cache, no metadata');
             }

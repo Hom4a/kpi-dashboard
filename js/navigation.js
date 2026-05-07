@@ -84,31 +84,37 @@ export function openMobileUpload() {
     else { toast('Немає прав для завантаження', true); }
 }
 
-export function initSwipeGestures() {
-    let startX = 0, startY = 0, swiping = false;
+// Swipe gesture removed (conflicted з horizontal-scroll tables на mobile).
+// Replaced з hamburger menu via toggleMobileMenu(). Stub kept for backward
+// compat у app.js import чи майбутніх hooks.
+export function initSwipeGestures() { /* noop — see toggleMobileMenu */ }
 
-    document.addEventListener('touchstart', e => {
-        if (window.innerWidth > 768) return;
-        startX = e.touches[0].clientX; startY = e.touches[0].clientY; swiping = true;
-    }, { passive: true });
-
-    document.addEventListener('touchend', e => {
-        if (!swiping || window.innerWidth > 768) return;
-        swiping = false;
-        const dx = e.changedTouches[0].clientX - startX;
-        const dy = e.changedTouches[0].clientY - startY;
-        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-            const role = currentProfile ? currentProfile.role : 'viewer';
-            const pages = getVisiblePages(role, currentProfile);
-            const activeEl = document.querySelector('.page-section.active');
-            let curIdx = 0;
-            if (activeEl) {
-                const curPage = pageIdMap[activeEl.id] || 'volumes';
-                curIdx = pages.indexOf(curPage);
-                if (curIdx < 0) curIdx = 0;
+/**
+ * Toggle mobile drawer overlay (hamburger menu).
+ * On open: filter items by role-based getVisiblePages + sync active state.
+ */
+export function toggleMobileMenu() {
+    const drawer = document.getElementById('mobileDrawer');
+    if (!drawer) return;
+    const willOpen = !drawer.classList.contains('open');
+    if (willOpen) {
+        // Filter visible items per current user's role
+        const role = currentProfile ? currentProfile.role : 'viewer';
+        const visible = new Set(getVisiblePages(role, currentProfile));
+        const activePage = pageIdMap[document.querySelector('.page-section.active')?.id] || null;
+        drawer.querySelectorAll('.mobile-drawer-item').forEach(btn => {
+            const page = btn.dataset.page;
+            if (page) {
+                btn.style.display = visible.has(page) ? '' : 'none';
+                btn.classList.toggle('active', page === activePage);
             }
-            if (dx < 0 && curIdx < pages.length - 1) switchPage(pages[curIdx + 1]);
-            else if (dx > 0 && curIdx > 0) switchPage(pages[curIdx - 1]);
+            // Items без data-page (наприклад "Завантажити файл") — show always для editors+
+        });
+        // Hide upload item якщо user не має upload role
+        const uploadBtn = drawer.querySelector('.mobile-drawer-item:not([data-page])');
+        if (uploadBtn) {
+            uploadBtn.style.display = UPLOAD_ROLES.includes(role) ? '' : 'none';
         }
-    }, { passive: true });
+    }
+    drawer.classList.toggle('open');
 }
