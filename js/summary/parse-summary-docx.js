@@ -201,6 +201,71 @@ export async function parseSummaryDocx(buffer) {
 }
 
 /**
+ * Direct-children filter (avoid nested matches from drawings/textboxes).
+ */
+function _directChildren(parent, ns, localName) {
+    const result = [];
+    for (let i = 0; i < parent.childNodes.length; i++) {
+        const child = parent.childNodes[i];
+        if (child.nodeType === 1 && child.localName === localName && child.namespaceURI === ns) {
+            result.push(child);
+        }
+    }
+    return result;
+}
+
+/**
+ * Extract HTML from a single <w:r> run element.
+ * Preserves bold/italic/underline formatting via run properties (<w:rPr>).
+ * Used for text sections (XIV "Інша інформація", section_* commentary).
+ * NOT used for table cells — those use getCellText (numeric data).
+ */
+function extractRunHtml(run, ns) {
+    let text = '';
+    for (const t of _directChildren(run, ns, 't')) text += t.textContent || '';
+    if (!text) return '';
+    let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const rPr = _directChildren(run, ns, 'rPr')[0];
+    if (rPr) {
+        if (_directChildren(rPr, ns, 'b').length) html = `<strong>${html}</strong>`;
+        if (_directChildren(rPr, ns, 'i').length) html = `<em>${html}</em>`;
+        if (_directChildren(rPr, ns, 'u').length) html = `<u>${html}</u>`;
+    }
+    return html;
+}
+
+/**
+ * Extract HTML from a single <w:p> paragraph element.
+ * Joins all direct-child runs through extractRunHtml + applies <w:pPr><w:jc>
+ * alignment. Returns empty string якщо no text content (whitespace-only).
+ */
+function extractParagraphHtml(p, ns) {
+    let html = '';
+    for (const r of _directChildren(p, ns, 'r')) html += extractRunHtml(r, ns);
+    if (!html.trim()) return '';
+    let style = '';
+    const pPr = _directChildren(p, ns, 'pPr')[0];
+    if (pPr) {
+        const jc = _directChildren(pPr, ns, 'jc')[0];
+        if (jc) {
+            const align = jc.getAttributeNS(ns, 'val') || jc.getAttribute('w:val');
+            if (align === 'center') style = ' style="text-align:center"';
+            else if (align === 'right') style = ' style="text-align:right"';
+        }
+    }
+    return `<p${style}>${html}</p>`;
+}
+
+/**
+ * Join collected note content. HTML notes (XIV 'other', section_*) — empty
+ * separator (items already wrapped у <p>). Plain-text notes — '\n' separator.
+ */
+function _joinNoteContent(content, type) {
+    const isRich = type === 'other' || (type && type.startsWith('section_'));
+    return content.join(isRich ? '' : '\n').trim();
+}
+
+/**
  * Extract text content from a table cell, joining all <w:t> elements
  */
 function getCellText(el, ns, joinAll) {
@@ -342,20 +407,21 @@ function extractSectionTexts(doc, ns) {
     let currentSection = null;  // broad section (ОХОРОНА, ЗЕМЕЛЬНІ...)
     let currentSubSection = null;  // specific DB section (forest_protection, raids...)
     let currentText = [];
+    // section_* notes use rich-HTML format (preserve bold/italic/underline)
+    const flushCurrent = () => {
+        const sec = currentSubSection || currentSection;
+        if (!sec || !currentText.length) return;
+        results.push({ section: sec, content: currentText.join('').trim() });
+    };
     for (let i = 0; i < paragraphs.length; i++) {
         const isTable = isInsideTable(paragraphs[i]);
 
         if (isTable) {
             // Save any text collected before this table
             if (currentText.length) {
-                const sec = currentSubSection || currentSection;
-                if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
+                flushCurrent();
                 currentText = [];
             }
-            // Detect which DB section this table belongs to (from first row text)
-            const tTexts = paragraphs[i].getElementsByTagNameNS(ns, 't');
-            let tText = '';
-            for (let j = 0; j < tTexts.length; j++) tText += tTexts[j].textContent || '';
             // We can't reliably detect section from table paragraphs, skip
             continue;
         }
@@ -373,10 +439,7 @@ function extractSectionTexts(doc, ns) {
         }
 
         if (matchedSection) {
-            if (currentText.length) {
-                const sec = currentSubSection || currentSection;
-                if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
-            }
+            if (currentText.length) flushCurrent();
             currentSection = matchedSection;
             currentSubSection = matchedSection;
             currentText = [];
@@ -390,10 +453,7 @@ function extractSectionTexts(doc, ns) {
         }
 
         if (matchedSub) {
-            if (currentText.length) {
-                const sec = currentSubSection || currentSection;
-                if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
-            }
+            if (currentText.length) flushCurrent();
             currentSubSection = matchedSub;
             currentText = [];
             continue;
@@ -401,10 +461,7 @@ function extractSectionTexts(doc, ns) {
 
         // Roman numeral header → new broad section, save and reset
         if (/^[ІIVXХX]{1,5}\.\s/i.test(fullText)) {
-            if (currentText.length) {
-                const sec = currentSubSection || currentSection;
-                if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
-            }
+            if (currentText.length) flushCurrent();
             currentSection = null;
             currentSubSection = null;
             currentText = [];
@@ -414,18 +471,17 @@ function extractSectionTexts(doc, ns) {
         // Skip Block I note patterns
         if (/загальна оцінка|ключові події|позитивна|негативна|ризикова|питання.*рішення|основна динаміка/i.test(fullText)) continue;
 
-        // Collect text
+        // Collect HTML for content (preserves bold/italic/underline)
         if (currentSection) {
-            currentText.push(fullText);
+            const paraHtml = extractParagraphHtml(paragraphs[i], ns);
+            if (paraHtml) currentText.push(paraHtml);
         }
     }
 
-    if (currentText.length) {
-        const sec = currentSubSection || currentSection;
-        if (sec) results.push({ section: sec, content: currentText.join('\n').trim() });
-    }
+    if (currentText.length) flushCurrent();
 
-    return results.filter(r => r.content.length > 15);
+    // Filter out tiny content (heuristic: html tags add overhead so threshold relaxed)
+    return results.filter(r => r.content.replace(/<[^>]+>/g, '').trim().length > 15);
 }
 
 function extractNotes(doc, ns) {
@@ -458,7 +514,7 @@ function extractNotes(doc, ns) {
         if (matchedType) {
             // Save previous note
             if (currentType && currentType !== '_skip' && currentContent.length) {
-                notes.push({ note_type: currentType, content: currentContent.join('\n').trim() });
+                notes.push({ note_type: currentType, content: _joinNoteContent(currentContent, currentType) });
             }
             if (matchedType === '_skip') {
                 // Sub-header like "Основна динаміка показників" — save previous, don't collect
@@ -469,12 +525,17 @@ function extractNotes(doc, ns) {
             currentType = matchedType;
             currentContent = [];
 
-            // For section XIV ('other'), capture full paragraph text (minus the Roman numeral header)
+            // For section XIV ('other'), capture full paragraph HTML (minus the Roman numeral header)
             if (matchedType === 'other') {
-                const cleaned = fullText.replace(/^[ХXІIVX]+\.\s*/i, '').trim();
-                if (cleaned) currentContent.push(cleaned);
+                let paraHtml = extractParagraphHtml(paragraphs[i], ns);
+                // Strip leading Roman numeral pattern (XIV. / XV. / etc.) including any
+                // optional opening tags (e.g. <strong>) that wrap the prefix.
+                paraHtml = paraHtml.replace(/^(<p[^>]*>(?:<[^>]+>)*)\s*([ХXІIVX]+)\.\s*/i, '$1');
+                if (paraHtml && paraHtml.replace(/<[^>]+>/g, '').trim()) {
+                    currentContent.push(paraHtml);
+                }
             } else {
-                // For other notes: capture text after colon if present
+                // For other notes: capture text after colon if present (plain text)
                 const colonIdx = fullText.indexOf(':');
                 if (colonIdx >= 0) {
                     const after = fullText.substring(colonIdx + 1).trim();
@@ -485,12 +546,16 @@ function extractNotes(doc, ns) {
             // Stop collecting when we hit a new Roman numeral section (Latin + Cyrillic)
             if (/^[ІIVXХX]+\.\s/.test(fullText) || /^[ІIVXХX]+\./i.test(fullText)) {
                 if (currentContent.length) {
-                    notes.push({ note_type: currentType, content: currentContent.join('\n').trim() });
+                    notes.push({ note_type: currentType, content: _joinNoteContent(currentContent, currentType) });
                 }
                 currentType = null;
                 currentContent = [];
+            } else if (currentType === 'other') {
+                // XIV ('other'): preserve formatting via HTML extraction
+                const paraHtml = extractParagraphHtml(paragraphs[i], ns);
+                if (paraHtml) currentContent.push(paraHtml);
             } else {
-                // Collect all content including bold paragraphs
+                // Other note types: plain text
                 currentContent.push(fullText);
             }
         }
@@ -498,7 +563,7 @@ function extractNotes(doc, ns) {
 
     // Save last note
     if (currentType && currentContent.length) {
-        notes.push({ note_type: currentType, content: currentContent.join('\n').trim() });
+        notes.push({ note_type: currentType, content: _joinNoteContent(currentContent, currentType) });
     }
 
     return notes;

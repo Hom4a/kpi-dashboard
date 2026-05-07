@@ -567,9 +567,29 @@ function renderWeeklySectionTabs(data, date) {
     initCellAnnotations(container, 'weekly', date);
 }
 
-// Format multi-paragraph text with visual separators
+// Format multi-paragraph text with visual separators.
+// Two paths:
+//   1. Rich HTML (XIV "Інша інформація" + section_* з нового parser) →
+//      DOMPurify sanitize → innerHTML wrapped у .ws-rich-content
+//   2. Legacy plain text → existing line-pattern heuristic
 function formatParagraphs(text) {
     if (!text) return '';
+    // Detect HTML content (parse-summary-docx.js extractParagraphHtml output)
+    if (/<(p|strong|em|u|br|ul|ol|li)\b/i.test(text)) {
+        let clean;
+        if (typeof DOMPurify !== 'undefined') {
+            clean = DOMPurify.sanitize(text, {
+                ALLOWED_TAGS: ['p', 'strong', 'em', 'u', 'br', 'ul', 'ol', 'li', 'a'],
+                ALLOWED_ATTR: ['href', 'style', 'target', 'rel'],
+                FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'style'],
+            });
+        } else {
+            // Fallback: escape all tags (safe but loses formatting)
+            clean = text.replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;');
+        }
+        return `<div class="ws-rich-content">${clean}</div>`;
+    }
+    // Legacy plain-text format (backward compat для existing DB rows)
     return text.split('\n').filter(l => l.trim()).map(line => {
         const t = line.trim();
         // Detect list items: dates, dashes, bullets, numbered items
