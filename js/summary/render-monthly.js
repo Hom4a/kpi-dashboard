@@ -307,9 +307,14 @@ function renderSalaryTable(showYears, year, month, allData) {
     // Ітерація по salary_branches (sort_order з БД) — 20 рядків
     for (const br of branches) {
         const rows = salaryRows.filter(r => r.indicator_code === br.code);
-        // Якщо для гілки нема жодного значення в жодному з видимих років — пропускаємо
-        const anyValue = rows.some(r => r.value_numeric != null && showYears.includes(r.year));
-        if (!anyValue) continue;
+        // Hide branch якщо немає даних за вибраний період (hide-when-empty)
+        const hasCurrentData = rows.some(r =>
+            r.value_numeric != null && r.year === year && (r.month === month || r.month === 0)
+        ) || allData.some(r =>
+            r.indicator_group === 'region_salary' && r.indicator_code === 'region__' + br.code
+            && r.year === year && r.month === month && r.value_numeric != null
+        );
+        if (!hasCurrentData) continue;
 
         let cells = `<td class="ind-name">${br.canonical_name}</td>`;
         for (const y of showYears) {
