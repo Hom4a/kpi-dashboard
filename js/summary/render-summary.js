@@ -9,6 +9,7 @@ import { saveBlockComment, deleteBlockComment } from './db-summary.js';
 import { initCellAnnotations } from './cell-annotations.js';
 import { openWeeklyIndicatorModal, openMonthlyIndicatorModal } from './infographic-modal.js';
 import { renderMonthlyReport } from './render-monthly.js';
+import { renderAttachments } from './weekly-attachments.js';
 
 const MO = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 
@@ -406,6 +407,12 @@ function renderWeeklySectionTabs(data, date) {
                         }
                     }
                 }
+                // XIV ('Інша інформація') gets file attachments. Lazy-rendered (fetch
+                // happens after DOM append). Placeholder id maps до refresh helper у
+                // weekly-attachments.js.
+                if (block.id === 'XIV') {
+                    html += `<div id="wsAttachments_${date}" class="ws-attach-loading">Завантаження вкладень...</div>`;
+                }
             }
         }
 
@@ -451,6 +458,19 @@ function renderWeeklySectionTabs(data, date) {
     }
 
     container.innerHTML = html;
+
+    // Lazy-fill attachments placeholder for XIV block (async fetch after DOM commit)
+    const attachEl = container.querySelector(`#wsAttachments_${date}`);
+    if (attachEl) {
+        const role = currentProfile?.role;
+        const canEdit = role === 'admin' || role === 'editor';
+        renderAttachments(date, canEdit).then(html => {
+            attachEl.outerHTML = `<div id="wsAttachments_${date}">${html}</div>`;
+        }).catch(e => {
+            console.error('Attachments render error:', e);
+            attachEl.innerHTML = '';
+        });
+    }
 
     // Wire collapse toggles
     container.querySelectorAll('.ws-block-header[data-collapse-toggle]').forEach(hdr => {

@@ -8,6 +8,7 @@ import { switchPage, openMobileUpload, initSwipeGestures, toggleMobileMenu } fro
 import { populateFilters, applyFilter, resetFilters, initFilterEvents, setRenderAllCallback as setFilterRenderAll } from './filters.js';
 import { showDrillDown, closeDrillDown, toggleFullscreen, openTargetModal, closeTargetModal, saveTargets, openFormatHelp, closeFormatHelp, openViewerAccess, closeViewerAccess, openDataManage, closeDataManage, setRenderAllCallback as setModalsRenderAll, createUser, toggleAddUserForm, generateNewUserPassword, saveUserRow, resetUserPassword, toggleUserDisabled, toggleUserMfaRequired, resetUserMfaFactor, deleteUserRow, openChangePassword, closeChangePassword, generateMyPassword, submitChangePassword } from './modals.js';
 import { openSecurityModal, closeSecurityModal } from './security.js';
+import { uploadAttachments, downloadAttachment, deleteAttachment } from './summary/weekly-attachments.js';
 import { renderAll } from './render-all.js';
 import { setMainMode, renderTable } from './render-volumes.js';
 import { exportExcel } from './export.js';
@@ -403,6 +404,9 @@ window.generateMyPassword = generateMyPassword;
 window.submitChangePassword = submitChangePassword;
 window.openSecurityModal = openSecurityModal;
 window.closeSecurityModal = closeSecurityModal;
+window.uploadAttachments = uploadAttachments;
+window.downloadAttachment = downloadAttachment;
+window.deleteAttachment = deleteAttachment;
 window.createUser = createUser;
 window.toggleAddUserForm = toggleAddUserForm;
 window.generateNewUserPassword = generateNewUserPassword;

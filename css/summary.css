@@ -43,6 +43,24 @@
 .ws-para-bullet::before { content: '—'; position: absolute; left: 0; color: var(--primary); font-weight: 600; }
 .ws-para-header { font-weight: 600; color: var(--text1); margin-top: 4px; }
 
+/* Weekly attachments (XIV "Інша інформація" file uploads) */
+.ws-attachments { margin-top: 16px; padding: 12px 16px; background: var(--glass); border-radius: 10px; border: 1px solid var(--border); }
+.ws-attach-title { font-size: 14px; color: var(--text2); margin: 0 0 10px; font-weight: 600; }
+.ws-attach-list { display: flex; flex-direction: column; gap: 6px; }
+.ws-attach-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--bg2); }
+.ws-attach-icon { font-size: 18px; flex-shrink: 0; }
+.ws-attach-name { flex: 1; color: var(--primary); text-decoration: none; font-size: 13px; cursor: pointer; word-break: break-all; }
+.ws-attach-name:hover { text-decoration: underline; }
+.ws-attach-size { font-size: 11px; color: var(--text3); white-space: nowrap; flex-shrink: 0; }
+.ws-attach-delete { background: none; border: none; color: var(--rose); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+.ws-attach-delete:hover { background: rgba(255,0,0,0.1); }
+.ws-attach-empty { font-size: 13px; color: var(--text3); font-style: italic; }
+.ws-attach-upload { margin-top: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ws-attach-upload-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--primary); color: white; border-radius: 8px; font-size: 13px; cursor: pointer; transition: opacity 0.15s; }
+.ws-attach-upload-btn:hover { opacity: 0.85; }
+.ws-attach-hint { font-size: 11px; color: var(--text3); }
+.ws-attach-loading { font-size: 12px; color: var(--text3); padding: 10px; font-style: italic; }
+
 /* Rich-text content from Word (XIV "Інша інформація" + section_*) */
 .ws-rich-content p { margin: 0.4em 0; line-height: 1.55; }
 .ws-rich-content p:first-child { margin-top: 0; }
