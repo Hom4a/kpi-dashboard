@@ -1,9 +1,9 @@
 # Project State
 ## ETL Pipeline + Frontend Dashboard for ДП Ліси України
 
-**Last updated:** 2026-05-06
-**Working branch:** feature/admin-panel ahead of master +17 commits (Phase 1.5 manual done + G.3a recon complete)
-**Active epic:** ADMIN_EPIC.md — Phase 2.5 G.1 + G.2 + G.3a (recon) done; G.3b decision lock + implementation pending; Phase 2.6 unblocked (≥2 admins precondition met)
+**Last updated:** 2026-05-07
+**Working branch:** feature/admin-panel ahead of master +21 commits (Phase 2.5 G.3 TOTP MFA implementation complete)
+**Active epic:** ADMIN_EPIC.md — Phase 2.5 G.3 CLOSED; G.4 /profile/security consolidation + Phase 2.6 aal2 RLS lock-down pending
 **Production state:** Reference resolver live end-to-end + 5-period
 archival reference + safety guards on destructive actions + profiles
 RLS hardened (circular subquery tech debt closed) + 5 admin Edge
@@ -354,6 +354,53 @@ admin manually UPDATE profiles SET mfa_required=true для admin role
 ONLY ПІСЛЯ verifying both admins enrolled. Phase 2.6 RLS aal2 lock-down
 з тільки після цього.
 
+### Phase 2.5 G.3 — TOTP MFA implementation (CLOSED 2026-05-07)
+
+Goal: TOTP MFA enrollment, login gate, admin reset.
+
+G.3c-1 (commit e9f10a1): Edge Function reset-mfa-factor. GoTrue
+admin HTTP API approach (GET /factors → DELETE per factor). 172 LOC.
+Mechanism choice: HTTP fetch over .schema('auth') (PGRST_DB_SCHEMAS
+default не exposes auth) і admin.mfa SDK (namespace shape varies
+across patches).
+
+G.3c-2 (commit 7c2ac94): js/security.js — securityModal з TOTP
+enrollment flow (enroll → QR SVG → challenge → verify → aal2).
+185 LOC. ESM import via app.js. Button "🛡 Безпека" у header
+поряд з "🔑 Пароль". QR rendered as inline SVG from GoTrue
+response — no CDN libs.
+
+G.3c-3 (commit 8509083, amended into 136c813): Login flow MFA gate
+у showAppForUser() (auth.js). Two cases:
+- Case A: has TOTP factor + currentLevel='aal1' + nextLevel='aal2' →
+  challenge modal (verify or sign out)
+- Case B: no factor + mfa_required=true → forced enrollment (enroll
+  or sign out)
+Both cases: cancel → signOut. Forced flows hide modal close X.
+Added 100 LOC до security.js: openMFAChallenge + openForcedEnrollment
++ shared _wireVerify helper + VERIFY_INPUT_HTML template constant
+(refactored to stay <350 LOC).
+
+Hotfix amended into 136c813: Promise.race з 3s timeout навколо
+SDK calls + modal awaits. SDK MFA methods хангли на production
+(getAuthenticatorAssuranceLevel або listFactors не resolve'ились).
+Timeout = graceful skip → console.warn + continue normal flow.
+
+G.3c-4 (commit 136c813): 7th button "🔓 Скинути MFA" у user
+management modal (modals.js). callAdminEdgeFunction('reset-mfa-factor',
+{ target_id }) pattern. Confirm dialog → toast feedback з
+factors_deleted count.
+
+Production deploy 2026-05-06: Edge Function via tar pipe (md5 match),
+frontend Vite build (PowerShell з $env:VITE_BASE='/') + tar pipe
+deploy (md5 match). 4 negative smokes pass: OPTIONS preflight,
+POST no auth (401), POST invalid token (401), GET (405).
+
+Known trade-off (G.3c-5 TODO): 3s timeout wraps modal interactions
+too — split into SDK-detection timeout (3s) + infinite modal wait
+needed before real enrollment begins. Acceptable now (0 enrolled
+factors), потребує refinement коли users почнуть enroll'ити.
+
 ## Pending — fresh-mind required
 
 ### Frontend audit (next session)
@@ -415,19 +462,30 @@ ONLY ПІСЛЯ verifying both admins enrolled. Phase 2.6 RLS aal2 lock-down
     - ~~G.3a TOTP enrollment recon~~ (DONE 2026-05-06; SDK greenfield, tables
       ready, 5 login flow integration points у js/auth.js identified;
       ~485 LOC implementation estimate)
-    - **G.3 implementation pending: see G.3a synthesis для 7 design
-      questions** (UI placement, forced enrollment UX, admin reset
-      mechanism, GOTRUE_MFA_* env timing, MAX_ENROLLED_FACTORS,
-      pre-condition, recovery codes) — G.3b decision lock у наступній сесії
-    - G.4: /profile/security page consolidation (post-G.3, single hub
-      для password + MFA + sessions)
+    - ~~G.3 TOTP MFA implementation~~ (DONE 2026-05-07, commits e9f10a1 +
+      7c2ac94 + 8509083 (amended into 136c813); 4 sub-steps —
+      reset-mfa-factor Edge Function + securityModal + login flow gate
+      (timeout-protected) + admin reset-MFA button)
+    - **G.3c-5 NEXT: split MFA gate timeout** (SDK detection 3s + modal
+      infinite) — required before first real TOTP enrollment, бо поточний
+      single 3s race wraps modal interactions теж і timeouts якщо user
+      типує код довше 3 сек
+    - G.4: /profile/security page consolidation (single hub для password
+      change + MFA enroll/disable/reset + sessions info)
     - G.x future hardening: 'logout-all-sessions' button (admin.signOut
       по user_id) для terminating інших active devices після pwd change
     - createUser min 6→8 chars alignment (defer — separate consistency task)
     - Phase 2.6 aal2 RLS lock-down — unblocked (≥2 admins precondition
-      met), gated на all G.3 + G.4 completion
-    - Phase 7 polish: clean up '/forgot password' UI affordance якщо
-      existing — currently misleading бо /recover endpoint fails 500
+      met), gated на G.3c-5 + G.4 completion
+    - Phase 7 polish: enrolled MFA status display у user cards (currently
+      profiles row не has mfa_enrolled column — потребує auth.mfa_factors
+      query); trust device option; viewerAccessModal id rename →
+      userManagementModal; clean up '/forgot password' UI affordance
+    - GOTRUE_MFA env vars: explicit lock-in config (GOTRUE_MFA_ENABLED=true,
+      MAX_ENROLLED_FACTORS=2, RATE_LIMIT_CHALLENGE_AND_VERIFY=15) +
+      safe service recreate. G.3c-1 attempt failed на `no such service:
+      supabase-auth` → docker-compose service name detection blocked
+      sandbox. Defaults у v2.x вже permissive — explicit env optional.
     - Production SMTP setup: окремий operational task поза admin epic.
       Edit .env з real credentials + force-recreate supabase-auth container.
       Required only якщо майбутньому додавати invite emails / magic links /
