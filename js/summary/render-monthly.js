@@ -341,15 +341,20 @@ function renderSalaryTable(showYears, year, month, allData) {
         let cells = `<td class="ind-name">${br.canonical_name}</td>`;
         for (const y of showYears) {
             if (y > year) { cells += '<td>—</td>'; continue; }
-            const monthlyRecs = rows.filter(r => r.year === y && r.month > 0 && r.month <= (y === year ? month : 12) && r.value_numeric != null);
             const isCurrent = y === year;
-            let cellVal = null;
-            if (monthlyRecs.length) {
-                cellVal = monthlyRecs.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecs.length;
-            } else {
-                // Annual fallback (yearly file single snapshot)
-                const annual = rows.find(r => r.year === y && r.month === 0 && r.value_numeric != null);
-                if (annual) cellVal = annual.value_numeric;
+            // Per Тетянине рішення: prefer Excel cross-year cell (annual snapshot,
+            // period_month=0) over computed avg(monthly). Excel cell is bookkeeping-
+            // correct (weighted з per-branch нюансами, які ми не реплікуємо —
+            // DB не містить headcount per branch).
+            const annual = rows.find(r => r.year === y && r.month === 0 && r.value_numeric != null);
+            let cellVal = annual?.value_numeric ?? null;
+            if (cellVal == null) {
+                // Fallback: simple avg of monthly (для current year коли annual
+                // cell у Excel ще не заповнено, або для legacy entities без annual).
+                const monthlyRecs = rows.filter(r => r.year === y && r.month > 0 && r.month <= (y === year ? month : 12) && r.value_numeric != null);
+                if (monthlyRecs.length) {
+                    cellVal = monthlyRecs.reduce((s, r) => s + r.value_numeric, 0) / monthlyRecs.length;
+                }
             }
             if (cellVal != null) {
                 cells += isCurrent ? `<td><b>${fN(cellVal)}</b></td>` : `<td>${fN(cellVal)}</td>`;
