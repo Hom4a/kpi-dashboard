@@ -83,10 +83,34 @@ export function computeYtd(indicator, allData, year, month) {
     }
 
     if (f === 'sum') {
+        // Annual snapshot (Excel cross-year cell) is bookkeeping-authoritative
+        // та не страждає від floating-point drift'у sum-of-monthly. Перевага
+        // annual ТІЛЬКИ при complete view (slider охоплює всі доступні monthly
+        // дані) — для partial view sum зберігає month-slider semantics.
+        //
+        // Cases:
+        //   1. monthly=0 (e.g. 2022 yearly file без monthly breakdown) → annual
+        //   2. closed year cellMonth=12, rows == allRows → annual (no drift)
+        //   3. current year, slider на latest uploaded month (rows==allRows)
+        //      → annual (= Excel YTD-as-of-latest)
+        //   4. current year, slider на ранній місяць (rows < allRows)
+        //      → sum-of-monthly (preserves "slide back" semantics)
         const rows = findMonthlyRecords(code, allData, year, month);
-        if (rows.length) return rows.reduce((s, r) => s + r.value_numeric, 0);
         const ann = findAnnualRecord(code, allData, year);
-        return ann?.value_numeric ?? null;
+        const annualValue = ann?.value_numeric ?? null;
+
+        // Case 1: no monthly data at all
+        if (rows.length === 0) return annualValue;
+
+        // Determine complete vs partial view via second lookup без slider:
+        const allRows = findMonthlyRecords(code, allData, year, 12);
+        const isCompleteView = rows.length === allRows.length;
+
+        // Cases 2-3: complete view + annual exists → annual (bookkeeping-correct)
+        if (isCompleteView && annualValue != null) return annualValue;
+
+        // Case 4: partial view (slider scrolled back) → sum-of-monthly
+        return rows.reduce((s, r) => s + r.value_numeric, 0);
     }
 
     if (f === 'avg') {
