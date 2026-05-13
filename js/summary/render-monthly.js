@@ -14,7 +14,7 @@ import {
 } from './indicators-loader.js';
 import {
     fN, toSlash, isVolPriceText, extractPrice,
-    findMonthRecord, findMonthlyRecords,
+    findMonthRecord, findMonthlyRecords, findAnnualRecord,
     computeYtd, computeVolpriceYtd,
 } from './monthly-compute.js';
 
@@ -169,7 +169,18 @@ function renderIndicatorRow(ind, showYears, year, month, allData) {
 
         if (isText) {
             const last = findMonthlyRecords(ind.code, allData, y, cellMonth).pop();
-            cellContent = last?.value_text || '—';
+            if (last?.value_text) {
+                cellContent = last.value_text;
+            } else if (last?.value_numeric != null) {
+                cellContent = fN(last.value_numeric);
+            } else {
+                const ann = findAnnualRecord(ind.code, allData, y);
+                if (ann?.value_text) {
+                    cellContent = ann.value_text;
+                } else if (ann?.value_numeric != null) {
+                    cellContent = fN(ann.value_numeric);
+                }
+            }
         } else if (isVolPrice) {
             const { volume, avgPrice } = computeVolpriceYtd(ind, allData, y, cellMonth);
             if (volume != null) {
@@ -191,7 +202,18 @@ function renderIndicatorRow(ind, showYears, year, month, allData) {
     let curDisplay = '—', curNum = null;
     if (isText) {
         const monthRec = findMonthRecord(ind.code, allData, year, month);
-        curDisplay = monthRec?.value_text || '—';
+        if (monthRec?.value_text) {
+            curDisplay = monthRec.value_text;
+        } else if (monthRec?.value_numeric != null) {
+            curDisplay = fN(monthRec.value_numeric);
+        } else {
+            const ann = findAnnualRecord(ind.code, allData, year);
+            if (ann?.value_text) {
+                curDisplay = ann.value_text;
+            } else if (ann?.value_numeric != null) {
+                curDisplay = fN(ann.value_numeric);
+            }
+        }
     } else if (isVolPrice) {
         const monthRec = findMonthRecord(ind.code, allData, year, month);
         if (monthRec?.value_text) {
