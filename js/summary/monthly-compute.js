@@ -97,8 +97,14 @@ export function computeYtd(indicator, allData, year, month) {
     }
 
     if (f === 'last') {
-        const rows = findMonthlyRecords(code, allData, year, month);
-        if (rows.length) return rows[rows.length - 1].value_numeric;
+        // Per Тетянине рішення: NO carry-forward для balance-type metrics
+        // (receivables/payables/cash/arrears — всі 10 indicators з
+        // ytd_formula='last' є balance-type у M_FIN + M_TAX). Якщо поточний
+        // період має лише value_text marker ('до DD.MM.YYYY') без numeric —
+        // показати annual snapshot або '—', НЕ карі-forward останнього
+        // ненульового місяця.
+        const cur = findMonthRecord(code, allData, year, month);
+        if (cur?.value_numeric != null) return cur.value_numeric;
         const ann = findAnnualRecord(code, allData, year);
         return ann?.value_numeric ?? null;
     }
