@@ -168,8 +168,8 @@ function computeDerived(indicator, allData, year, month) {
     const f = indicator.derived_formula;
 
     if (f === 'per_employee') {
-        // total_sales × 1_000_000 / avg(headcount)
-        const rev = findMonthlyRecords('total_sales', allData, year, month);
+        // revenue_total_mln × 1_000_000 / avg(headcount)
+        const rev = findMonthlyRecords('revenue_total_mln', allData, year, month);
         const hc  = findMonthlyRecords('headcount', allData, year, month);
         const totalRev = rev.reduce((s, r) => s + r.value_numeric, 0);
         const avgHc = hc.length ? hc.reduce((s, r) => s + r.value_numeric, 0) / hc.length : 0;
@@ -177,12 +177,13 @@ function computeDerived(indicator, allData, year, month) {
     }
 
     if (f === 'avg_wood_price') {
-        // (vol_round × price_round + vol_fw_pv × price_fw_pv + vol_fw_np × price_fw_np)
-        // / (vol_round + vol_fw_pv + vol_fw_np)
+        // (sale_roundwood_km3 × sale_roundwood_price_grn + sale_pv_firewood_km3 × sale_pv_firewood_price_grn
+        //  + sale_np_firewood_km3 × sale_np_firewood_price_grn)
+        // / (sale_roundwood_km3 + sale_pv_firewood_km3 + sale_np_firewood_km3)
         const pairs = [
-            ['vol_round',       'price_round'],
-            ['vol_firewood_pv', 'price_firewood_pv'],
-            ['vol_firewood_np', 'price_firewood_np'],
+            ['sale_roundwood_km3',   'sale_roundwood_price_grn'],
+            ['sale_pv_firewood_km3', 'sale_pv_firewood_price_grn'],
+            ['sale_np_firewood_km3', 'sale_np_firewood_price_grn'],
         ];
         let num = 0, den = 0;
         for (const [volCode, priceCode] of pairs) {
@@ -200,10 +201,10 @@ function computeDerived(indicator, allData, year, month) {
     }
 
     if (f === 'sales_other_residual') {
-        // total_sales - sales_round - sales_processed (YTD)
-        const total = computeYtd(getIndicatorByCode('total_sales'), allData, year, month) || 0;
-        const round = computeYtd(getIndicatorByCode('sales_round'),  allData, year, month) || 0;
-        const proc  = computeYtd(getIndicatorByCode('sales_processed'), allData, year, month) || 0;
+        // revenue_total_mln - revenue_roundwood_mln - revenue_processing_mln (YTD)
+        const total = computeYtd(getIndicatorByCode('revenue_total_mln'), allData, year, month) || 0;
+        const round = computeYtd(getIndicatorByCode('revenue_roundwood_mln'),  allData, year, month) || 0;
+        const proc  = computeYtd(getIndicatorByCode('revenue_processing_mln'), allData, year, month) || 0;
         return total - round - proc;
     }
 
