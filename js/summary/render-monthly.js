@@ -465,12 +465,19 @@ function renderReferenceBlock(allData, year, month) {
     } else {
         // Iterate rows directly (not joined text) to track category-prefix
         // transitions and inject section banners (electricity_* → ЕЛЕКТРОЕНЕРГІЯ:
-        // etc). Headers are presentation-only, not stored у БД.
+        // etc). Headers are presentation-only, not stored у БД. State machine
+        // tracks sectionOpen щоб group header + його bullets у single .ref-section
+        // card (закривається при prefix transition або кінці loop'у).
         let lastPrefix = null;
+        let sectionOpen = false;
         for (const row of refRows) {
             const prefix = row.indicator_name.split('_')[0];
-            if (prefix !== lastPrefix && REFERENCE_SECTION_HEADERS[prefix]) {
-                content += `<div class="ref-section"><div class="ref-title">${REFERENCE_SECTION_HEADERS[prefix]}</div></div>`;
+            if (prefix !== lastPrefix) {
+                if (sectionOpen) { content += '</div>'; sectionOpen = false; }
+                if (REFERENCE_SECTION_HEADERS[prefix]) {
+                    content += `<div class="ref-section"><div class="ref-title">${REFERENCE_SECTION_HEADERS[prefix]}</div>`;
+                    sectionOpen = true;
+                }
             }
             lastPrefix = prefix;
 
@@ -481,6 +488,10 @@ function renderReferenceBlock(allData, year, month) {
                 // Intro paragraphs (subsistence_minimum/min_wage/country_avg_salary)
                 // — long-form description з own wrapper.
                 if (/^прожитковий|^мінімальна|^середня заробітна/i.test(t)) {
+                    // Defensive: close current section before standalone intro
+                    // (intros are first у current REFERENCE_CATEGORY_ORDER, але
+                    // якщо колись переставлять — не зламається).
+                    if (sectionOpen) { content += '</div>'; sectionOpen = false; }
                     content += `<div class="ref-section"><p>${t}</p></div>`;
                 } else if (t.startsWith('-') || t.startsWith('–')) {
                     const hasUp = /⬆|\(\+/.test(t);
@@ -492,6 +503,8 @@ function renderReferenceBlock(allData, year, month) {
                 }
             }
         }
+        // Close last open section (if loop ended inside one)
+        if (sectionOpen) { content += '</div>'; }
     }
 
     return `<div class="monthly-table-block">
