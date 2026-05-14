@@ -194,7 +194,7 @@ export function computeVolpriceYtd(indicator, allData, year, month) {
 
 // ===== Derived formulas =====
 
-function computeDerived(indicator, allData, year, month, singleMonth = false) {
+export function computeDerived(indicator, allData, year, month, singleMonth = false) {
     const f = indicator.derived_formula;
 
     // YTD complete-view annual preference (analog Patch 1 для sum metrics):

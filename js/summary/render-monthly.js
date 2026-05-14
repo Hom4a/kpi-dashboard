@@ -15,7 +15,7 @@ import {
 import {
     fN, toSlash, isVolPriceText, extractPrice,
     findMonthRecord, findMonthlyRecords, findAnnualRecord,
-    computeYtd, computeVolpriceYtd,
+    computeYtd, computeVolpriceYtd, computeDerived,
 } from './monthly-compute.js';
 
 const MO = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
@@ -224,8 +224,11 @@ function renderIndicatorRow(ind, showYears, year, month, allData) {
             curNum = monthRec.value_numeric;
         }
     } else if (ind.ytd_formula === 'derived') {
-        // Derived: compute for just-this-month using single-month range
-        const val = computeYtd(ind, allData, year, month);
+        // Derived current-month: invoke computeDerived directly з singleMonth=true,
+        // щоб отримати власне значення місяця, а не YTD (яке б дублювало значення
+        // year-column для closed-view сценарію). E.g. 'Реалізовано на 1 штатного'
+        // April 2026: was 520 944 (YTD) → 121 699 (April-only).
+        const val = computeDerived(ind, allData, year, month, true);
         if (val != null) { curDisplay = fN(val); curNum = val; }
     } else {
         const monthRec = findMonthRecord(ind.code, allData, year, month);
