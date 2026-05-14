@@ -194,49 +194,106 @@ export function computeVolpriceYtd(indicator, allData, year, month) {
 
 // ===== Derived formulas =====
 
-function computeDerived(indicator, allData, year, month) {
+function computeDerived(indicator, allData, year, month, singleMonth = false) {
     const f = indicator.derived_formula;
 
-    if (f === 'per_employee') {
-        // revenue_total_mln × 1_000_000 / avg(headcount)
-        const rev = findMonthlyRecords('revenue_total_mln', allData, year, month);
-        const hc  = findMonthlyRecords('headcount', allData, year, month);
-        const totalRev = rev.reduce((s, r) => s + r.value_numeric, 0);
-        const avgHc = hc.length ? hc.reduce((s, r) => s + r.value_numeric, 0) / hc.length : 0;
-        return avgHc > 0 ? totalRev * 1_000_000 / avgHc : null;
+    // YTD complete-view annual preference (analog Patch 1 для sum metrics):
+    // closes per_employee 2023-2025 divergence з Excel (Excel weighted formula
+    // vs local simple avg). Preserves slider semantics — для partial view
+    // falls through до local YTD computation. Skip для singleMonth — то
+    // викликається з current-month cell (Patch 3), там потрібен per-formula
+    // обчислений single-month value, не annual snapshot.
+    if (!singleMonth) {
+        const ann = findAnnualRecord(indicator.code, allData, year);
+        if (ann?.value_numeric != null) {
+            const rows = findMonthlyRecords(indicator.code, allData, year, month);
+            const allRows = findMonthlyRecords(indicator.code, allData, year, 12);
+            if (rows.length === 0 || rows.length === allRows.length) {
+                return ann.value_numeric;
+            }
+        }
     }
 
-    if (f === 'avg_wood_price') {
-        // (sale_roundwood_km3 × sale_roundwood_price_grn + sale_pv_firewood_km3 × sale_pv_firewood_price_grn
-        //  + sale_np_firewood_km3 × sale_np_firewood_price_grn)
-        // / (sale_roundwood_km3 + sale_pv_firewood_km3 + sale_np_firewood_km3)
+    let computed = null;
+
+    if (f === 'per_employee') {
+        if (singleMonth) {
+            // Single-month: revenue × 1M / headcount of that specific month.
+            const revRec = findMonthRecord('revenue_total_mln', allData, year, month);
+            const hcRec  = findMonthRecord('headcount', allData, year, month);
+            if (revRec?.value_numeric != null && hcRec?.value_numeric > 0) {
+                computed = revRec.value_numeric * 1_000_000 / hcRec.value_numeric;
+            }
+        } else {
+            // YTD: sum(revenue_total_mln × 1M) / avg(headcount) over [1..month]
+            const rev = findMonthlyRecords('revenue_total_mln', allData, year, month);
+            const hc  = findMonthlyRecords('headcount', allData, year, month);
+            const totalRev = rev.reduce((s, r) => s + r.value_numeric, 0);
+            const avgHc = hc.length ? hc.reduce((s, r) => s + r.value_numeric, 0) / hc.length : 0;
+            if (avgHc > 0) computed = totalRev * 1_000_000 / avgHc;
+        }
+    }
+    else if (f === 'avg_wood_price') {
         const pairs = [
             ['sale_roundwood_km3',   'sale_roundwood_price_grn'],
             ['sale_pv_firewood_km3', 'sale_pv_firewood_price_grn'],
             ['sale_np_firewood_km3', 'sale_np_firewood_price_grn'],
         ];
         let num = 0, den = 0;
-        for (const [volCode, priceCode] of pairs) {
-            const vols   = findMonthlyRecords(volCode, allData, year, month);
-            const prices = findMonthlyRecords(priceCode, allData, year, month);
-            for (const vr of vols) {
-                const pr = prices.find(r => r.month === vr.month);
-                if (pr?.value_numeric != null && vr.value_numeric != null) {
+        if (singleMonth) {
+            // Single-month: Σ(vol_i × price_i) / Σ(vol_i) for that month only.
+            for (const [volCode, priceCode] of pairs) {
+                const vr = findMonthRecord(volCode, allData, year, month);
+                const pr = findMonthRecord(priceCode, allData, year, month);
+                if (pr?.value_numeric != null && vr?.value_numeric != null) {
                     num += vr.value_numeric * pr.value_numeric;
                     den += vr.value_numeric;
                 }
             }
+        } else {
+            // YTD: weighted avg across all months [1..month].
+            for (const [volCode, priceCode] of pairs) {
+                const vols   = findMonthlyRecords(volCode, allData, year, month);
+                const prices = findMonthlyRecords(priceCode, allData, year, month);
+                for (const vr of vols) {
+                    const pr = prices.find(r => r.month === vr.month);
+                    if (pr?.value_numeric != null && vr.value_numeric != null) {
+                        num += vr.value_numeric * pr.value_numeric;
+                        den += vr.value_numeric;
+                    }
+                }
+            }
         }
-        return den > 0 ? num / den : null;
+        if (den > 0) computed = num / den;
+    }
+    else if (f === 'sales_other_residual') {
+        if (singleMonth) {
+            // Single-month: residual = total[m] - roundwood[m] - processing[m]
+            const tot = findMonthRecord('revenue_total_mln',      allData, year, month);
+            const rnd = findMonthRecord('revenue_roundwood_mln',  allData, year, month);
+            const prc = findMonthRecord('revenue_processing_mln', allData, year, month);
+            if (tot?.value_numeric != null) {
+                computed = tot.value_numeric - (rnd?.value_numeric || 0) - (prc?.value_numeric || 0);
+            }
+        } else {
+            // YTD: residual = total_YTD - round_YTD - processing_YTD
+            // (computeYtd 'sum' branch returns annual snapshot for closed years).
+            const totYtd = computeYtd(getIndicatorByCode('revenue_total_mln'),      allData, year, month);
+            const rndYtd = computeYtd(getIndicatorByCode('revenue_roundwood_mln'),  allData, year, month);
+            const prcYtd = computeYtd(getIndicatorByCode('revenue_processing_mln'), allData, year, month);
+            if (totYtd != null) {
+                computed = totYtd - (rndYtd || 0) - (prcYtd || 0);
+            }
+        }
     }
 
-    if (f === 'sales_other_residual') {
-        // revenue_total_mln - revenue_roundwood_mln - revenue_processing_mln (YTD)
-        const total = computeYtd(getIndicatorByCode('revenue_total_mln'), allData, year, month) || 0;
-        const round = computeYtd(getIndicatorByCode('revenue_roundwood_mln'),  allData, year, month) || 0;
-        const proc  = computeYtd(getIndicatorByCode('revenue_processing_mln'), allData, year, month) || 0;
-        return total - round - proc;
-    }
+    if (computed != null) return computed;
 
-    return null;
+    // Annual fallback: when monthly inputs are insufficient to compute (e.g.
+    // partial view, OR top-level annual-first didn't trigger because monthly
+    // count differs from expected), look up the derived metric's own annual
+    // snapshot (period_month=0). Defensive — for закритого view annual вже
+    // спрацював вище; цей блок ловить edge cases.
+    const ann = findAnnualRecord(indicator.code, allData, year);
+    return ann?.value_numeric ?? null;
 }
