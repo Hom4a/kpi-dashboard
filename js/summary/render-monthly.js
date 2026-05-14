@@ -409,6 +409,16 @@ const REFERENCE_CATEGORY_ORDER = [
     'food_bread_rye', 'food_eggs', 'food_pork', 'food_lard',
 ];
 
+// Section banner text — НЕ зберігається у БД (reference_text content per
+// category only). Injected at render via category-prefix mapping. Аналог
+// рожевих highlight'ів у Тетяниній паперовій довідці.
+const REFERENCE_SECTION_HEADERS = {
+    electricity: 'ЕЛЕКТРОЕНЕРГІЯ:',
+    gas:         'ГАЗ:',
+    fuel:        'ПММ (за даними Мінфіну):',
+    food:        'ПРОДУКТИ (за даними Держстату):',
+};
+
 /**
  * Render the «Довідково» block.
  *
@@ -449,28 +459,39 @@ function renderReferenceBlock(allData, year, month) {
         return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
 
-    const refText = refRows.map(r => r.value_text).filter(Boolean).join('\n');
-
     let content = '';
-    if (refText) {
-        const lines = refText.split('\n').filter(l => l.trim());
-        for (const line of lines) {
-            const t = line.trim();
-            if (/^[А-ЯЄЇҐA-Z]{3,}.*:$/.test(t) || /^ПММ:|^ГАЗ:|^ЕЛЕКТРОЕНЕРГІЯ:|^ПРОДУКТИ/i.test(t)) {
-                content += `<div class="ref-section"><div class="ref-title">${t}</div>`;
-            } else if (/^прожитковий|^мінімальна|^середня заробітна/i.test(t)) {
-                content += `<div class="ref-section"><p>${t}</p></div>`;
-            } else if (t.startsWith('-') || t.startsWith('–')) {
-                const hasUp = /⬆|\([\+]/.test(t);
-                const hasDown = /⬇|\(\-/.test(t);
-                const cls = hasUp ? 'ref-delta-up' : hasDown ? 'ref-delta-down' : '';
-                content += `<p class="${cls}">${t}</p>`;
-            } else {
-                content += `<p>${t}</p>`;
+    if (refRows.length === 0) {
+        content = '<p class="reference-empty" style="color:var(--text3);font-size:12px">Немає даних</p>';
+    } else {
+        // Iterate rows directly (not joined text) to track category-prefix
+        // transitions and inject section banners (electricity_* → ЕЛЕКТРОЕНЕРГІЯ:
+        // etc). Headers are presentation-only, not stored у БД.
+        let lastPrefix = null;
+        for (const row of refRows) {
+            const prefix = row.indicator_name.split('_')[0];
+            if (prefix !== lastPrefix && REFERENCE_SECTION_HEADERS[prefix]) {
+                content += `<div class="ref-section"><div class="ref-title">${REFERENCE_SECTION_HEADERS[prefix]}</div></div>`;
+            }
+            lastPrefix = prefix;
+
+            const text = row.value_text || '';
+            const lines = text.split('\n').filter(l => l.trim());
+            for (const line of lines) {
+                const t = line.trim();
+                // Intro paragraphs (subsistence_minimum/min_wage/country_avg_salary)
+                // — long-form description з own wrapper.
+                if (/^прожитковий|^мінімальна|^середня заробітна/i.test(t)) {
+                    content += `<div class="ref-section"><p>${t}</p></div>`;
+                } else if (t.startsWith('-') || t.startsWith('–')) {
+                    const hasUp = /⬆|\(\+/.test(t);
+                    const hasDown = /⬇|\(\-/.test(t);
+                    const cls = hasUp ? 'ref-delta-up' : hasDown ? 'ref-delta-down' : '';
+                    content += `<p class="${cls}">${t}</p>`;
+                } else {
+                    content += `<p>${t}</p>`;
+                }
             }
         }
-    } else {
-        content = '<p class="reference-empty" style="color:var(--text3);font-size:12px">Немає даних</p>';
     }
 
     return `<div class="monthly-table-block">
