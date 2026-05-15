@@ -401,6 +401,37 @@ too — split into SDK-detection timeout (3s) + infinite modal wait
 needed before real enrollment begins. Acceptable now (0 enrolled
 factors), потребує refinement коли users почнуть enroll'ити.
 
+### Sub-sprint 0.A — Data Entry + Builder unblock (CLOSED 2026-05-15)
+
+ROADMAP.md Sprint 0.4 finalized via safer mini-sprint approach. Applied
+additively, без триггерів і RLS rewrites, із per-file backup + smoke.
+
+Applied files:
+- sql/dynamic-data.sql — 3 tables (dataset_types, custom_datasets,
+  form_templates) + 3 indexes + 8 RLS policies + 8 seed dataset_types
+  (kpi/prices/inventory/plan_fact/zsu/staff/work_hours/cash_balance)
+- sql/dashboard-builder.sql — 1 table (dashboard_configs) + 5 RLS
+  policies (view-own/insert/update/delete + admin-full)
+
+Pre-flight:
+- Pre-existence check: 4/4 tables = false (clean slate)
+- Schema-only backup: /tmp/schema-backup-pre-0a-20260515-083640.sql (289 KB)
+
+Apply outputs (verbatim, zero errors):
+- dynamic-data: CREATE TABLE x3, CREATE INDEX x3, ALTER TABLE x3,
+  CREATE POLICY x8, INSERT 0 8
+- dashboard-builder: CREATE TABLE, ALTER TABLE, CREATE POLICY x5
+
+Schema cache reload x2 (NOTIFY pgrst, 'reload schema').
+
+Browser smoke: Введення page завантажується без 'Could not find
+dataset_types' error; 8 system cards + 2 hardcoded summary cards
+видні. Конструктор / Дашборди page loads (empty list initial state).
+Regression: Зведена логіка untouched (constraint preserved).
+
+Refs: ROADMAP.md Sprint 0.4 + reports/sprint0_discovery.md
+Decisions 2 + 4.
+
 ## Pending — fresh-mind required
 
 ### Frontend audit (next session)

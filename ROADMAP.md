@@ -65,11 +65,18 @@ Sprint sizing — кожен ≈ 1 робоча сесія Claude Code з кіл
 
 **Час:** 1 сесія (~2 години)
 **Ціль:** Чистий ground для великих робіт + розблокувати Data Entry page.
+**Статус (2026-05-15):** partial — 0.4 ✅ done | 0.1 deferred | 0.2 / 0.3 / 0.5 TODO
 
-#### 0.1. sql/26 aal2 RLS apply
+#### 0.1. sql/26 aal2 RLS apply — **DEFERRED**
 
-Файл `sql/26-rls-aal2-writes.sql` готовий від Phase 2.6 admin epic. Apply: admin writes на normalized таблицях вимагають `aal2` (MFA verified session). Передумова — ≥2 admin users existing (met per Phase 1.5 closure).
+Файл `sql/26-rls-aal2-writes.sql` згаданий у ADMIN_EPIC.md Phase 2.6 як deliverable, **але насправді не drafted у repo**. Sprint 0 discovery виявив preconditions BLOCKED:
+- ≥2 admins exist ✅ (2: valeriy418 + kaiassistantopenclaw)
+- 0/2 admins мають enrolled+verified MFA factor ❌ — apply premature заблокує усі writes
+- Pre-step: обидва admins enrol MFA через '🛡 Безпека' header button → verify `auth.mfa_factors` ≥2 verified → draft sql/26 + rollback → apply
 
+Refs: [reports/sprint0_discovery.md](./reports/sprint0_discovery.md) Decision 1.
+
+- [ ] _(BLOCKED on MFA enrolment)_ Draft `sql/26-rls-aal2-writes.sql` + `sql/26-rollback.sql`
 - [ ] Backup `sql/backups/pre-sql26-{ts}.sql`
 - [ ] Apply `psql -f sql/26-rls-aal2-writes.sql`
 - [ ] Smoke test: editor user writes still work (no aal2 req); admin write without MFA → 403
@@ -91,18 +98,23 @@ Security TODO ще з минулих сесій (memory: "valeriy418@gmail.com p
 - [ ] If delete: `supabase functions delete <name>` локально + git rm `supabase/functions/<name>/`
 - [ ] If deploy: `supabase functions deploy <name>` + smoke test
 
-#### 0.4. dataset_types investigation (БЛОКЕР для Sprint 2)
+#### 0.4. dataset_types unblock — ✅ **DONE (Sub-sprint 0.A, 2026-05-15)**
 
-Error: `Could not find the table 'public.dataset_types' in the schema cache`. Pre-existing — таблиця не мігрувалася з cloud. Frontend очікує її в `db-dynamic.js`. Без цього data-entry page крашиться при load.
+Discovery виявив: `sql/dynamic-data.sql` + `sql/dashboard-builder.sql` вже existing у repo з матчем 1:1 до frontend usage. Apply additively (clean state preconditions met, 0 existing tables conflict).
 
-**Discovery prompt (read-only):**
-1. Grep frontend код на `dataset_types` + `custom_datasets` — повний use map
-2. Check Cloud Supabase exports / SQL backups — чи є schema definition десь у repo? `sql/` dir scan, `archive/`, інші місця
-3. Якщо schema знайдена в backups → план migration
-4. Якщо ні → propose minimal schema based on code usage (`SELECT`, `INSERT` patterns у frontend)
-5. Decide: (a) create migration від scratch, (b) restore from cloud backup, (c) refactor frontend на graceful degradation якщо table missing
+**Applied:**
 
-**Decision point:** stop after discovery. Decision визначить scope Sprint 2.
+- [x] Schema-only backup `/tmp/schema-backup-pre-0a-20260515-083640.sql` (289 KB)
+- [x] `sql/dynamic-data.sql` — 3 tables (dataset_types, custom_datasets, form_templates) + 3 indexes + 8 RLS policies + 8 seed dataset_types
+- [x] `sql/dashboard-builder.sql` — 1 table (dashboard_configs) + 5 RLS policies
+- [x] PostgREST schema cache reload (×2)
+- [x] Browser smoke: Введення page завантажується без error, 8 system cards visible
+- [x] Browser smoke: Конструктор / Дашборди page loads (empty list, 0 saved)
+- [x] Regression check: Зведена логіка не зачеплена
+
+**Outcome:** Data Entry page повністю unblocked. Конструктор foundation laid. Зведена логіки не торкнуто per Sprint 0 constraint.
+
+Refs: [reports/sprint0_discovery.md](./reports/sprint0_discovery.md) Decisions 2 + 4.
 
 #### 0.5. Merge feature/admin-panel → master
 
@@ -337,12 +349,20 @@ ssh valeriy@10.0.18.16 "sudo rm -rf /var/www/dashboards.e-forest.gov.ua/* && \
 | Дата | Sprint | Рішення | Обґрунтування |
 |---|---|---|---|
 | 2026-05-14 | — | Створити цей роадмап | Користувач явно попросив після audit + 3 cloud-parity напрямки defined |
-| _TBD_ | 0.4 | dataset_types: create/restore/refactor | Залежить від Sprint 0.4 discovery |
+| 2026-05-15 | 0.4 | Applied dynamic-data.sql + dashboard-builder.sql | Safer mini-sprint approach per user preference — additive-only files existing у repo, schema 1:1 матч до frontend usage, clean prod state. Sub-sprint 0.A executed з backup + smoke + reload checkpoints. |
+| _BLOCKED_ | 0.1 | sql/26 aal2 RLS — defer until MFA enrolled | Discovery (sprint0_discovery.md): 0/2 admins з verified MFA factor. Apply premature заблокує усі writes. Bootstrap MFA для valeriy + kaiassistantopenclaw → re-evaluate. |
 | _TBD_ | 1.3 | Audit retention policy | After production usage data |
 
 ---
 
 ## VIII. Status / Last updated
 
-**Updated:** 2026-05-14 by Claude session
+**Updated:** 2026-05-15 by Claude session (Sub-sprint 0.A closure)
 **Next review:** Після Sprint 0 completion або через тиждень — whichever first.
+
+**Sprint 0 progress:**
+- 0.1 sql/26 aal2 — _DEFERRED_ (BLOCKED on MFA enrolment)
+- 0.2 admin password rotation — TODO
+- 0.3 Edge Functions cleanup — TODO
+- 0.4 dataset_types unblock — ✅ DONE (Sub-sprint 0.A, 2026-05-15)
+- 0.5 merge → master — TODO
